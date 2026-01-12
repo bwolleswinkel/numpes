@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Numerical operations on polytopes, ellipsoids, and subspaces"
 readme = "README.md"
-# TODO: Add license
+license = "GPL-3.0"
 # TODO: Add more keywords
 keywords = ["polytope"]
 classifiers = [
