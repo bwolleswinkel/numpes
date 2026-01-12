@@ -35,7 +35,7 @@ A = np.array([[ 0,  1],
               [ 0, -1]])
 b = np.array([1, 1, 1, 0])
 
-poly = pes.poly(A, b)  # Defines a polytope Ax <= b
+poly = pes.poly(A, b)  # Defines a polytope A x <= b
 
 poly.plot(show=True)
 ```
