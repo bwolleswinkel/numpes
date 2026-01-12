@@ -33,10 +33,28 @@ templates_path = ['_templates']
 html_theme = 'sphinx_immaterial'
 
 html_theme_options = {
-    "palette": {
-        "primary": "orange",
-        "accent": "orange"
-    },
+    "palette": [
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "primary": "orange",
+            "accent": "orange",
+            "toggle": {
+                "icon": "material/brightness-7",
+                "name": "Switch to dark mode"
+            }
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "primary": "orange",
+            "accent": "orange",
+            "toggle": {
+                "icon": "material/brightness-4",
+                "name": "Switch to light mode"
+            }
+        }
+    ],
     "color": {
         "primary": "#FFA500"
     }
