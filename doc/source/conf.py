@@ -6,8 +6,8 @@ project = 'numpes'
 copyright = '2026, Bart Wolleswinkel'
 author = 'Bart Wolleswinkel'
 
-release = '0.1.27'
-version = '0.1.27'
+release = '0.1.0'
+version = '0.1.0'
 
 # -- General configuration
 
