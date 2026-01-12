@@ -1,0 +1,24 @@
+[project]
+name = "numpes"
+dynamic = ["version"]
+dependencies = [
+  "numpy",
+]
+requires-python = ">=3.14"
+authors = [
+  {name = "Bart Wolleswinkel", email = "b.wolleswinkel@tudelft.nl"}
+]
+description = "Numerical operations on polytopes, ellipsoids, and subspaces"
+readme = "README.md"
+keywords = ["polytope"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python"
+]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
