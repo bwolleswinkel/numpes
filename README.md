@@ -9,7 +9,7 @@ NumPES is a controls-oriented Python package for performings numerical operation
 
 The easiest way to instal NumPES is by running
 
-``` py
+``` zsh
 pip install numpes
 ```
 
