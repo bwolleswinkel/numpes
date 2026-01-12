@@ -32,5 +32,15 @@ templates_path = ['_templates']
 
 html_theme = 'sphinx_immaterial'
 
+html_theme_options = {
+    "palette": {
+        "primary": "orange",
+        "accent": "orange"
+    },
+    "color": {
+        "primary": "#FFA500"
+    }
+}
+
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
