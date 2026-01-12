@@ -9,13 +9,13 @@ NumPES is a controls-oriented Python package for performings numerical operation
 
 The easiest way to instal NumPES is by running
 
-```
+``` py
 pip install numpes
 ```
 
 in your terminal or dedicated virtual environment. Then, import NumPES using
 
-```
+``` py
 import numpes as pes
 ```
 
@@ -25,7 +25,7 @@ at the top of your script to make its functionalities available.
 
 NumPES allows you to construct polytope, ellipsoid, and subspace objects and manipulate these. For example, start by initializing a polytope represented by its half-space representation (H-representation).
 
-```
+``` py
 import numpy as np
 import numpes as pes
 
