@@ -2,7 +2,7 @@
 
 # -- Project information
 
-project = 'numpes'
+project = 'NumPES'
 copyright = '2026, Bart Wolleswinkel'
 author = 'Bart Wolleswinkel'
 
