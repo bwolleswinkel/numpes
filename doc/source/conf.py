@@ -56,7 +56,7 @@ html_theme_options = {
         }
     ],
     "color": {
-        "primary": "#FFA500"
+        "primary": "#FFA900"
     }
 }
 
