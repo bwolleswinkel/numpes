@@ -1,4 +1,5 @@
 .vscode/
+.tox/
 __pycache__/
 
 scratchpad.py

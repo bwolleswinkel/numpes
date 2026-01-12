@@ -24,3 +24,28 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "vcs"
+
+[tool.tox]
+env_list = ["3.14"]
+
+[tool.tox.env_run_base]
+description = "Run tests"
+deps = ["pytest", "pytest-cov"]
+commands = [["pytest", "--cov=src/numpes", "--cov-report=term-missing", "--no-cov-on-fail"]]
+package = "editable"
+set_env.COVERAGE_FILE = "{temp_dir}/.coverage"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+skip_covered = false
+skip_empty = true
+show_missing = true
