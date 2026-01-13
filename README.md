@@ -1,7 +1,7 @@
 # NumPES
 
-[![PyPI version](https://img.shields.io/pypi/v/numpes)](https://pypi.org/project/numpes/)
-[![Documentation](https://img.shields.io/badge/Docs-Read%20the%20Docs-orange)](numpes.readthedocs.io/en/latest/)
+[![PyPI version](https://img.shields.io/pypi/v/numpes-blue)](https://pypi.org/project/numpes/)
+[![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-orange)](https://numpes.readthedocs.io)
 ![Tests](https://github.com/bwolleswinkel/numpes/actions/workflows/run-package-tests.yml/badge.svg)
 
 NumPES is a controls-oriented Python package for performings numerical operations on polytopes, ellipsoids, and subspaces. Its classes are implemented as emulating numeric types, enabling a breadth of operations to be performed and evaluated. A modern scientific computing package implemented in Python, using C/C++ as a backend for efficient computation. 
