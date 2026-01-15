@@ -30,6 +30,7 @@ templates_path = ['_templates']
 
 # -- Options for HTML output
 
+# TODO: Maybe change the theme to Furo 
 html_theme = 'sphinx_immaterial'
 
 html_theme_options = {

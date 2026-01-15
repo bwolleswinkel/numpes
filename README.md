@@ -1,5 +1,6 @@
 # NumPES
 
+<!-- TODO: Maybe add a 'coverage' badge -->
 [![PyPI version](https://img.shields.io/pypi/v/numpes?color=blue)](https://pypi.org/project/numpes/)
 [![Documentation](https://img.shields.io/badge/docs-Read%20the%20Docs-orange)](https://numpes.readthedocs.io)
 ![Tests](https://github.com/bwolleswinkel/numpes/actions/workflows/run-package-tests.yml/badge.svg)
