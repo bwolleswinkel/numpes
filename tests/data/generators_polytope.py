@@ -1,0 +1,1 @@
+"""Script containing generators for several known polytopes used in tests"""

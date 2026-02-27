@@ -1,0 +1,1 @@
+"""Script containing archetypes for polytopes used in tests"""
