@@ -1,0 +1,1 @@
+"""Script containing fixtures used in testing, such as resetting globals and constructing test classes from archetypes and generators"""
