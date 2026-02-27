@@ -23,8 +23,8 @@ Use the built-in `help` function to view a function's docstring:
 >>> help(pes.poly)
 ... # doctest: +SKIP
 
-Available sub-packages
-----------------------
+Sub-packages
+------------
 control
     Provides several algorithms from control theory
 
