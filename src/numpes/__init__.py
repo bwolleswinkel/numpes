@@ -28,6 +28,15 @@ Sub-packages
 control
     Provides several algorithms from control theory
 
+Modules
+-------
+polytope
+    Provides the Polytope and Zonotope class for representing convex polytopes and zonotopes, respectively, and related functions
+ellipsoid
+    Provides the Ellipsoid class for representing ellipsoids, and related functions
+subspace
+    Provides the Subspace class for representing linear subspaces, and related functions
+
 Utilities
 ---------
 __version__
