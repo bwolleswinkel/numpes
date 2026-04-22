@@ -3,6 +3,8 @@ name = "numpes"
 dynamic = ["version"]
 dependencies = [
   "numpy",
+  "scipy",
+  "pycddlib"
 ]
 requires-python = ">=3.14"
 authors = [
@@ -18,6 +20,31 @@ classifiers = [
   "Programming Language :: Python"
 ]
 
+[project.optional-dependencies]
+extra = [
+  "numpes",
+  "matplotlib",
+  "cvxpy",
+  "pulp",
+]
+
+[dependency-groups]
+tests = [
+  "numpes[extra]",
+  "tox",
+  "pytest",
+  "hypothesis",
+]
+dev = [
+  "numpes[extra]",
+  "mypy",
+  "scipy-stubs",
+  "types-matplotlib",
+  "isort",
+  "pylint",
+  "ruff",
+]
+
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
@@ -26,26 +53,66 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.tox]
-env_list = ["3.14"]
+env_list = ["py314"]
 
-[tool.tox.env_run_base]
-description = "Run tests"
-deps = ["pytest", "pytest-cov"]
-commands = [["pytest", "--cov=src/numpes", "--cov-report=term-missing", "--no-cov-on-fail"]]
-package = "editable"
-set_env.COVERAGE_FILE = "{temp_dir}/.coverage"
+[tool.tox.env."py314"]
+description = "Run all tests with extra dependencies"
+deps = [
+  "pytest",
+  "pytest-cov",
+  "hypothesis",
+]
+extras = ["extra"]
+commands = [
+  [
+    "pytest",
+    "--cov=numpes",
+    "--cov-report=term-missing",
+    "--cov-report=",
+    "--no-cov-on-fail",
+    "-rs",
+    "tests",
+  ]
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "--import-mode=importlib --strict-markers"
+testpaths = ["tests"]
+markers = [
+  # Function-based markers
+  "enum_verts: tests for vertex enumeration functionality",
+  "enum_facets: tests for facet enumeration functionality", 
+  "display: tests for plotting and display functionality",
+  # Module-based markers
+  "utils: tests for the utils subpackage",
+  # Test type-based markers
+  "unit: unit tests"
+]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["numpes"]
 branch = true
+data_file = "/tmp/.coverage"
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
+  "pragma: no cover",
+  "def __repr__",
+  "raise AssertionError",
+  "raise NotImplementedError",
 ]
 skip_covered = false
 skip_empty = true
 show_missing = true
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.messages_control]
+disable = [
+  "too-many-locals",  # R0914
+  "too-many-arguments",  # R0913
+  "too-many-positional-arguments",  # R0917
+  "too-many-instance-attributes",  #R0902
+]

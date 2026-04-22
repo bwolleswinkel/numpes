@@ -1,0 +1,1 @@
+"""Module containing the ConvexRegion class, which represents convex regions in a vector space (more specifically, Euclidean space) and provides methods for checking if points are contained within the region"""
