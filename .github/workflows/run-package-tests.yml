@@ -33,17 +33,5 @@ jobs:
                 python -m pip install --upgrade pip
                 python -m pip install tox tox-gh-actions
 
-            - name: Debug checkout
-              run: |
-                git rev-parse HEAD
-                git status --short
-                git log -1 --oneline
-                if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-                  git diff --stat HEAD^..HEAD
-                else
-                  echo 'No parent commit available for diff; checkout may be shallow.'
-                fi
-                git grep -n "test_enum_verts_nondegen_2d" -- tests/numpes/utils/test_spatial.py || true
-
             - name: Tests with tox
-              run: python -m tox -e py314 -- -vv
+              run: tox -e py314
