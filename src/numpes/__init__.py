@@ -9,7 +9,9 @@ Provides
 
 How to use the documentation
 ----------------------------
-Documentation is available in two forms: docstrings provided with the code, and a `Read the Docs<https://numpes.readthedocs.io/en/latest/>`_ hosted version with more elaborate explanations and examples.
+Documentation is available in two forms: docstrings provided with the code, 
+and a `Read the Docs<https://numpes.readthedocs.io/en/latest/>`_ hosted version with 
+more elaborate explanations and examples.
 
 The docstring examples assume that `numpes` has been imported as `pes`:
 >>> import numpes as pes
@@ -21,17 +23,19 @@ True
 
 Use the built-in `help` function to view a function's docstring:
 >>> help(pes.poly)
-... # doctest: +SKIP
 
 Sub-packages
 ------------
 control
     Provides several algorithms from control theory
+utils
+    Provides utility functions from linear algebra, polyhedral computations, and more
 
 Modules
 -------
 polytope
-    Provides the Polytope and Zonotope class for representing convex polytopes and zonotopes, respectively, and related functions
+    Provides the Polytope and Zonotope class for representing 
+    convex polytopes and zonotopes, respectively, and related functions
 ellipsoid
     Provides the Ellipsoid class for representing ellipsoids, and related functions
 subspace
@@ -44,10 +48,15 @@ __version__
 
 """
 
-from .polytope import *
+from importlib.metadata import PackageNotFoundError
 
-# FIXME: This does not seem to be working properly for version numbering
-try: 
-    from ._version import version as __version__
-except ImportError:
-    __version__: str = "unknown"
+from . import control, utils
+from ._config import algo_options, get_config, reset_config, set_algo_options
+from .exceptions import ConversionError, InvalidCombinationOfArguments, InvalidRepresentation, NumpesException
+from .polytope import Polytope
+
+try:
+    from importlib.metadata import version
+    __version__: str = version('numpes')
+except (ImportError, PackageNotFoundError) as _:
+    __version__ = "unknown"
