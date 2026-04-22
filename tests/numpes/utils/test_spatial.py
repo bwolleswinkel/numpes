@@ -49,7 +49,7 @@ def test_enum_verts_parameterize_inconsistent_dimensions_value_error(Ab: NDArray
 
 @pytest.mark.enum_verts
 @pytest.mark.parametrize('Ab, expected_verts', [
-    (np.array([[ 1,  0, 1],
+    (np.array([[ np.inf,  0, 1],  # FIXME: `np.inf => 1`
                [ 0,  1, 1],
                [-1,  0, 0],
                [ 0, -1, 0]]),
