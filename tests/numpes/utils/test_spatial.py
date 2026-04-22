@@ -782,6 +782,21 @@ def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar:
         f"Expected signed angle between {v_1} and {v_2} to be 0 degrees (parallel), but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees"
     
 
+@given(vector_2d_or_3d_pair=integers(
+        min_value=2, max_value=3).flatmap(lambda n: tuples(
+    arrays(float, (n,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)), 
+    arrays(float, (n,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))), 
+    scalar_1=floats(ATOL, 100, allow_infinity=False, allow_nan=False),
+    scalar_2=floats(ATOL, 100, allow_infinity=False, allow_nan=False),
+)
+def test_signed_angle_random_2d_or_3d_scale_invariance(vector_2d_or_3d_pair: tuple[NDArray, NDArray], scalar_1: float, scalar_2: float):
+    v_1, v_2 = vector_2d_or_3d_pair
+    v_1_scaled, v_2_scaled = scalar_1 * v_1, scalar_2 * v_2
+    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assert pes.utils.signed_angle(v_1, v_2) == approx(pes.utils.signed_angle(v_1_scaled, v_2_scaled), atol=1E-6), \
+        f"Given v_1={v_1}, v_2={v_2}, v_1_scaled={v_1_scaled}, v_2_scaled={v_2_scaled}, expected signed angle between them to be invariant under positive scaling, but got angle={rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and angle_scaled={rad2deg(pes.utils.signed_angle(v_1_scaled, v_2_scaled))} degrees respectively"
+    
+
 @given(vector_2d_or_3d=integers(
         min_value=2, max_value=3).flatmap(lambda n: arrays(float, (n,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False))), scalar=floats(-100, 0, allow_infinity=False, allow_nan=False)
 )
