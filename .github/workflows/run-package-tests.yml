@@ -34,4 +34,4 @@ jobs:
                 python -m pip install tox tox-gh-actions
 
             - name: Tests with tox
-              run: tox
+              run: tox -- -vv
