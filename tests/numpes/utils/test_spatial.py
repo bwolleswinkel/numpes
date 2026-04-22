@@ -54,7 +54,7 @@ def test_enum_verts_parameterize_inconsistent_dimensions_value_error(Ab: NDArray
                [-1,  0, 0],
                [ 0, -1, 0]]),
      np.array([[0, 0],
-               [9, 0],  # FIXME: `9 => 1`
+               [1, 0],
                [0, 1],
                [1, 1]])),
     (np.array([[ 1,  1,  2  ],
