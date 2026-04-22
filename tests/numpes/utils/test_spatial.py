@@ -792,7 +792,7 @@ def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar:
 def test_signed_angle_random_2d_or_3d_scale_invariance(vector_2d_or_3d_pair: tuple[NDArray, NDArray], scalar_1: float, scalar_2: float):
     v_1, v_2 = vector_2d_or_3d_pair
     v_1_scaled, v_2_scaled = scalar_1 * v_1, scalar_2 * v_2
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assume(not v_1 == approx(0) and not v_2 == approx(0) and not v_1_scaled == approx(0) and not v_2_scaled == approx(0))  # Skip cases where any vector is zero
     assert pes.utils.signed_angle(v_1, v_2) == approx(pes.utils.signed_angle(v_1_scaled, v_2_scaled), atol=1E-6), \
         f"Given v_1={v_1}, v_2={v_2}, v_1_scaled={v_1_scaled}, v_2_scaled={v_2_scaled}, expected signed angle between them to be invariant under positive scaling, but got angle={rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and angle_scaled={rad2deg(pes.utils.signed_angle(v_1_scaled, v_2_scaled))} degrees respectively"
     
