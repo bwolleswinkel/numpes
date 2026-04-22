@@ -726,7 +726,7 @@ def test_signed_angle_random_nd_not_2d_or_3d_value_error(vector_nd_pair: tuple[N
 ))
 def test_signed_angle_random_2d_in_range(vector_2d_pair: tuple[NDArray, NDArray]):
     v_1, v_2 = vector_2d_pair
-    assume(not v_1 == approx(0) and not v_2 == approx(0))
+    assume(v_1 != approx(0) and v_2 != approx(0))
     assert -180 <= rad2deg(pes.utils.signed_angle(v_1, v_2)) <= 180, \
         f"Expected signed angle between {v_1} and {v_2} to be between -180 and 180 degrees, but got {np.degrees(pes.utils.signed_angle(v_1, v_2))} degrees"
 
@@ -737,8 +737,8 @@ def test_signed_angle_random_2d_in_range(vector_2d_pair: tuple[NDArray, NDArray]
 ))
 def test_signed_angle_random_2d_commutative(vector_2d_pair: tuple[NDArray, NDArray]):
     v_1, v_2 = vector_2d_pair
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where one of the vectors is zero
-    assume(not np.linalg.matrix_rank(np.column_stack([v_1, v_2])) < 2)  # Skip cases where the vectors are (anti)parallel
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
+    assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
     assert pes.utils.signed_angle(v_1, v_2) == approx(-pes.utils.signed_angle(v_2, v_1)), \
         f"Expected signed angle between {v_1} and {v_2} to be the negative of the signed angle between {v_2} and {v_1}, but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and {rad2deg(pes.utils.signed_angle(v_2, v_1))} degrees respectively"
 
@@ -777,7 +777,7 @@ def test_signed_angle_parametrize_attribute_error(v_1: NDArray, v_2: NDArray, lo
 def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar: float):
     v_1 = vector_2d_or_3d
     v_2 = scalar * v_1
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where any vector is zero
     assert pes.utils.signed_angle(v_1, v_2) == approx(0, atol=1E-6), \
         f"Expected signed angle between {v_1} and {v_2} to be 0 degrees (parallel), but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees"
     
@@ -792,10 +792,10 @@ def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar:
 def test_signed_angle_random_2d_or_3d_scale_invariance(vector_2d_or_3d_pair: tuple[NDArray, NDArray], scalar_1: float, scalar_2: float):
     v_1, v_2 = vector_2d_or_3d_pair
     v_1_scaled, v_2_scaled = scalar_1 * v_1, scalar_2 * v_2
-    assume(not v_1 == approx(0) and
-           not v_2 == approx(0) and
-           not v_1_scaled == approx(0) and
-           not v_2_scaled == approx(0))  # Skip cases where any vector is zero
+    assume(v_1 != approx(0) and
+           v_2 != approx(0) and
+           v_1_scaled != approx(0) and
+           v_2_scaled != approx(0))  # Skip cases where any vector is zero
     assert pes.utils.signed_angle(v_1, v_2) == approx(pes.utils.signed_angle(v_1_scaled, v_2_scaled), atol=1E-6), \
         f"Given v_1={v_1}, v_2={v_2}, v_1_scaled={v_1_scaled}, v_2_scaled={v_2_scaled}, expected signed angle between them to be invariant under positive scaling, but got angle={rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and angle_scaled={rad2deg(pes.utils.signed_angle(v_1_scaled, v_2_scaled))} degrees respectively"
     
@@ -806,7 +806,7 @@ def test_signed_angle_random_2d_or_3d_scale_invariance(vector_2d_or_3d_pair: tup
 def test_signed_angle_random_2d_or_3d_antiparallel(vector_2d_or_3d: NDArray, scalar: float):
     v_1 = vector_2d_or_3d
     v_2 = scalar * v_1
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where any vector is zero
     assert abs(pes.utils.signed_angle(v_1, v_2)) == approx(deg2rad(180)), \
         f"Expected signed angle between {v_1} and {v_2} to be ±180 degrees (antiparallel), but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees"
 
@@ -818,10 +818,10 @@ def test_signed_angle_random_2d_or_3d_antiparallel(vector_2d_or_3d: NDArray, sca
 def test_signed_angle_random_3d_cross_product_perpendicular(vector_3d_pair):
     v_1, v_2 = vector_3d_pair
     cross_product = np.cross(v_1, v_2)
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where one of the vectors is zero
-    assume(not np.linalg.matrix_rank(np.column_stack([v_1, v_2])) < 2)  # Skip cases where the vectors are (anti)parallel
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
+    assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
     # FIXME: I should be able to remove the line below, but sometimes hypothesis suddenly generates a numerically ill-conditioned counterexample.
-    assume(not np.linalg.norm(cross_product) == approx(0))  # Skip cases where cross product is numerically zero
+    assume(np.linalg.norm(cross_product) != approx(0))  # Skip cases where cross product is numerically zero
     assert abs(pes.utils.signed_angle(v_1, cross_product)) == approx(deg2rad(90)), \
         f"Expected signed angle between {v_1} and {cross_product} to be ±90 degrees when one is the cross product of the other, but got {rad2deg(pes.utils.signed_angle(v_1, cross_product))} degrees"
 
@@ -831,7 +831,7 @@ def test_signed_angle_random_3d_cross_product_perpendicular(vector_3d_pair):
 )
 def test_signed_angle_random_2d_or_3d_identical_inputs(vector_2d_or_3d):
     v = vector_2d_or_3d
-    assume(not v == approx(0))  # Skip cases where the vector is numerically zero
+    assume(v != approx(0))  # Skip cases where the vector is numerically zero
     assert pes.utils.signed_angle(v, v) == approx(0, atol=1E-6), f"The angle between a vector and itself should be zero, received {rad2deg(pes.utils.signed_angle(v, v))}"
 
 
