@@ -91,7 +91,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["numpes"]
 branch = true
 data_file = "/tmp/.coverage"
 

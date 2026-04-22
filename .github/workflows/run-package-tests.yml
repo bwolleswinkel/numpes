@@ -33,5 +33,13 @@ jobs:
                 python -m pip install --upgrade pip
                 python -m pip install tox tox-gh-actions
 
+            - name: Debug checkout
+              run: |
+                git rev-parse HEAD
+                git status --short
+                git log -1 --oneline
+                git diff --stat HEAD^..HEAD
+                git grep -n "test_enum_verts_nondegen_2d" -- tests/numpes/utils/test_spatial.py || true
+
             - name: Tests with tox
-              run: tox
+              run: python -m tox -e py314 -- -vv
