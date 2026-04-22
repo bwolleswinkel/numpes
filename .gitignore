@@ -1,5 +1,10 @@
 .vscode/
 .tox/
 __pycache__/
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
-scratchpad.py
+scratchpad*.py
+unused/
