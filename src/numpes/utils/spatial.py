@@ -209,11 +209,16 @@ def conv(verts: NDArray) -> NDArray:
     # Special case: zero or one point
     if verts.shape[0] <= 1:
         return verts
-    centered = verts - np.mean(verts, axis=0)
+
+    # Zero tiny values for robustness
+    verts_clean = np.array(verts, dtype=np.float64, copy=True)
+    verts_clean[np.abs(verts_clean) < CFG.atol] = 0.0
+
+    centered = verts_clean - np.mean(verts_clean, axis=0)
     rank = np.linalg.matrix_rank(centered, tol=CFG.atol)
     if rank == 0:
-        return verts[0:1, :]  # To maintain 2D shape
-    if rank < verts.shape[1]:
+        return verts[0:1, :]  # To maintain 2D shape, use original
+    if rank < verts_clean.shape[1]:
         # Points lie on a lower-dimensional manifold - project to intrinsic dimension
         _, _, Vh = np.linalg.svd(centered, full_matrices=False)
         coords_proj = centered @ Vh[:rank, :].T  # Project to rank-dimensional subspace
@@ -234,11 +239,11 @@ def conv(verts: NDArray) -> NDArray:
             extremes.extend([idx_min, idx_max])
         return verts[np.unique(extremes)]
     # 1D case
-    if verts.shape[1] == 1:
+    if verts_clean.shape[1] == 1:
         # For 1D case, find min and max points
-        idx_min, idx_max = np.argmin(verts[:, 0]), np.argmax(verts[:, 0])
+        idx_min, idx_max = np.argmin(verts_clean[:, 0]), np.argmax(verts_clean[:, 0])
         return verts[np.unique([idx_min, idx_max])]
-    hull = sp.spatial.ConvexHull(verts)  # pylint: disable=no-member
+    hull = sp.spatial.ConvexHull(verts_clean)  # pylint: disable=no-member
     return verts[hull.vertices]
 
 
@@ -283,18 +288,25 @@ def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> 
     dot_prod = np.clip(np.dot(v_1_norm, v_2_norm), -1.0, 1.0)
     angle = np.arccos(dot_prod)
 
+    # Robust sign computation
     if v_1.size == 2:
-        sign = np.sign(v_1_norm[0] * v_2_norm[1] - v_1_norm[1] * v_2_norm[0])
+        sign_val = v_1_norm[0] * v_2_norm[1] - v_1_norm[1] * v_2_norm[0]
+        sign = np.sign(sign_val)
         # If look is provided in 2D, check if it points in negative z direction
         if look is not None and look.size >= 3 and look[2] < 0:
             sign = -sign
+        # If sign is zero due to collinearity, always return +|angle|
+        if np.isclose(sign_val, 0, atol=CFG.atol, rtol=CFG.rtol):
+            sign = 1
     else:
         if look is None:
             look = np.array([0.0, 0.0, 1.0])
         cross_prod = np.cross(v_1_norm, v_2_norm)
-        sign = np.sign(np.dot(cross_prod, look / np.linalg.norm(look)))
-
-    if sign == 0:
-        sign = 1
+        cross_dot = np.dot(cross_prod, look / np.linalg.norm(look))
+        # If cross product is nearly zero, treat as collinear and force sign=1
+        if np.isclose(cross_dot, 0, atol=CFG.atol, rtol=CFG.rtol):
+            sign = 1
+        else:
+            sign = np.sign(cross_dot)
 
     return float(sign * angle)

@@ -12,7 +12,7 @@ from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import floats, integers, tuples
 
 import numpes as pes
-from tests.conftest import ATOL, N_MAX
+from tests.conftest import RTOL, ATOL, N_MAX
 from tests.helpers import approx, deg2rad, normalize, rad2deg, lsort
 
 if TYPE_CHECKING:
@@ -545,6 +545,24 @@ class TestConv:
     def test_parameterize_3d_degen_redundant_plane(self, verts: NDArray, expected_verts: NDArray) -> None:
         assert lsort(pes.utils.conv(verts)) == approx(lsort(expected_verts)), \
             f"Expected convex hull of\n{verts}\nto be equal to\n{pes.utils.conv(verts)}\n(same rows, order does not matter)"
+        
+    @pytest.mark.parametrize('verts, expected_verts', [
+        (np.array([[0., 1., 0., 0., 0.],
+                   [0., 0., 0., 1., 0.],
+                   [0., 0., 1., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 1.]]),  # Failing test case from hypothesis, with 1E-103 replaced by 0
+         np.array([[0., 1., 0., 0., 0.],
+                   [0., 0., 0., 1., 0.],
+                   [0., 0., 1., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 1.]])),
+    ])
+    def test_parameterize_nd_degen_(self, verts: NDArray, expected_verts: NDArray) -> None:
+        assert lsort(pes.utils.conv(verts)) == approx(lsort(expected_verts)), \
+            f"Given\n{verts}\nexpected convex hull \n{pes.utils.conv(verts)}\nto be equal to\n{expected_verts}\n(same rows, order does not matter)"
     
     def test_parameterize_3d_degen_line(self) -> None:
         ...
@@ -659,7 +677,6 @@ class TestConv:
     # E   )
 
     # scipy/spatial/_qhull.pyx:356: QhullError
-    @pytest.mark.skip(reason="For some reason, this test is now failing. We need to find why. See error message in comment above")
     @given(verts=integers(min_value=1, max_value=N_MAX).flatmap(
         lambda n: integers(min_value=1, max_value=n + 10).flatmap(
             lambda k: arrays(float, (k, n), elements=floats(-100, 100, allow_infinity=False, allow_nan=False))
@@ -739,8 +756,10 @@ def test_signed_angle_random_2d_commutative(vector_2d_pair: tuple[NDArray, NDArr
     v_1, v_2 = vector_2d_pair
     assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
     assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
-    assert pes.utils.signed_angle(v_1, v_2) == approx(-pes.utils.signed_angle(v_2, v_1)), \
-        f"Expected signed angle between {v_1} and {v_2} to be the negative of the signed angle between {v_2} and {v_1}, but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and {rad2deg(pes.utils.signed_angle(v_2, v_1))} degrees respectively"
+    angle = pes.utils.signed_angle(v_1, v_2)
+    assume(np.abs(angle) != deg2rad(180))  # Skip cases where the angle is close to ±180 (sign is ambiguous for collinear vectors)
+    assert angle == approx(-pes.utils.signed_angle(v_2, v_1)), \
+        f"Expected signed angle between {v_1} and {v_2} to be the negative of the signed angle between {v_2} and {v_1}, but got {rad2deg(angle)} degrees and {rad2deg(pes.utils.signed_angle(v_2, v_1))} degrees respectively"
 
 
 @pytest.mark.parametrize('v_1, v_2, look', [
