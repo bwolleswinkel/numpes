@@ -13,16 +13,23 @@ signed_angle
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy as sp
-import cdd
+
+try:
+    import cdd
+    CDD_INSTALLED: bool = True
+except ImportError as _:
+    CDD_INSTALLED = False
 
 from .._config import CFG
 
 if TYPE_CHECKING:
     from typing import Optional
+
     from numpy.typing import NDArray
 
 
@@ -45,6 +52,9 @@ def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, ND
         A (k_rays, n) array of k_rays rays in n-dimensional space.
     
     """
+    if not CDD_INSTALLED:
+        raise ImportError("The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.")
+
     # Validate dimension consistency between Ab and Ab_eq
     if Ab_eq is not None and Ab.shape[0] > 0 and Ab_eq.shape[0] > 0 and Ab.shape[1] != Ab_eq.shape[1]:
         raise ValueError(f"Both Ab and Ab_eq should have the same number of columns n + 1," \
@@ -140,6 +150,9 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
     Ab_eq : NDArray
         An (m_eq, n + 1) array of m_eq facet normals corresponding to equalities.
     """
+    if not CDD_INSTALLED:
+        raise ImportError("The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.")
+
     # Validate dimension consistency between verts and rays
     if rays is not None and verts.shape[1] != rays.shape[1]:
         raise ValueError(f"Both verts and rays should have the same number of columns n," \
