@@ -26,11 +26,20 @@ jobs:
                     - extra: cdd
                     - extra: extra
                     - os: ubuntu-latest
+                      cdd_gmp: true
+                      extra: base
+                    - os: ubuntu-latest
                       cdd_gmp: false
                       extra: full
                     - os: macos-latest
+                      cdd_gmp: true
+                      extra: base
+                    - os: macos-latest
                       cdd_gmp: false
                       extra: full
+                    - os: windows-latest
+                      cdd_gmp: true
+                      extra: base
                     - os: windows-latest
                       cdd_gmp: false
                       extra: full
@@ -65,4 +74,10 @@ jobs:
                 python -m pip install tox tox-gh-actions
 
             - name: Tests with tox
-              run: tox -e ${{ matrix.extra }}
+              run: |
+                if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+                  export CFLAGS="-I/opt/homebrew/include"
+                  export LDFLAGS="-L/opt/homebrew/lib"
+                  export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:${PKG_CONFIG_PATH}"
+                fi
+                tox -e ${{ matrix.extra }}
