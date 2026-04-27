@@ -57,7 +57,7 @@ jobs:
                 python-version: ${{ matrix.python }}
 
             - name: Install system dependencies
-              if: matrix.cdd_gmp
+              if: matrix.cdd_gmp && matrix.os != 'windows-latest'
               shell: bash
               run: |
                 if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
@@ -65,9 +65,15 @@ jobs:
                     sudo apt-get install -y libcdd-dev libgmp-dev
                 elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
                     brew install cddlib gmp
-                elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                    choco install cddlib gmp
                 fi
+
+            - name: Install Windows system dependencies
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
+                .\vcpkg\bootstrap-vcpkg.bat
+                .\vcpkg\vcpkg.exe install gmp:x64-windows cddlib:x64-windows
 
             - name: Install dependencies
               shell: bash
@@ -82,5 +88,9 @@ jobs:
                   export CFLAGS="-I/opt/homebrew/include"
                   export LDFLAGS="-L/opt/homebrew/lib"
                   export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:${PKG_CONFIG_PATH}"
+                  tox -e ${{ matrix.extra }}
+                elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+                  ./vcpkg/vcpkg env --triplet x64-windows -- tox -e ${{ matrix.extra }}
+                else
+                  tox -e ${{ matrix.extra }}
                 fi
-                tox -e ${{ matrix.extra }}
