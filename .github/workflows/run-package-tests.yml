@@ -105,4 +105,4 @@ jobs:
               if: matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                .\vcpkg\vcpkg.exe env --triplet x64-windows -- tox -e ${{ matrix.extra }}
+                .\vcpkg\vcpkg.exe env "tox -e ${{ matrix.extra }}" --triplet x64-windows
