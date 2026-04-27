@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, final
 
 try:
     import cvxpy as cvx
@@ -17,7 +17,7 @@ from ._internal.wraps import wraps
 from .exceptions import ConversionError
 
 if TYPE_CHECKING:
-    from typing import Any, Generator, Literal, Optional, ContextManager
+    from typing import Any, ContextManager, Final, Generator, Literal, Optional
 
 
 @dataclass
@@ -43,6 +43,7 @@ class ConfigSchema:
     print_format_subs: str = '...'
 
 
+@final
 class GlobalConfig:
     """Class representing the global configuration for the package, containing global constants and settings"""
 
@@ -193,7 +194,7 @@ class GlobalConfig:
 
 
 # NOTE: This is a global instance that needs to be initialized once here
-CFG: GlobalConfig = GlobalConfig()
+CFG: Final[GlobalConfig] = GlobalConfig()
 
 
 # FIXME: Do we actually want this?
