@@ -67,7 +67,16 @@ jobs:
                     brew install cddlib gmp
                 fi
 
-            - name: Install Windows system dependencies
+            - name: Cache vcpkg
+              if: matrix.os == 'windows-latest'
+              uses: actions/cache@v4
+              with:
+                path: vcpkg
+                key: vcpkg-${{ runner.os }}-windows
+                restore-keys: |
+                  vcpkg-${{ runner.os }}-
+
+            - name: Install system dependencies on Windows
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
@@ -82,15 +91,18 @@ jobs:
                 python -m pip install tox tox-gh-actions
 
             - name: Tests with tox
+              if: matrix.os != 'windows-latest'
               shell: bash
               run: |
                 if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
                   export CFLAGS="-I/opt/homebrew/include"
                   export LDFLAGS="-L/opt/homebrew/lib"
                   export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:${PKG_CONFIG_PATH}"
-                  tox -e ${{ matrix.extra }}
-                elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-                  ./vcpkg/vcpkg env --triplet x64-windows -- tox -e ${{ matrix.extra }}
-                else
-                  tox -e ${{ matrix.extra }}
                 fi
+                tox -e ${{ matrix.extra }}
+
+            - name: Tests with tox on Windows
+              if: matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                .\vcpkg\vcpkg.exe env --triplet x64-windows -- tox -e ${{ matrix.extra }}
