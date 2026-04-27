@@ -43,6 +43,7 @@ jobs:
                     # - os: windows-latest
                     #   cdd_gmp: false
                     #   extra: full
+                    - os: windows-latest
 
         runs-on: ${{ matrix.os }}
 
