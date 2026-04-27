@@ -37,12 +37,12 @@ jobs:
                     - os: macos-latest
                       cdd_gmp: false
                       extra: full
-                    - os: windows-latest
-                      cdd_gmp: true
-                      extra: base
-                    - os: windows-latest
-                      cdd_gmp: false
-                      extra: full
+                    # - os: windows-latest
+                    #   cdd_gmp: true
+                    #   extra: base
+                    # - os: windows-latest
+                    #   cdd_gmp: false
+                    #   extra: full
 
         runs-on: ${{ matrix.os }}
 
@@ -105,4 +105,4 @@ jobs:
               if: matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                .\vcpkg\vcpkg.exe env --triplet x64-windows -- python -m tox -e ${{ matrix.extra }}
+                .\vcpkg\vcpkg.exe env --triplet x64-windows -- python -m tox -e ${{ matrix.extra }}  # FIXME: This is failing with "error: unexpected switch: --" ...
