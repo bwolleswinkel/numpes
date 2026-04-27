@@ -14,6 +14,7 @@ on:
 jobs:
     tests: 
         strategy:
+            fail-fast: false
             matrix:
                 os: [ubuntu-latest, macos-latest, windows-latest]
                 cdd_gmp: [true, false]
@@ -47,7 +48,7 @@ jobs:
                 python-version: ${{ matrix.python }}
 
             - name: Install system dependencies
-              if: matrix.cdd_gmp == 'true'
+              if: matrix.cdd_gmp
               run: |
                 if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
                     sudo apt-get update
