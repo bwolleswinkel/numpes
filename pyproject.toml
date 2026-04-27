@@ -60,16 +60,76 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.tox]
-env_list = ["py314"]
+env_list = [
+  "base",
+  "cdd",
+  "extra",
+  "full",
+]
 
-[tool.tox.env."py314"]
-description = "Run all tests with extra dependencies"
+[tool.tox.env.base]
 deps = [
   "pytest",
   "pytest-cov",
   "hypothesis",
 ]
+commands = [
+  [
+    "pytest",
+    "--cov=numpes",
+    "--cov-report=term-missing",
+    "--cov-report=",
+    "--no-cov-on-fail",
+    "-rs",
+    "tests",
+  ]
+]
+
+[tool.tox.env.cdd]
+extras = ["cdd"]
+deps = [
+  "pytest",
+  "pytest-cov",
+  "hypothesis",
+]
+commands = [
+  [
+    "pytest",
+    "--cov=numpes",
+    "--cov-report=term-missing",
+    "--cov-report=",
+    "--no-cov-on-fail",
+    "-rs",
+    "tests",
+  ]
+]
+
+[tool.tox.env.extra]
+extras = ["extra"]
+deps = [
+  "pytest",
+  "pytest-cov",
+  "hypothesis",
+]
+commands = [
+  [
+    "pytest",
+    "--cov=numpes",
+    "--cov-report=term-missing",
+    "--cov-report=",
+    "--no-cov-on-fail",
+    "-rs",
+    "tests",
+  ]
+]
+
+[tool.tox.env.full]
 extras = ["full"]
+deps = [
+  "pytest",
+  "pytest-cov",
+  "hypothesis",
+]
 commands = [
   [
     "pytest",
