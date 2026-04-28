@@ -25,7 +25,7 @@ try:
 except ImportError as _:
     CDD_INSTALLED = False
 
-from .._config import CFG
+from numpes._config import CFG
 
 if TYPE_CHECKING:
     from typing import Optional

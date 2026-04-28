@@ -31,10 +31,10 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from ._config import CFG
-from ._internal import multipledispatch, wraps
-from .exceptions import InvalidCombinationOfArguments, InvalidRepresentation
-from .utils import enum_facets, enum_gens, signed_angle
+from numpes._config import CFG
+from numpes._internal import multipledispatch, wraps
+from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
+from numpes.utils import enum_facets, enum_gens, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self

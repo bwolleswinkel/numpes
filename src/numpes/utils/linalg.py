@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .._config import CFG
-from .linprog import Status, solve_lp
+from numpes._config import CFG
+from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
     from typing import Optional

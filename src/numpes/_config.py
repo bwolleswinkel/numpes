@@ -13,8 +13,8 @@ try:
 except ImportError as _:
     CVXPY_INSTALLED = False
 
-from ._internal.wraps import wraps
-from .exceptions import ConversionError
+from numpes._internal.wraps import wraps
+from numpes.exceptions import ConversionError
 
 if TYPE_CHECKING:
     from typing import Any, ContextManager, Final, Generator, Literal, Optional

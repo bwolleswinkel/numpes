@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from .._config import CFG
+from numpes._config import CFG
 
 try:
     import cvxpy as cvx
