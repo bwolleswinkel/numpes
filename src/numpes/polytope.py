@@ -31,7 +31,7 @@ except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
 from ._config import CFG
-from ._internal import multipledispatch
+from ._internal import multipledispatch, wraps
 from .exceptions import InvalidCombinationOfArguments, InvalidRepresentation
 from .utils import enum_facets, enum_gens, signed_angle
 
@@ -333,6 +333,53 @@ class Polytope:
         self._vrepr = None
         self.hrepr = (np.column_stack((A, b)), np.column_stack((A_eq, b_eq)))
 
+    def _init_ambient(self,
+                      n: int
+                      ) -> None:
+        """Initialize a polytope covering R^n.
+
+        Parameters
+        ----------
+        n: int
+            Dimension of the ambient space.
+
+        Raises
+        ------
+        TypeError
+            If the argument `n` is of the wrong type.
+        ValueError
+            If the provided ambient dimension `n` is not a positive integer.
+        """
+
+        def _validate_inputs(n: int) -> None:
+            """Validate the inputs for polytope initialization covering R^n.
+            
+            Raises
+            ------
+            TypeError
+                If the argument `n` is of the wrong type.
+            ValueError
+                If the provided ambient dimension `n` is not a positive integer.
+            """
+            if not isinstance(n, int):
+                raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
+            if n <= 0:
+                raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
+
+        _validate_inputs(n)
+
+        self._vrepr = (np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n))))
+        self._hrepr = (np.empty((0, n + 1)), np.empty((0, n + 1)))
+        self._is_empty = False
+        self._is_degen = True
+        self._is_bounded = False
+        self._is_full_dim = True
+        self._is_pointed = False
+        self._is_singleton = False
+        self._dim = n
+        self._vol = np.inf
+        self._chebcr = (np.full(n + 1, np.nan), np.inf)
+
     @property
     def vrepr(self) -> tuple[NDArray, NDArray]:
         """V-representation of the polytope as a tuple (verts, rays)"""
@@ -554,3 +601,11 @@ class Polytope:
             plt.show()
 
         return ax
+
+
+@wraps(Polytope._init_ambient)  # pylint: disable=protected-access
+def poly_ambient(n: int) -> Polytope:
+    """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
+    poly = Polytope(n=n)
+    poly._init_ambient(n)  # pylint: disable=protected-access
+    return poly

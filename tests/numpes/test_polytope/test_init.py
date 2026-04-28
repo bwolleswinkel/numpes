@@ -7,6 +7,10 @@ import numpy as np
 import numpes as pes
 from numpes import InvalidCombinationOfArguments
 import pytest
+from hypothesis import given
+from hypothesis.strategies import integers
+
+from tests.conftest import N_MAX
 
 if TYPE_CHECKING:
     from typing import EllipsisType
@@ -228,3 +232,113 @@ def test_polytope_init_hrepr_value_error_eq(args: tuple[NDArray, NDArray], kwarg
 def test_polytope_init_hrepr_invalid_combination(args: tuple[EllipsisType, EllipsisType], kwargs: dict[str, EllipsisType], expected_msg: str):
     with pytest.raises(InvalidCombinationOfArguments, match=expected_msg):
         pes.Polytope(*args, **kwargs)
+
+
+class TestInitAmbient:
+    """Tests for the method `Polytope._init_ambient`"""
+
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        20_000,
+    ])
+    def parametrize_valid(self, n: int):
+        _ = pes.poly_ambient(n)
+
+    @pytest.mark.parametrize('n', [
+        -1,
+        0,
+    ])
+    def test_parametrize_value_error(self, n: int):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Dimension 'n' must be a positive integer, got n={n}")):
+            pes.poly_ambient(n)
+
+    @pytest.mark.parametrize('n', [
+        0.5,
+        np.inf,
+        np.nan,
+        '3',
+        ...,
+    ])
+    def test_parametrize_type_error(self, n: int):
+        with pytest.raises(TypeError, match=re.escape(
+            f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")):
+            pes.poly_ambient(n)
+
+    @pytest.mark.skip(reason="The operator == is not yet implemented for the Polytope class")
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_random_manual_gens_equivalent(self, n: int):
+        verts, rays = np.empty((0, n)), np.vstack((np.eye(n), -np.eye(n)))
+        poly_gens = pes.poly(verts, rays=rays)
+        poly_ambient = pes.poly_ambient(n)
+        assert poly_gens == poly_ambient, \
+            f"Expected the polytope initialized with the generators of the ambient polytope to be equal to the ambient polytope, but got {poly_gens} and {poly_ambient}."
+
+    def test_manual_from_facets(self):
+        ...
+
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    @pytest.mark.parametrize('attr_name, attr_val', [
+        ('_is_empty', False),
+        ('_is_degen', True),
+        ('_is_bounded', False),
+        ('_is_full_dim', True),
+        ('_is_pointed', False),
+        ('_is_singleton', False),
+        ('_dim', ...),
+        ('_vol', np.inf),
+        ('_chebcr', ...),
+    ])
+    def test_random_attribute_values(self, n: int, attr_name: str, attr_val: bool | float | int):
+        poly = pes.poly_ambient(n)
+        if attr_name == '_dim':
+            attr_val = n
+        elif attr_name == '_chebcr':
+            attr_val = (np.full(n + 1, np.nan), np.inf)
+        if attr_name == '_chebcr':
+            assert (
+                np.array_equal(getattr(poly, attr_name)[0], attr_val[0], equal_nan=True) and
+                getattr(poly, attr_name)[1] == attr_val[1]
+                ), \
+                f"Expected attribute '{attr_name}' to be {attr_val} for the ambient polytope in dimension {n}, but got {getattr(poly, attr_name)}."
+        else:
+            assert getattr(poly, attr_name) == attr_val, \
+                f"Expected attribute '{attr_name}' to be {attr_val} for the ambient polytope in dimension {n}, but got {getattr(poly, attr_name)}."
+        
+    @pytest.mark.skip(reason="These properties are not implemented yet")
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    @pytest.mark.parametrize('attr_name, attr_val', [
+        ('is_empty', True),
+        ('is_degen', True),
+        ('is_bounded', False),
+        ('is_full_dim', True),
+        ('is_pointed', True),
+        ('is_singleton', True),
+        ('dim', ...),
+        ('vol', np.inf),
+        ('chebc', ...),
+        ('chebr', ...),
+        ('n', ...),
+    ])
+    def test_random_property(self):
+        ...
+
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_random_gens(self, n: int):
+        poly = pes.poly_ambient(n)
+        assert poly.verts.shape == (0, n), \
+            f"Expected the ambient polytope in dimension {n} to have 0 vertices in ambient dimension {n}, but got {poly.verts.shape}."
+        assert np.array_equal(poly.rays, np.vstack((np.eye(n), -np.ones(n)))), \
+            f"Expected the ambient polytope in dimension {n} to have rays equal to the standard basis vectors and [-1, -1, ..., -1], but got rays with shape {poly.rays.shape} and values\n{poly.rays}."
+
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_random_facets(self, n: int):
+        poly = pes.poly_ambient(n)
+        assert poly.Ab.shape == (0, n + 1), \
+            f"Expected the ambient polytope in dimension {n} to have 0 inequalities in ambient dimension {n}, but got {poly.Ab.shape}."
+        assert poly.Ab_eq.shape == (0, n + 1), \
+            f"Expected the ambient polytope in dimension {n} to have 0 equalities in ambient dimension {n}, but got {poly.Ab_eq.shape}."

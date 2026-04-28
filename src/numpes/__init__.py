@@ -53,7 +53,7 @@ from importlib.metadata import PackageNotFoundError
 from . import control, utils
 from ._config import algo_options, get_config, reset_config, set_algo_options
 from .exceptions import ConversionError, InvalidCombinationOfArguments, InvalidRepresentation, NumpesException
-from .polytope import Polytope
+from .polytope import Polytope, poly_ambient
 
 try:
     from importlib.metadata import version
