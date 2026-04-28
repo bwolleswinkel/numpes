@@ -28,14 +28,13 @@ at the top of your script to make its functionalities available.
 NumPES allows you to construct polytope, ellipsoid, and subspace objects and manipulate these. For example, start by initializing a polytope represented by its half-space representation (H-representation).
 
 ``` py
-import numpy as np
 import numpes as pes
 
-A = np.array([[ 0,  1],
-              [-2,  0],
-              [ 1,  1],
-              [ 0, -1]])
-b = np.array([1, 1, 1, 0])
+A = [[ 0,  1],
+     [-2,  0],
+     [ 1,  1],
+     [ 0, -1]]
+b = [1, 1, 1, 0]
 
 poly = pes.poly(A, b)  # Defines a polytope A x <= b
 
