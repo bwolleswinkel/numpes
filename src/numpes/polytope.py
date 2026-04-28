@@ -18,6 +18,7 @@ poly_from_bounds
     A factory function for creating a Polytope instance from upper and lower bounds.
 """
 
+from __future__ import annotations
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -601,6 +602,30 @@ class Polytope:
             plt.show()
 
         return ax
+
+
+@wraps(Polytope.__init__)  # pylint: disable=protected-access
+def poly(*args: NDArray, **kwargs: int | NDArray) -> Polytope:
+    """Wrapper function for `Polytope.__init__` to create a polytope"""
+    return Polytope(*args, **kwargs)
+
+
+@wraps(Polytope._init_empty)  # pylint: disable=protected-access
+def poly_empty(n: int) -> Polytope:
+    """Wrapper function for `Polytope._init_empty` to create an empty polytope"""
+    return Polytope(n=n)
+
+
+@wraps(Polytope._init_vrepr)  # pylint: disable=protected-access
+def poly_from_verts(verts: NDArray, rays: Optional[NDArray]) -> Polytope:
+    """Wrapper function for `Polytope._init_vrepr` to create a polytope from vertices, and optionally rays"""
+    return Polytope(verts=verts, rays=rays)
+
+
+@wraps(Polytope._init_hrepr)  # pylint: disable=protected-access
+def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq: Optional[NDArray] = None) -> Polytope:
+    """Wrapper function for `Polytope._init_hrepr` to create a polytope from inequalities, and optionally equalities"""
+    return Polytope(A=A, b=b, A_eq=A_eq, b_eq=b_eq)
 
 
 @wraps(Polytope._init_ambient)  # pylint: disable=protected-access
