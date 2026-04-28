@@ -3,7 +3,7 @@ import importlib.util
 
 import numpy as np
 import pytest
-from hypothesis import given, assume
+from hypothesis import given
 from hypothesis.strategies import floats
 
 from tests.helpers import approx, deg2rad, lsort, normalize, rad2deg, requires, close_figures
@@ -67,15 +67,13 @@ class TestRadiansDegreesConversion:
         assert deg == pytest.approx(rad2deg(rad)), \
             f"Expected {deg} degrees to be approximately equal to {rad2deg(rad)} degrees"
 
-    @given(val=floats(allow_infinity=False, allow_nan=False))
+    @given(val=floats(min_value=-1E10, max_value=1E10, allow_infinity=False, allow_nan=False))
     def test_random_rad2deg_deg2rad_inverse(self, val: float):
-        assume(abs(val) <= 1E10)
         assert val == pytest.approx(rad2deg(deg2rad(val))), \
             f"Expected {val} degrees to be approximately equal to {rad2deg(deg2rad(val))} degrees"
 
-    @given(val=floats(allow_infinity=False, allow_nan=False))
+    @given(val=floats(min_value=-1E10, max_value=1E10, allow_infinity=False, allow_nan=False))
     def test_random_deg2rad_rad2deg_inverse(self, val: float):
-        assume(abs(val) <= 1E10)
         assert val == pytest.approx(deg2rad(rad2deg(val))), \
             f"Expected {val} radians to be approximately equal to {deg2rad(rad2deg(val))} radians"
 
