@@ -57,6 +57,14 @@ def test_polytope_init_empty_dispatch_init_vrepr_type_error(args: tuple[()] | tu
         pes.Polytope(*args, **kwargs)
 
 
+def test_polytope_init_empty_manual_verts():
+    ...
+
+
+def test_polytope_init_empty_manual_facets():
+    ...
+
+
 @pytest.mark.parametrize('args, kwargs, expected_msg', [
     ((), {},
      "Dimension 'n' must be provided for empty polytope initialization"),
