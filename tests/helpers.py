@@ -99,9 +99,15 @@ def requires(import_name: str, exception: type[BaseException] = ImportError, mat
 
     def decorator(test_obj):
         if inspect.isclass(test_obj):
-            for attr_name, attr_value in vars(test_obj).items():
-                if attr_name.startswith('test') and callable(attr_value):
-                    setattr(test_obj, attr_name, decorator(attr_value))
+            for attr_name in dir(test_obj):
+                if not attr_name.startswith('test'):
+                    continue
+                attr_value = getattr(test_obj, attr_name)
+                if not callable(attr_value):
+                    continue
+                if getattr(attr_value, '__requires_wrapped__', False):
+                    continue
+                setattr(test_obj, attr_name, decorator(attr_value))
             return test_obj
 
         @wraps(test_obj)
@@ -112,6 +118,7 @@ def requires(import_name: str, exception: type[BaseException] = ImportError, mat
                 return None
             return test_obj(*args, **kwargs)
 
+        wrapper.__requires_wrapped__ = True
         return wrapper
 
     return decorator

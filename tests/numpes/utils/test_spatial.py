@@ -33,149 +33,157 @@ pytestmark = [pytest.mark.utils, pytest.mark.unit]
 # TODO: Implement check when Ab.ndims != 2 as raises the error
 
 
-@pytest.mark.parametrize('Ab, Ab_eq', [
-    (np.array([[1, 0, 0]]),
-     np.array([[0, 0]])),
-    (np.array([[0, 0]]),
-     np.array([[1, 0, 1]])),
-    (np.array([[0, 0, 1, 2]]),
-     np.array([[1, 0, 1],
-               [0, 1, 1]]))
-])
-def test_enum_verts_parameterize_inconsistent_dimensions_value_error(Ab: NDArray, Ab_eq: NDArray):
-    with pytest.raises(ValueError, match=re.escape(f"Both Ab and Ab_eq should have the same number of columns n + 1, but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")):
-        _ = pes.utils.enum_gens(Ab, Ab_eq)
+@requires(
+    'cdd',
+    ImportError,
+    "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+)
+class TestEnumVerts:
+    """Tests for the function `pes.utils.enum_verts`"""
+
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.array([[1, 0, 0]]),
+        np.array([[0, 0]])),
+        (np.array([[0, 0]]),
+        np.array([[1, 0, 1]])),
+        (np.array([[0, 0, 1, 2]]),
+        np.array([[1, 0, 1],
+                [0, 1, 1]]))
+    ])
+    def test_enum_verts_parameterize_inconsistent_dimensions_value_error(self, Ab: NDArray, Ab_eq: NDArray):
+        with pytest.raises(ValueError, match=re.escape(f"Both Ab and Ab_eq should have the same number of columns n + 1, but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")):
+            _ = pes.utils.enum_gens(Ab, Ab_eq)
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, expected_verts', [
-    (np.array([[ 1,  0, 1],
-               [ 0,  1, 1],
-               [-1,  0, 0],
-               [ 0, -1, 0]]),
-     np.array([[0, 0],
-               [1, 0],
-               [0, 1],
-               [1, 1]])),
-    (np.array([[ 1,  1,  2  ],
-               [-1,  0, -0.5],
-               [ 0, -1, -0.5]]),
-     np.array([[0.5, 0.5],
-               [0.5, 1.5],
-               [1.5, 0.5]]))
-])
-def test_enum_verts_nondegen_2d(Ab: NDArray, expected_verts: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays}"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, expected_verts', [
+        (np.array([[ 1,  0, 1],
+                [ 0,  1, 1],
+                [-1,  0, 0],
+                [ 0, -1, 0]]),
+        np.array([[0, 0],
+                [1, 0],
+                [0, 1],
+                [1, 1]])),
+        (np.array([[ 1,  1,  2  ],
+                [-1,  0, -0.5],
+                [ 0, -1, -0.5]]),
+        np.array([[0.5, 0.5],
+                [0.5, 1.5],
+                [1.5, 0.5]]))
+    ])
+    def test_enum_verts_nondegen_2d(self, Ab: NDArray, expected_verts: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays}"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, expected_verts, expected_rays', [
-    (np.array([[-1,  0, 0],
-               [ 0, -1, 0]]), 
-     np.empty((0, 3)), 
-     np.array([[0, 0]]),
-     np.array([[1, 0],
-               [0, 1]])), 
-    (np.array([[-1,  0, 0]]), 
-     np.array([[1, -1, 0]]),
-     np.array([[0, 0]]),
-     np.array([[1, 1]]))
-])
-def test_enum_verts_unbounded_2d(Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray, expected_rays: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert lsort(rays) == approx(lsort(expected_rays)), \
-        f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, expected_verts, expected_rays', [
+        (np.array([[-1,  0, 0],
+                [ 0, -1, 0]]), 
+        np.empty((0, 3)), 
+        np.array([[0, 0]]),
+        np.array([[1, 0],
+                [0, 1]])), 
+        (np.array([[-1,  0, 0]]), 
+        np.array([[1, -1, 0]]),
+        np.array([[0, 0]]),
+        np.array([[1, 1]]))
+    ])
+    def test_enum_verts_unbounded_2d(self, Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray, expected_rays: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert lsort(rays) == approx(lsort(expected_rays)), \
+            f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, k, expected_rays', [
-    (np.array([[ 1, 0, 1],
-               [-1, 0, 1]]), 
-     np.empty((0, 2)),
-     2,
-     np.array([[0,  1],
-               [0, -1]])) 
-])
-def test_enum_verts_non_unique_2d(Ab: NDArray, Ab_eq: NDArray, k: int, expected_rays: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert verts.shape == (k, Ab.shape[1] - 1), \
-        f"Expected {k} vertices, but got {verts.shape[0]}"
-    assert lsort(rays) == approx(lsort(expected_rays)), \
-        f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, k, expected_rays', [
+        (np.array([[ 1, 0, 1],
+                [-1, 0, 1]]), 
+        np.empty((0, 2)),
+        2,
+        np.array([[0,  1],
+                [0, -1]])) 
+    ])
+    def test_enum_verts_non_unique_2d(self, Ab: NDArray, Ab_eq: NDArray, k: int, expected_rays: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert verts.shape == (k, Ab.shape[1] - 1), \
+            f"Expected {k} vertices, but got {verts.shape[0]}"
+        assert lsort(rays) == approx(lsort(expected_rays)), \
+            f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, expected_verts', [
-    (np.empty((0, 2)), 
-     np.array([[1, 0, 0],
-               [0, 1, 0]]),
-     np.array([[0, 0]])),
-    (np.array([[ 1,  0, 0],
-               [ 0,  1, 0],
-               [-1,  0, 0],
-               [ 0, -1, 0]]),
-     np.empty((0, 2)),
-     np.array([[0, 0]])),
-    (np.empty((0, 2)), 
-     np.array([[1, 0, -0.2],
-               [0, 1,  0.5]]),
-     np.array([[-0.2, 0.5]]))
-])
-def test_enum_verts_singleton_2d(Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays.size}"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, expected_verts', [
+        (np.empty((0, 2)), 
+        np.array([[1, 0, 0],
+                [0, 1, 0]]),
+        np.array([[0, 0]])),
+        (np.array([[ 1,  0, 0],
+                [ 0,  1, 0],
+                [-1,  0, 0],
+                [ 0, -1, 0]]),
+        np.empty((0, 2)),
+        np.array([[0, 0]])),
+        (np.empty((0, 2)), 
+        np.array([[1, 0, -0.2],
+                [0, 1,  0.5]]),
+        np.array([[-0.2, 0.5]]))
+    ])
+    def test_enum_verts_singleton_2d(self, Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays.size}"
 
 
-@pytest.mark.enum_verts
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_verts_empty_nd(n: int):
-    Ab, Ab_eq = np.column_stack([np.zeros((1, n)), [-1]]), np.empty((0, n + 1))
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert verts.size == 0, \
-        f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays} (rays.shape={rays.shape})"
+    @pytest.mark.enum_verts
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_verts_empty_nd(self, n: int):
+        Ab, Ab_eq = np.column_stack([np.zeros((1, n)), [-1]]), np.empty((0, n + 1))
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert verts.size == 0, \
+            f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays} (rays.shape={rays.shape})"
 
 
-@pytest.mark.enum_verts
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_verts_full_space_nd(n: int):
-    Ab, Ab_eq = np.empty((0, n + 1)), np.empty((0, n + 1))
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    I_min_I = np.vstack([np.eye(n), -np.eye(n)])
-    assert verts.size == 0, \
-        f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
-    assert lsort(rays) == approx(lsort(I_min_I)), \
-        f"Expected rays to be row-equal to [I, -I] (unit vectors in all cardinal directions), but got\n{rays}"
+    @pytest.mark.enum_verts
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_verts_full_space_nd(self, n: int):
+        Ab, Ab_eq = np.empty((0, n + 1)), np.empty((0, n + 1))
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        I_min_I = np.vstack([np.eye(n), -np.eye(n)])
+        assert verts.size == 0, \
+            f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
+        assert lsort(rays) == approx(lsort(I_min_I)), \
+            f"Expected rays to be row-equal to [I, -I] (unit vectors in all cardinal directions), but got\n{rays}"
 
 
-@pytest.mark.enum_verts
-def test_enum_verts_archetypes(poly_arch_all: tuple[Polytope, PolytopeData]):
-    _, poly_data = poly_arch_all
-    Ab, Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(poly_data.verts)), \
-        f"Expected vertices\n{poly_data.verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert lsort(rays) == approx(lsort(poly_data.rays)), \
-        f"Expected rays\n{poly_data.rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
-    
+    @pytest.mark.enum_verts
+    def test_enum_verts_archetypes(self, poly_arch_all: tuple[Polytope, PolytopeData]):
+        _, poly_data = poly_arch_all
+        Ab, Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(poly_data.verts)), \
+            f"Expected vertices\n{poly_data.verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert lsort(rays) == approx(lsort(poly_data.rays)), \
+            f"Expected rays\n{poly_data.rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+        
 
-def test_enum_verts_archetypes_2d_nondegen_none_equivalent_empty(poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
-    _, poly_data = poly_arch_nondegen_2d
-    Ab, n = np.column_stack([poly_data.A, poly_data.b]), poly_data.n
-    assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, np.empty((0, n + 1)))[0])), \
-        f"Expected enum_verts(Ab) and enum_verts(Ab, np.empty((0, n + 1))) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, np.empty((0, n + 1)))}"
-    assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, None)[0])), \
-        f"Expected enum_verts(Ab) and enum_verts(Ab, None) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, None)}"
+    def test_enum_verts_archetypes_2d_nondegen_none_equivalent_empty(self, poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
+        _, poly_data = poly_arch_nondegen_2d
+        Ab, n = np.column_stack([poly_data.A, poly_data.b]), poly_data.n
+        assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, np.empty((0, n + 1)))[0])), \
+            f"Expected enum_verts(Ab) and enum_verts(Ab, np.empty((0, n + 1))) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, np.empty((0, n + 1)))}"
+        assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, None)[0])), \
+            f"Expected enum_verts(Ab) and enum_verts(Ab, None) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, None)}"
 
 
 # ======================

@@ -3,10 +3,15 @@
 import numpy as np
 from numpes._config import CFG
 
-from tests.helpers import lsort, approx
+from tests.helpers import lsort, approx, requires
 
 
 # FIXME: Change to all archetypes
+@requires(
+    'cdd',
+    ImportError,
+    "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+)
 def test_polytope_hrepr_archetypes_enum_verts(poly_arch_nondegen_hrepr_2d):
     poly, poly_data = poly_arch_nondegen_hrepr_2d
     assert lsort(poly.verts) == approx(lsort(poly_data.verts)), \
@@ -14,6 +19,11 @@ def test_polytope_hrepr_archetypes_enum_verts(poly_arch_nondegen_hrepr_2d):
 
 
 # FIXME: Change to all archetypes
+@requires(
+    'cdd',
+    ImportError,
+    "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+)
 def test_polytope_vrepr_archetypes_enum_facets(poly_arch_nondegen_vrepr_2d):    
     poly, poly_data = poly_arch_nondegen_vrepr_2d
     excepted_Ab = np.column_stack([poly_data.A, poly_data.b])
