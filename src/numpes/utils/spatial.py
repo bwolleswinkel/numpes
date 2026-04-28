@@ -152,6 +152,12 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
     """
     if not CDD_INSTALLED:
         raise ImportError("The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.")
+    
+    # Validate input dimensions
+    if verts.ndim != 2:
+        raise ValueError(f"Verts should be a 2D array of shape (k, n), but received verts.shape={verts.shape}")
+    if rays is not None and rays.ndim != 2:
+        raise ValueError(f"Rays should be a 2D array of shape (k_rays, n), but received rays.shape={rays.shape}")
 
     # Validate dimension consistency between verts and rays
     if rays is not None and verts.shape[1] != rays.shape[1]:

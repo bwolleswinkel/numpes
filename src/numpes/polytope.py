@@ -492,13 +492,14 @@ class Polytope:
             elif self.n == 3:
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
         else:
             fig = None
-        assert ax is not None, "Object 'ax' should be of type Axes or Axes3D, but got None instead"  # for type checker
 
         if color is None:
             # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[attr-defined]
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
 
         # TODO: Also implement the logic when `self` is lower-dimensional, so when it is a single plane, or a line.
         # TODO: Also add a degeneracy check for plotting
