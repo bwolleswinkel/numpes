@@ -106,13 +106,11 @@ jobs:
               if: matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                # $include = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\include"
-                # $lib = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\lib"
-                # $env:INCLUDE = \"$include;$env:INCLUDE\"
-                # $env:LIB = \"$lib;$env:LIB\"
-                # $env:CFLAGS = \"-I$include\"
-                # $env:LDFLAGS = \"-L$lib\"
-                # $env:Path = \"$env:Path;${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\bin\"
-                # python -m tox -e ${{ matrix.extra }}
-                echo "Skipping tox tests on Windows for now, such that a cache is built."
-                exit 0
+                $include = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\include"
+                $lib = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\lib"
+                $env:INCLUDE = \"$include;$env:INCLUDE\"
+                $env:LIB = \"$lib;$env:LIB\"
+                $env:CFLAGS = \"-I$include\"
+                $env:LDFLAGS = \"-L$lib\"
+                $env:Path = \"$env:Path;${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\bin\"
+                python -m tox -e ${{ matrix.extra }}
