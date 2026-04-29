@@ -115,7 +115,28 @@ jobs:
               run: |
                 Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows-static-md-release\include"
 
-            - name: Tests with tox on Windows (cdd/gmp)
+            # - name: Tests with tox on Windows (cdd/gmp)
+            #   if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+            #   shell: pwsh
+            #   run: |
+            #     $triplet = "x64-windows-static-md-release"
+            #     $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
+            #     $include = "$prefix\include"
+            #     $cddinclude = "$prefix\include\cddlib"
+            #     $lib = "$prefix\lib"
+            #     $bin = "$prefix\bin"
+            #     $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
+            #     $env:CPATH = "$cddinclude;$include"
+            #     $env:LIB = "$lib;$env:LIB"
+            #     $env:CFLAGS = "-I$cddinclude -I$include"
+            #     $env:LDFLAGS = "-L$lib"
+            #     $env:CL = "/I$cddinclude /I$include"
+            #     $env:Path = "$env:Path;$bin"
+            #     $env:DISTUTILS_USE_SDK = "1"
+            #     $env:MSSdk = "1"
+            #     Get-ChildItem Env:
+            #     python -m tox -e ${{ matrix.extra }}
+            - name: Direct pip install pycddlib (debug)
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
@@ -135,7 +156,7 @@ jobs:
                 $env:DISTUTILS_USE_SDK = "1"
                 $env:MSSdk = "1"
                 Get-ChildItem Env:
-                python -m tox -e ${{ matrix.extra }}
+                python -m pip install --no-cache-dir --force-reinstall --no-build-isolation pycddlib
 
             - name: Tests with tox on Windows
               if: (!matrix.cdd_gmp) && matrix.os == 'windows-latest'
