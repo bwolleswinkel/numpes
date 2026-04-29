@@ -12,8 +12,13 @@ authors = [
 description = "Numerical operations on polytopes, ellipsoids, and subspaces"
 readme = "README.md"
 license = "GPL-3.0"
-# TODO: Add more keywords
-keywords = ["polytope"]
+keywords = [
+  "polytope",
+  "ellipsoid",
+  "subspace",
+  "control",
+  "scientific-computing",
+]
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Programming Language :: Python"
@@ -53,8 +58,8 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
+requires = ["uv"]
+build-backend = "uv.build"
 
 [tool.hatch.version]
 source = "vcs"
