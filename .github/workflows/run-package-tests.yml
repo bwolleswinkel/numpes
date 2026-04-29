@@ -83,7 +83,7 @@ jobs:
               run: |
                 git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
                 .\vcpkg\bootstrap-vcpkg.bat
-                .\vcpkg\vcpkg.exe install gmp:x64-windows cddlib:x64-windows
+                .\vcpkg\vcpkg.exe install gmp:x64-windows-static-md-release cddlib:x64-windows-static-md-release
 
             - name: Install dependencies
               shell: bash
@@ -106,22 +106,23 @@ jobs:
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows\include"
+                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows-static-md-release\include"
 
             - name: Tests with tox on Windows (cdd/gmp)
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                $include = "${{ github.workspace }}\vcpkg\installed\x64-windows\include"
-                $cddinclude = "${{ github.workspace }}\vcpkg\installed\x64-windows\include\cddlib"
-                $lib = "${{ github.workspace }}\vcpkg\installed\x64-windows\lib"
-                $bin = "${{ github.workspace }}\vcpkg\installed\x64-windows\bin"
-                $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
-                $env:CPATH = "$cddinclude;$include"
+                $triplet = "x64-windows-static-md-release"
+                $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
+                $include = "$prefix\include"
+                $lib = "$prefix\lib"
+                $bin = "$prefix\bin"
+                $env:INCLUDE = "$include;$env:INCLUDE"
+                $env:CPATH = "$include"
                 $env:LIB = "$lib;$env:LIB"
-                $env:CFLAGS = "-I$include -I$cddinclude"
+                $env:CFLAGS = "-I$include"
                 $env:LDFLAGS = "-L$lib"
-                $env:CL = "/I$include /I$cddinclude"
+                $env:CL = "/I$include"
                 $env:Path = "$env:Path;$bin"
                 $env:DISTUTILS_USE_SDK = "1"
                 $env:MSSdk = "1"
