@@ -120,6 +120,7 @@ jobs:
                 $env:LIB = "$lib;$env:LIB"
                 $env:CFLAGS = "-I$include -I$cddinclude"
                 $env:LDFLAGS = "-L$lib"
+                $env:CL = "/I$include /I$cddinclude"
                 $env:Path = "$env:Path;$bin"
                 python -m tox -e ${{ matrix.extra }}
 
