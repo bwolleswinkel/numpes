@@ -69,8 +69,8 @@ jobs:
                 fi
 
             - name: Cache vcpkg
-              if: matrix.os == 'windows-latest'
-              uses: actions/cache@v4
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              uses: actions/cache@v5
               with:
                 path: vcpkg
                 key: vcpkg-${{ runner.os }}-windows
@@ -102,15 +102,22 @@ jobs:
                 fi
                 tox -e ${{ matrix.extra }}
 
-            - name: Tests with tox on Windows
-              if: matrix.os == 'windows-latest'
+            - name: Tests with tox on Windows (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
-                $include = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\include"
-                $lib = "${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\lib"
-                $env:INCLUDE = \"$include;$env:INCLUDE\"
-                $env:LIB = \"$lib;$env:LIB\"
-                $env:CFLAGS = \"-I$include\"
-                $env:LDFLAGS = \"-L$lib\"
-                $env:Path = \"$env:Path;${{ github.workspace }}\\vcpkg\\installed\\x64-windows\\bin\"
+                $include = "${{ github.workspace }}\vcpkg\installed\x64-windows\include"
+                $lib = "${{ github.workspace }}\vcpkg\installed\x64-windows\lib"
+                $bin = "${{ github.workspace }}\vcpkg\installed\x64-windows\bin"
+                $env:INCLUDE = "$include;$env:INCLUDE"
+                $env:LIB = "$lib;$env:LIB"
+                $env:CFLAGS = "-I$include"
+                $env:LDFLAGS = "-L$lib"
+                $env:Path = "$env:Path;$bin"
+                python -m tox -e ${{ matrix.extra }}
+
+            - name: Tests with tox on Windows
+              if: !matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
                 python -m tox -e ${{ matrix.extra }}
