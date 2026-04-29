@@ -13,7 +13,7 @@ linprog
     Provides handlers for solving linear programs using either SciPy, CVXPY, or PuLP as a backend.
 """
 
-from .linalg import *
-from .linprog import *
-from .spatial import *
-from .timeout import *
+from numpes.utils.linalg import *
+from numpes.utils.linprog import *
+from numpes.utils.spatial import *
+from numpes.utils.timeout import *

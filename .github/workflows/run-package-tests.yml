@@ -1,4 +1,4 @@
-name: tests
+name: Run Tests
 
 on:
     push:
@@ -12,26 +12,158 @@ on:
     workflow_call: {}
 
 jobs:
-    test:   
-        runs-on: ubuntu-latest
-        if: "!contains(github.event.head_commit.message, '[skip tests]')"
-        steps:
-            - uses: actions/checkout@v4
+    tests: 
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                cdd_gmp: [true, false]
+                python: ['3.10', '3.14']
+                extra: [base, cdd, extra, full]
 
-            - name: Set up Python
-              uses: actions/setup-python@v4
+                exclude:
+                    - python: '3.10'
+                    - extra: cdd
+                    - extra: extra
+                    - os: ubuntu-latest
+                      cdd_gmp: true
+                      extra: base
+                    - os: ubuntu-latest
+                      cdd_gmp: false
+                      extra: full
+                    - os: macos-latest
+                      cdd_gmp: true
+                      extra: base
+                    - os: macos-latest
+                      cdd_gmp: false
+                      extra: full
+                    - os: windows-latest
+                      cdd_gmp: true
+                      extra: base
+                    - os: windows-latest
+                      cdd_gmp: false
+                      extra: full
+                    # FIXME: Builds with cdd/gmp on Windows are still failing due to build issues with pycddlib
+                    - os: windows-latest
+                      cdd_gmp: true
+
+        runs-on: ${{ matrix.os }}
+
+        if: "!contains(github.event.head_commit.message, '[skip tests]')"
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - name: Install uv and set up Python
+              uses: astral-sh/setup-uv@v5
               with:
-                python-version: '3.14'
+                python-version: ${{ matrix.python }}
 
             - name: Install system dependencies
+              if: matrix.cdd_gmp && matrix.os != 'windows-latest'
+              shell: bash
               run: |
-                sudo apt-get update
-                sudo apt-get install -y libcdd-dev libgmp-dev
+                if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+                    sudo apt-get update
+                    sudo apt-get install -y libcdd-dev libgmp-dev
+                elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+                    brew install cddlib gmp
+                fi
+
+            - name: Cache vcpkg (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              uses: actions/cache@v5
+              with:
+                path: vcpkg
+                key: vcpkg-${{ runner.os }}-windows
+                restore-keys: |
+                  vcpkg-${{ runner.os }}-
+
+            - name: Install system dependencies on Windows (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                git clone --depth 1 https://github.com/microsoft/vcpkg.git vcpkg
+                .\vcpkg\bootstrap-vcpkg.bat
+                .\vcpkg\vcpkg.exe install gmp:x64-windows-static-md-release cddlib:x64-windows-static-md-release
+
+            - name: Debug cddlib headers after vcpkg install (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                Write-Host "Listing all headers in vcpkg include directory:"
+                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows-static-md-release\include"
 
             - name: Install dependencies
+              shell: bash
               run: |
-                python -m pip install --upgrade pip
-                python -m pip install tox tox-gh-actions
+                uv pip install tox tox-gh-actions
 
             - name: Tests with tox
-              run: tox -e py314
+              if: matrix.os != 'windows-latest'
+              shell: bash
+              run: |
+                if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+                  export CFLAGS="-I/opt/homebrew/include"
+                  export LDFLAGS="-L/opt/homebrew/lib"
+                  export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:${PKG_CONFIG_PATH}"
+                fi
+                tox -e ${{ matrix.extra }}
+
+            - name: Debug vcpkg include contents (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows-static-md-release\include"
+
+            # FIXME: Not working, raises "pip._vendor.pyproject_hooks._impl.BackendUnavailable: Cannot import 'setuptools.build_meta'"
+            # - name: Direct pip install pycddlib (debug)
+            #   if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+            #   shell: pwsh
+            #   run: |
+            #     $triplet = "x64-windows-static-md-release"
+            #     $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
+            #     $include = "$prefix\include"
+            #     $cddinclude = "$prefix\include\cddlib"
+            #     $lib = "$prefix\lib"
+            #     $bin = "$prefix\bin"
+            #     $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
+            #     $env:CPATH = "$cddinclude;$include"
+            #     $env:LIB = "$lib;$env:LIB"
+            #     $env:CFLAGS = "-I$cddinclude -I$include"
+            #     $env:LDFLAGS = "-L$lib"
+            #     $env:CL = "/I$cddinclude /I$include"
+            #     $env:Path = "$env:Path;$bin"
+            #     $env:DISTUTILS_USE_SDK = "1"
+            #     $env:MSSdk = "1"
+            #     Get-ChildItem Env:
+            #     python -m pip install --no-cache-dir --force-reinstall --no-build-isolation pycddlib
+
+            - name: Tests with tox on Windows (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                # FIXME: The following is still not building pycddlib properly 
+                $triplet = "x64-windows-static-md-release"
+                $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
+                $include = "$prefix\include"
+                $cddinclude = "$prefix\include\cddlib"
+                $lib = "$prefix\lib"
+                $bin = "$prefix\bin"
+                $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
+                $env:CPATH = "$cddinclude;$include"
+                $env:LIB = "$lib;$env:LIB"
+                $env:CFLAGS = "-I$cddinclude -I$include"
+                $env:LDFLAGS = "-L$lib"
+                $env:CL = "/I$cddinclude /I$include"
+                $env:Path = "$env:Path;$bin"
+                $env:DISTUTILS_USE_SDK = "1"
+                $env:MSSdk = "1"
+                Get-ChildItem Env:
+                python -m tox -e ${{ matrix.extra }}
+
+            - name: Tests with tox on Windows
+              if: (!matrix.cdd_gmp) && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                python -m tox -e ${{ matrix.extra }}

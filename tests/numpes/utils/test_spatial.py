@@ -12,8 +12,8 @@ from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import floats, integers, tuples
 
 import numpes as pes
-from tests.conftest import ATOL, N_MAX
-from tests.helpers import approx, deg2rad, normalize, rad2deg, lsort
+from tests.conftest import RTOL, ATOL, N_MAX
+from tests.helpers import approx, deg2rad, normalize, rad2deg, lsort, requires
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -33,327 +33,350 @@ pytestmark = [pytest.mark.utils, pytest.mark.unit]
 # TODO: Implement check when Ab.ndims != 2 as raises the error
 
 
-@pytest.mark.parametrize('Ab, Ab_eq', [
-    (np.array([[1, 0, 0]]),
-     np.array([[0, 0]])),
-    (np.array([[0, 0]]),
-     np.array([[1, 0, 1]])),
-    (np.array([[0, 0, 1, 2]]),
-     np.array([[1, 0, 1],
-               [0, 1, 1]]))
-])
-def test_enum_verts_parameterize_inconsistent_dimensions_value_error(Ab: NDArray, Ab_eq: NDArray):
-    with pytest.raises(ValueError, match=re.escape(f"Both Ab and Ab_eq should have the same number of columns n + 1, but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")):
-        _ = pes.utils.enum_gens(Ab, Ab_eq)
+@requires(
+    'cdd',
+    ImportError,
+    "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+)
+class TestEnumVerts:
+    """Tests for the function `pes.utils.enum_verts`"""
+
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.array([[1, 0, 0]]),
+        np.array([[0, 0]])),
+        (np.array([[0, 0]]),
+        np.array([[1, 0, 1]])),
+        (np.array([[0, 0, 1, 2]]),
+        np.array([[1, 0, 1],
+                [0, 1, 1]]))
+    ])
+    def test_enum_verts_parameterize_inconsistent_dimensions_value_error(self, Ab: NDArray, Ab_eq: NDArray):
+        with pytest.raises(ValueError, match=re.escape(f"Both Ab and Ab_eq should have the same number of columns n + 1, but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")):
+            _ = pes.utils.enum_gens(Ab, Ab_eq)
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, expected_verts', [
-    (np.array([[ 1,  0, 1],
-               [ 0,  1, 1],
-               [-1,  0, 0],
-               [ 0, -1, 0]]),
-     np.array([[0, 0],
-               [1, 0],
-               [0, 1],
-               [1, 1]])),
-    (np.array([[ 1,  1,  2  ],
-               [-1,  0, -0.5],
-               [ 0, -1, -0.5]]),
-     np.array([[0.5, 0.5],
-               [0.5, 1.5],
-               [1.5, 0.5]]))
-])
-def test_enum_verts_nondegen_2d(Ab: NDArray, expected_verts: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays}"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, expected_verts', [
+        (np.array([[ 1,  0, 1],
+                [ 0,  1, 1],
+                [-1,  0, 0],
+                [ 0, -1, 0]]),
+        np.array([[0, 0],
+                [1, 0],
+                [0, 1],
+                [1, 1]])),
+        (np.array([[ 1,  1,  2  ],
+                [-1,  0, -0.5],
+                [ 0, -1, -0.5]]),
+        np.array([[0.5, 0.5],
+                [0.5, 1.5],
+                [1.5, 0.5]]))
+    ])
+    def test_enum_verts_nondegen_2d(self, Ab: NDArray, expected_verts: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays}"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, expected_verts, expected_rays', [
-    (np.array([[-1,  0, 0],
-               [ 0, -1, 0]]), 
-     np.empty((0, 3)), 
-     np.array([[0, 0]]),
-     np.array([[1, 0],
-               [0, 1]])), 
-    (np.array([[-1,  0, 0]]), 
-     np.array([[1, -1, 0]]),
-     np.array([[0, 0]]),
-     np.array([[1, 1]]))
-])
-def test_enum_verts_unbounded_2d(Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray, expected_rays: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert lsort(rays) == approx(lsort(expected_rays)), \
-        f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, expected_verts, expected_rays', [
+        (np.array([[-1,  0, 0],
+                [ 0, -1, 0]]), 
+        np.empty((0, 3)), 
+        np.array([[0, 0]]),
+        np.array([[1, 0],
+                [0, 1]])), 
+        (np.array([[-1,  0, 0]]), 
+        np.array([[1, -1, 0]]),
+        np.array([[0, 0]]),
+        np.array([[1, 1]]))
+    ])
+    def test_enum_verts_unbounded_2d(self, Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray, expected_rays: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert lsort(rays) == approx(lsort(expected_rays)), \
+            f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, k, expected_rays', [
-    (np.array([[ 1, 0, 1],
-               [-1, 0, 1]]), 
-     np.empty((0, 2)),
-     2,
-     np.array([[0,  1],
-               [0, -1]])) 
-])
-def test_enum_verts_non_unique_2d(Ab: NDArray, Ab_eq: NDArray, k: int, expected_rays: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert verts.shape == (k, Ab.shape[1] - 1), \
-        f"Expected {k} vertices, but got {verts.shape[0]}"
-    assert lsort(rays) == approx(lsort(expected_rays)), \
-        f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, k, expected_rays', [
+        (np.array([[ 1, 0, 1],
+                [-1, 0, 1]]), 
+        np.empty((0, 2)),
+        2,
+        np.array([[0,  1],
+                [0, -1]])) 
+    ])
+    def test_enum_verts_non_unique_2d(self, Ab: NDArray, Ab_eq: NDArray, k: int, expected_rays: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert verts.shape == (k, Ab.shape[1] - 1), \
+            f"Expected {k} vertices, but got {verts.shape[0]}"
+        assert lsort(rays) == approx(lsort(expected_rays)), \
+            f"Expected rays\n{expected_rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
 
 
-@pytest.mark.enum_verts
-@pytest.mark.parametrize('Ab, Ab_eq, expected_verts', [
-    (np.empty((0, 2)), 
-     np.array([[1, 0, 0],
-               [0, 1, 0]]),
-     np.array([[0, 0]])),
-    (np.array([[ 1,  0, 0],
-               [ 0,  1, 0],
-               [-1,  0, 0],
-               [ 0, -1, 0]]),
-     np.empty((0, 2)),
-     np.array([[0, 0]])),
-    (np.empty((0, 2)), 
-     np.array([[1, 0, -0.2],
-               [0, 1,  0.5]]),
-     np.array([[-0.2, 0.5]]))
-])
-def test_enum_verts_singleton_2d(Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray):
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(expected_verts)), \
-        f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays.size}"
+    @pytest.mark.enum_verts
+    @pytest.mark.parametrize('Ab, Ab_eq, expected_verts', [
+        (np.empty((0, 2)), 
+        np.array([[1, 0, 0],
+                [0, 1, 0]]),
+        np.array([[0, 0]])),
+        (np.array([[ 1,  0, 0],
+                [ 0,  1, 0],
+                [-1,  0, 0],
+                [ 0, -1, 0]]),
+        np.empty((0, 2)),
+        np.array([[0, 0]])),
+        (np.empty((0, 2)), 
+        np.array([[1, 0, -0.2],
+                [0, 1,  0.5]]),
+        np.array([[-0.2, 0.5]]))
+    ])
+    def test_enum_verts_singleton_2d(self, Ab: NDArray, Ab_eq: NDArray, expected_verts: NDArray):
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(expected_verts)), \
+            f"Expected vertices\n{expected_verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays.size}"
 
 
-@pytest.mark.enum_verts
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_verts_empty_nd(n: int):
-    Ab, Ab_eq = np.column_stack([np.zeros((1, n)), [-1]]), np.empty((0, n + 1))
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert verts.size == 0, \
-        f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
-    assert rays.size == 0, \
-        f"Expected no rays, but got {rays} (rays.shape={rays.shape})"
+    @pytest.mark.enum_verts
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_verts_empty_nd(self, n: int):
+        Ab, Ab_eq = np.column_stack([np.zeros((1, n)), [-1]]), np.empty((0, n + 1))
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert verts.size == 0, \
+            f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
+        assert rays.size == 0, \
+            f"Expected no rays, but got {rays} (rays.shape={rays.shape})"
 
 
-@pytest.mark.enum_verts
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_verts_full_space_nd(n: int):
-    Ab, Ab_eq = np.empty((0, n + 1)), np.empty((0, n + 1))
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    I_min_I = np.vstack([np.eye(n), -np.eye(n)])
-    assert verts.size == 0, \
-        f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
-    assert lsort(rays) == approx(lsort(I_min_I)), \
-        f"Expected rays to be row-equal to [I, -I] (unit vectors in all cardinal directions), but got\n{rays}"
+    @pytest.mark.enum_verts
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_verts_full_space_nd(self, n: int):
+        Ab, Ab_eq = np.empty((0, n + 1)), np.empty((0, n + 1))
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        I_min_I = np.vstack([np.eye(n), -np.eye(n)])
+        assert verts.size == 0, \
+            f"Expected no vertices, but got {verts} (verts.shape={verts.shape})"
+        assert lsort(rays) == approx(lsort(I_min_I)), \
+            f"Expected rays to be row-equal to [I, -I] (unit vectors in all cardinal directions), but got\n{rays}"
 
 
-@pytest.mark.enum_verts
-def test_enum_verts_archetypes(poly_arch_all: tuple[Polytope, PolytopeData]):
-    _, poly_data = poly_arch_all
-    Ab, Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
-    verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
-    assert lsort(verts) == approx(lsort(poly_data.verts)), \
-        f"Expected vertices\n{poly_data.verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
-    assert lsort(rays) == approx(lsort(poly_data.rays)), \
-        f"Expected rays\n{poly_data.rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
-    
+    @pytest.mark.enum_verts
+    def test_enum_verts_archetypes(self, poly_arch_all: tuple[Polytope, PolytopeData]):
+        _, poly_data = poly_arch_all
+        Ab, Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
+        verts, rays = pes.utils.enum_gens(Ab, Ab_eq)
+        assert lsort(verts) == approx(lsort(poly_data.verts)), \
+            f"Expected vertices\n{poly_data.verts}\nto be equal to\n{verts}\n(same rows, order does not matter)"
+        assert lsort(rays) == approx(lsort(poly_data.rays)), \
+            f"Expected rays\n{poly_data.rays}\nto be equal to\n{rays}\n(same rows, order does not matter)"
+        
 
-def test_enum_verts_archetypes_2d_nondegen_none_equivalent_empty(poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
-    _, poly_data = poly_arch_nondegen_2d
-    Ab, n = np.column_stack([poly_data.A, poly_data.b]), poly_data.n
-    assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, np.empty((0, n + 1)))[0])), \
-        f"Expected enum_verts(Ab) and enum_verts(Ab, np.empty((0, n + 1))) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, np.empty((0, n + 1)))}"
-    assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, None)[0])), \
-        f"Expected enum_verts(Ab) and enum_verts(Ab, None) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, None)}"
+    def test_enum_verts_archetypes_2d_nondegen_none_equivalent_empty(self, poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
+        _, poly_data = poly_arch_nondegen_2d
+        Ab, n = np.column_stack([poly_data.A, poly_data.b]), poly_data.n
+        assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, np.empty((0, n + 1)))[0])), \
+            f"Expected enum_verts(Ab) and enum_verts(Ab, np.empty((0, n + 1))) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, np.empty((0, n + 1)))}"
+        assert lsort(pes.utils.enum_gens(Ab)[0]) == approx(lsort(pes.utils.enum_gens(Ab, None)[0])), \
+            f"Expected enum_verts(Ab) and enum_verts(Ab, None) to give the same vertices, but got\n{pes.utils.enum_gens(Ab)}\nand\n{pes.utils.enum_gens(Ab, None)}"
 
 
 # ======================
 # (function) enum_facets
 # ======================
 
-# TODO: Implement check when verts.ndims != 2 as raises the error
+
+@requires(
+    'cdd',
+    ImportError,
+    "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+)
+class TestEnumFacets:
+    """Tests for the function `pes.utils.enum_facets`"""
+
+    @pytest.mark.parametrize('verts, rays', [
+        (np.array([[1, 0, 1]]),
+        np.array([[0, 0]])),
+        (np.array([[0, 0]]),
+        np.array([[1, 0, 1]])),
+        (np.array([[0, 0, 1, 2]]),
+        np.array([[1, 0, 1],
+                [0, 1, 1]])),
+    ])
+    def test_enum_facets_parameterize_inconsistent_dimensions_value_error(self, verts: NDArray, rays: NDArray):
+        with pytest.raises(ValueError, match=re.escape(f"Both verts and rays should have the same number of columns n, but received verts.shape={verts.shape} and rays.shape={rays.shape}")):
+            _ = pes.utils.enum_facets(verts, rays)
 
 
-@pytest.mark.parametrize('verts, rays', [
-    (np.array([[1, 0, 1]]),
-     np.array([[0, 0]])),
-    (np.array([[0, 0]]),
-     np.array([[1, 0, 1]])),
-    (np.array([[0, 0, 1, 2]]),
-     np.array([[1, 0, 1],
-               [0, 1, 1]]))
-])
-def test_enum_facets_parameterize_inconsistent_dimensions_value_error(verts: NDArray, rays: NDArray):
-    with pytest.raises(ValueError, match=re.escape(f"Both verts and rays should have the same number of columns n, but received verts.shape={verts.shape} and rays.shape={rays.shape}")):
-        _ = pes.utils.enum_facets(verts, rays)
+    @pytest.mark.parametrize('verts, rays', [
+        (np.arange(30).reshape(5, 3, 2), np.empty((0, 3))),
+    ])
+    def test_enum_facets_parameterize_wrong_number_of_dimensions_value_error(self, verts: NDArray, rays: NDArray):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Verts should be a 2D array of shape (k, n), but received verts.shape={verts.shape}")):
+            _ = pes.utils.enum_facets(verts, rays)
 
 
-@pytest.mark.parametrize('verts, expected_Ab', [
-    (np.array([[0, 0],
-               [1, 0],
-               [0, 1],
-               [1, 1]]),
-     np.array([[ 1,  0, 1],
-               [ 0,  1, 1],
-               [-1,  0, 0],
-               [ 0, -1, 0]])),
-    (np.array([[0.5, 0.5],
-               [0.5, 1.5],
-               [1.5, 0.5]]),
-     np.array([[ 1,  1,  2  ],
-               [-1,  0, -0.5],
-               [ 0, -1, -0.5]]))
-])  
-def test_enum_facets_nondegen_2d(verts: NDArray, expected_Ab: NDArray):
-    Ab, Ab_eq = pes.utils.enum_facets(verts, np.empty((0, verts.shape[1])))
-    assert lsort(normalize(Ab)) == approx(lsort(normalize(expected_Ab))), \
-        f"Expected inequalities\n{expected_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
-    assert Ab_eq.size == 0, \
-        f"Expected no equality constraints, but got {Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
+    @pytest.mark.parametrize('verts, expected_Ab', [
+        (np.array([[0, 0],
+                [1, 0],
+                [0, 1],
+                [1, 1]]),
+        np.array([[ 1,  0, 1],
+                [ 0,  1, 1],
+                [-1,  0, 0],
+                [ 0, -1, 0]])),
+        (np.array([[0.5, 0.5],
+                [0.5, 1.5],
+                [1.5, 0.5]]),
+        np.array([[ 1,  1,  2  ],
+                [-1,  0, -0.5],
+                [ 0, -1, -0.5]]))
+    ])  
+    def test_enum_facets_nondegen_2d(self, verts: NDArray, expected_Ab: NDArray):
+        Ab, Ab_eq = pes.utils.enum_facets(verts, np.empty((0, verts.shape[1])))
+        assert lsort(normalize(Ab)) == approx(lsort(normalize(expected_Ab))), \
+            f"Expected inequalities\n{expected_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
+        assert Ab_eq.size == 0, \
+            f"Expected no equality constraints, but got {Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
 
 
-@pytest.mark.parametrize('verts, rays, expected_Ab, expected_Ab_eq', [
-    (np.array([[0, 0]]),
-     np.array([[1, 0],
-               [0, 1]]), 
-     np.array([[-1,  0, 0],
-               [ 0, -1, 0]]),
-     np.empty((0, 3))), 
-    (np.array([[0, 0]]), 
-     np.array([[1, 1]]),
-     np.array([[-1,  0, 0]]),
-     np.array([[1, -1, 0]]))
-])
-def test_enum_facets_unbounded_2d(verts: NDArray, rays: NDArray, expected_Ab: NDArray, expected_Ab_eq: NDArray):
-    Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
-    assert lsort(normalize(Ab)) == approx(lsort(normalize(expected_Ab))), \
-        f"Expected inequalities\n{expected_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
-    assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
-        f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
+    @pytest.mark.parametrize('verts, rays, expected_Ab, expected_Ab_eq', [
+        (np.array([[0, 0]]),
+        np.array([[1, 0],
+                [0, 1]]), 
+        np.array([[-1,  0, 0],
+                [ 0, -1, 0]]),
+        np.empty((0, 3))), 
+        (np.array([[0, 0]]), 
+        np.array([[1, 1]]),
+        np.array([[-1,  0, 0]]),
+        np.array([[1, -1, 0]]))
+    ])
+    def test_enum_facets_unbounded_2d(self, verts: NDArray, rays: NDArray, expected_Ab: NDArray, expected_Ab_eq: NDArray):
+        Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
+        assert lsort(normalize(Ab)) == approx(lsort(normalize(expected_Ab))), \
+            f"Expected inequalities\n{expected_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
+        assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
+            f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
 
 
-@pytest.mark.parametrize('verts, rays, expected_Ab_eq', [
-    (np.array([[1,  np.nan]]),
-     np.array([[0,  1],
-               [0, -1]]),
-     np.array([[1, 0, 1]]))
-])
-@given(y=floats(min_value=-1E6, max_value=1E6, allow_nan=False, allow_infinity=False))
-def test_enum_facets_non_unique_2d(verts: NDArray, rays: NDArray, expected_Ab_eq: NDArray, y: float):
-    verts[0, 1] = y
-    Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
-    assert Ab.size == 0, \
-        f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
-    assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
-        f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
+    @pytest.mark.parametrize('verts, rays, expected_Ab_eq', [
+        (np.array([[1,  np.nan]]),
+        np.array([[0,  1],
+                [0, -1]]),
+        np.array([[1, 0, 1]]))
+    ])
+    @given(y=floats(min_value=-1E6, max_value=1E6, allow_nan=False, allow_infinity=False))
+    def test_enum_facets_non_unique_2d(self, verts: NDArray, rays: NDArray, expected_Ab_eq: NDArray, y: float):
+        verts[0, 1] = y
+        Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
+        assert Ab.size == 0, \
+            f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
+        assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
+            f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
 
 
-@pytest.mark.parametrize('verts, expected_Ab_eq', [
-    (np.array([[0, 0]]),
-     np.array([[1, 0, 0],
-               [0, 1, 0]])),
-    (np.array([[-0.2, 0.5]]), 
-     np.array([[1, 0, -0.2],
-               [0, 1,  0.5]]))
-])
-def test_enum_facets_singleton_2d(verts: NDArray, expected_Ab_eq: NDArray):
-    Ab, Ab_eq = pes.utils.enum_facets(verts)
-    assert Ab.size == 0, \
-        f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
-    assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
-        f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
+    @pytest.mark.parametrize('verts, expected_Ab_eq', [
+        (np.array([[0, 0]]),
+        np.array([[1, 0, 0],
+                [0, 1, 0]])),
+        (np.array([[-0.2, 0.5]]), 
+        np.array([[1, 0, -0.2],
+                [0, 1,  0.5]]))
+    ])
+    def test_enum_facets_singleton_2d(self, verts: NDArray, expected_Ab_eq: NDArray):
+        Ab, Ab_eq = pes.utils.enum_facets(verts)
+        assert Ab.size == 0, \
+            f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
+        assert lsort(normalize(Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
+            f"Expected equality constraints\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
 
 
-@pytest.mark.parametrize('Ab, expected_verts', [
-    (..., ...)
-])  
-def test_enum_facets_nondegen_3d(Ab: NDArray, expected_verts: NDArray):
-    ...
+    # @pytest.mark.parametrize('Ab, expected_verts', [
+    #     (..., ...)
+    # ])  
+    # def test_enum_facets_nondegen_3d(self, Ab: NDArray, expected_verts: NDArray):
+    #     ...
 
 
-@pytest.mark.parametrize('verts, rays, expected_Ab, expected_Ab_eq', [
-    (..., ..., ..., ...)
-])
-def test_enum_facets_unbounded_3d(verts: NDArray, rays: NDArray, expected_Ab: NDArray, expected_Ab_eq: NDArray):
-    ...
+    # @pytest.mark.parametrize('verts, rays, expected_Ab, expected_Ab_eq', [
+    #     (..., ..., ..., ...)
+    # ])
+    # def test_enum_facets_unbounded_3d(self, verts: NDArray, rays: NDArray, expected_Ab: NDArray, expected_Ab_eq: NDArray):
+    #     ...
 
 
-@pytest.mark.parametrize('verts, rays, k, expected_Ab', [
-    (..., ..., ..., ...)
-])
-def test_enum_facets_non_unique_3d(verts: NDArray, rays: NDArray, k: int, expected_Ab: NDArray):
-    ...
+    # @pytest.mark.parametrize('verts, rays, k, expected_Ab', [
+    #     (..., ..., ..., ...)
+    # ])
+    # def test_enum_facets_non_unique_3d(self, verts: NDArray, rays: NDArray, k: int, expected_Ab: NDArray):
+    #     ...
 
 
-@pytest.mark.parametrize('verts, expected_Ab_eq', [
-    (..., ...)
-])
-def test_enum_facets_singleton_3d(verts: NDArray, expected_Ab_eq: NDArray):
-    ...
+    # @pytest.mark.parametrize('verts, expected_Ab_eq', [
+    #     (..., ...)
+    # ])
+    # def test_enum_facets_singleton_3d(self, verts: NDArray, expected_Ab_eq: NDArray):
+    #     ...
 
 
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_facets_empty_nd(n: int):
-    verts, rays = np.empty((0, n)), np.empty((0, n))
-    Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
-    assert Ab == approx(np.column_stack([np.zeros((1, n)), [-1]])), \
-        f"Expected a single inequality [0, ..., 0, -1], but got Ab={Ab} (Ab.shape={Ab.shape})"
-    assert Ab_eq.size == 0, \
-        f"Expected no equality constraints, but got {Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_facets_empty_nd(self, n: int):
+        verts, rays = np.empty((0, n)), np.empty((0, n))
+        Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
+        assert Ab == approx(np.column_stack([np.zeros((1, n)), [-1]])), \
+            f"Expected a single inequality [0, ..., 0, -1], but got Ab={Ab} (Ab.shape={Ab.shape})"
+        assert Ab_eq.size == 0, \
+            f"Expected no equality constraints, but got {Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
 
 
-@pytest.mark.enum_facets
-@given(n=integers(min_value=1, max_value=N_MAX))
-def test_enum_facets_full_space_nd(n: int):
-    verts, rays = np.empty((0, n)), np.vstack([np.eye(n), -np.eye(n)])
-    Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
-    assert Ab.size == 0, \
-        f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
-    assert Ab.shape == (0, n + 1), \
-        f"Expected shape of Ab to be (0, n + 1), but got (Ab.shape={Ab.shape})"
-    assert Ab_eq.size == 0, \
-        f"Expected no equalities, but got Ab_eq={Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
-    assert Ab_eq.shape == (0, n + 1), \
-        f"Expected shape of Ab_eq to be (0, n + 1), but got (Ab_eq.shape={Ab_eq.shape})"
+    @pytest.mark.enum_facets
+    @given(n=integers(min_value=1, max_value=N_MAX))
+    def test_enum_facets_full_space_nd(self, n: int):
+        verts, rays = np.empty((0, n)), np.vstack([np.eye(n), -np.eye(n)])
+        Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
+        assert Ab.size == 0, \
+            f"Expected no inequalities, but got Ab={Ab} (Ab.shape={Ab.shape})"
+        assert Ab.shape == (0, n + 1), \
+            f"Expected shape of Ab to be (0, n + 1), but got (Ab.shape={Ab.shape})"
+        assert Ab_eq.size == 0, \
+            f"Expected no equalities, but got Ab_eq={Ab_eq} (Ab_eq.shape={Ab_eq.shape})"
+        assert Ab_eq.shape == (0, n + 1), \
+            f"Expected shape of Ab_eq to be (0, n + 1), but got (Ab_eq.shape={Ab_eq.shape})"
 
 
-def test_enum_facets_archetypes(poly_arch_all: tuple[Polytope, PolytopeData]):
-    _, poly_data = poly_arch_all
-    verts, rays = poly_data.verts, poly_data.rays
-    Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
-    excepted_Ab, expected_Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
-    assert lsort(normalize(Ab)) == approx(lsort(normalize(excepted_Ab))), \
-        f"Expected inequalities\n{excepted_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
-    assert lsort(normalize(Ab_eq)) == approx(lsort(normalize(expected_Ab_eq))), \
-        f"Expected equalities\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
-    
+    def test_enum_facets_archetypes(self, poly_arch_all: tuple[Polytope, PolytopeData]):
+        _, poly_data = poly_arch_all
+        verts, rays = poly_data.verts, poly_data.rays
+        Ab, Ab_eq = pes.utils.enum_facets(verts, rays)
+        excepted_Ab, expected_Ab_eq = np.column_stack([poly_data.A, poly_data.b]), np.column_stack([poly_data.A_eq, poly_data.b_eq])
+        assert lsort(normalize(Ab)) == approx(lsort(normalize(excepted_Ab))), \
+            f"Expected inequalities\n{excepted_Ab}\nto be equal to Ab=\n{Ab}\n(same rows, order does not matter)"
+        assert lsort(normalize(Ab_eq)) == approx(lsort(normalize(expected_Ab_eq))), \
+            f"Expected equalities\n{expected_Ab_eq}\nto be equal to Ab_eq=\n{Ab_eq}\n(same rows, order does not matter)"
+        
 
-def test_enum_facets_archetypes_2d_nondegen_none_equivalent_empty(poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
-    _, poly_data = poly_arch_nondegen_2d
-    verts, n = poly_data.verts, poly_data.n
-    assert lsort(pes.utils.enum_facets(verts)[0]) == approx(lsort(pes.utils.enum_facets(verts, np.empty((0, n)))[0])), \
-        f"Expected enum_facets(verts) and enum_facets(verts, np.empty((0, n))) to give the same inequalities, but got\n{pes.utils.enum_facets(verts)}\nand\n{pes.utils.enum_facets(verts, np.empty((0, n)))}"
-    assert lsort(pes.utils.enum_facets(verts)[0]) == approx(lsort(pes.utils.enum_facets(verts, None)[0])), \
-        f"Expected enum_facets(verts) and enum_facets(verts, None) to give the same inequalities, but got\n{pes.utils.enum_facets(verts)}\nand\n{pes.utils.enum_facets(verts, None)}"
-    
+    def test_enum_facets_archetypes_2d_nondegen_none_equivalent_empty(self, poly_arch_nondegen_2d: tuple[Polytope, PolytopeData]) -> None:
+        _, poly_data = poly_arch_nondegen_2d
+        verts, n = poly_data.verts, poly_data.n
+        assert lsort(pes.utils.enum_facets(verts)[0]) == approx(lsort(pes.utils.enum_facets(verts, np.empty((0, n)))[0])), \
+            f"Expected enum_facets(verts) and enum_facets(verts, np.empty((0, n))) to give the same inequalities, but got\n{pes.utils.enum_facets(verts)}\nand\n{pes.utils.enum_facets(verts, np.empty((0, n)))}"
+        assert lsort(pes.utils.enum_facets(verts)[0]) == approx(lsort(pes.utils.enum_facets(verts, None)[0])), \
+            f"Expected enum_facets(verts) and enum_facets(verts, None) to give the same inequalities, but got\n{pes.utils.enum_facets(verts)}\nand\n{pes.utils.enum_facets(verts, None)}"
+        
 
-def test_invariance_enum_verts_enum_facets_minimal() -> None:
-    """Tests whether enumerating the vertices and then enumerating the facets from those vertices leaves the input unchanged when there are no redundant constraints"""
-    ...
-    
+    # def test_invariance_enum_verts_enum_facets_minimal(self) -> None:
+    #     """Tests whether enumerating the vertices and then enumerating the facets from those vertices leaves the input unchanged when there are no redundant constraints"""
+    #     ...
+        
 
-# TODO: Add integration test where `@given(ndarray)`, we test `pes.utils.sort_rows(pes.utils.conv(verts)) == pes.utils.sort_rows(pes.utils.conv(pes.utils.enum_verts(pes.utils.enum_facets(verts, ...))))`
+    # TODO: Add integration test where `@given(ndarray)`, we test `pes.utils.sort_rows(pes.utils.conv(verts)) == pes.utils.sort_rows(pes.utils.conv(pes.utils.enum_verts(pes.utils.enum_facets(verts, ...))))`
 
 
 # ===============
@@ -545,6 +568,24 @@ class TestConv:
     def test_parameterize_3d_degen_redundant_plane(self, verts: NDArray, expected_verts: NDArray) -> None:
         assert lsort(pes.utils.conv(verts)) == approx(lsort(expected_verts)), \
             f"Expected convex hull of\n{verts}\nto be equal to\n{pes.utils.conv(verts)}\n(same rows, order does not matter)"
+        
+    @pytest.mark.parametrize('verts, expected_verts', [
+        (np.array([[0., 1., 0., 0., 0.],
+                   [0., 0., 0., 1., 0.],
+                   [0., 0., 1., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 1.]]),  # Failing test case from hypothesis, with 1E-103 replaced by 0
+         np.array([[0., 1., 0., 0., 0.],
+                   [0., 0., 0., 1., 0.],
+                   [0., 0., 1., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 1.]])),
+    ])
+    def test_parameterize_nd_degen_(self, verts: NDArray, expected_verts: NDArray) -> None:
+        assert lsort(pes.utils.conv(verts)) == approx(lsort(expected_verts)), \
+            f"Given\n{verts}\nexpected convex hull \n{pes.utils.conv(verts)}\nto be equal to\n{expected_verts}\n(same rows, order does not matter)"
     
     def test_parameterize_3d_degen_line(self) -> None:
         ...
@@ -659,7 +700,6 @@ class TestConv:
     # E   )
 
     # scipy/spatial/_qhull.pyx:356: QhullError
-    @pytest.mark.skip(reason="For some reason, this test is now failing. We need to find why. See error message in comment above")
     @given(verts=integers(min_value=1, max_value=N_MAX).flatmap(
         lambda n: integers(min_value=1, max_value=n + 10).flatmap(
             lambda k: arrays(float, (k, n), elements=floats(-100, 100, allow_infinity=False, allow_nan=False))
@@ -726,7 +766,7 @@ def test_signed_angle_random_nd_not_2d_or_3d_value_error(vector_nd_pair: tuple[N
 ))
 def test_signed_angle_random_2d_in_range(vector_2d_pair: tuple[NDArray, NDArray]):
     v_1, v_2 = vector_2d_pair
-    assume(not v_1 == approx(0) and not v_2 == approx(0))
+    assume(v_1 != approx(0) and v_2 != approx(0))
     assert -180 <= rad2deg(pes.utils.signed_angle(v_1, v_2)) <= 180, \
         f"Expected signed angle between {v_1} and {v_2} to be between -180 and 180 degrees, but got {np.degrees(pes.utils.signed_angle(v_1, v_2))} degrees"
 
@@ -737,10 +777,12 @@ def test_signed_angle_random_2d_in_range(vector_2d_pair: tuple[NDArray, NDArray]
 ))
 def test_signed_angle_random_2d_commutative(vector_2d_pair: tuple[NDArray, NDArray]):
     v_1, v_2 = vector_2d_pair
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where one of the vectors is zero
-    assume(not np.linalg.matrix_rank(np.column_stack([v_1, v_2])) < 2)  # Skip cases where the vectors are (anti)parallel
-    assert pes.utils.signed_angle(v_1, v_2) == approx(-pes.utils.signed_angle(v_2, v_1)), \
-        f"Expected signed angle between {v_1} and {v_2} to be the negative of the signed angle between {v_2} and {v_1}, but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and {rad2deg(pes.utils.signed_angle(v_2, v_1))} degrees respectively"
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
+    assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
+    angle = pes.utils.signed_angle(v_1, v_2)
+    assume(np.abs(angle) != deg2rad(180))  # Skip cases where the angle is close to ±180 (sign is ambiguous for collinear vectors)
+    assert angle == approx(-pes.utils.signed_angle(v_2, v_1)), \
+        f"Expected signed angle between {v_1} and {v_2} to be the negative of the signed angle between {v_2} and {v_1}, but got {rad2deg(angle)} degrees and {rad2deg(pes.utils.signed_angle(v_2, v_1))} degrees respectively"
 
 
 @pytest.mark.parametrize('v_1, v_2, look', [
@@ -777,9 +819,27 @@ def test_signed_angle_parametrize_attribute_error(v_1: NDArray, v_2: NDArray, lo
 def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar: float):
     v_1 = vector_2d_or_3d
     v_2 = scalar * v_1
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where any vector is zero
     assert pes.utils.signed_angle(v_1, v_2) == approx(0, atol=1E-6), \
         f"Expected signed angle between {v_1} and {v_2} to be 0 degrees (parallel), but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees"
+    
+
+@given(vector_2d_or_3d_pair=integers(
+        min_value=2, max_value=3).flatmap(lambda n: tuples(
+    arrays(float, (n,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)), 
+    arrays(float, (n,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))), 
+    scalar_1=floats(ATOL, 100, allow_infinity=False, allow_nan=False),
+    scalar_2=floats(ATOL, 100, allow_infinity=False, allow_nan=False),
+)
+def test_signed_angle_random_2d_or_3d_scale_invariance(vector_2d_or_3d_pair: tuple[NDArray, NDArray], scalar_1: float, scalar_2: float):
+    v_1, v_2 = vector_2d_or_3d_pair
+    v_1_scaled, v_2_scaled = scalar_1 * v_1, scalar_2 * v_2
+    assume(v_1 != approx(0) and
+           v_2 != approx(0) and
+           v_1_scaled != approx(0) and
+           v_2_scaled != approx(0))  # Skip cases where any vector is zero
+    assert pes.utils.signed_angle(v_1, v_2) == approx(pes.utils.signed_angle(v_1_scaled, v_2_scaled), atol=1E-6), \
+        f"Given v_1={v_1}, v_2={v_2}, v_1_scaled={v_1_scaled}, v_2_scaled={v_2_scaled}, expected signed angle between them to be invariant under positive scaling, but got angle={rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees and angle_scaled={rad2deg(pes.utils.signed_angle(v_1_scaled, v_2_scaled))} degrees respectively"
     
 
 @given(vector_2d_or_3d=integers(
@@ -788,7 +848,7 @@ def test_signed_angle_random_2d_or_3d_parallel(vector_2d_or_3d: NDArray, scalar:
 def test_signed_angle_random_2d_or_3d_antiparallel(vector_2d_or_3d: NDArray, scalar: float):
     v_1 = vector_2d_or_3d
     v_2 = scalar * v_1
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where any vector is zero
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where any vector is zero
     assert abs(pes.utils.signed_angle(v_1, v_2)) == approx(deg2rad(180)), \
         f"Expected signed angle between {v_1} and {v_2} to be ±180 degrees (antiparallel), but got {rad2deg(pes.utils.signed_angle(v_1, v_2))} degrees"
 
@@ -800,10 +860,10 @@ def test_signed_angle_random_2d_or_3d_antiparallel(vector_2d_or_3d: NDArray, sca
 def test_signed_angle_random_3d_cross_product_perpendicular(vector_3d_pair):
     v_1, v_2 = vector_3d_pair
     cross_product = np.cross(v_1, v_2)
-    assume(not v_1 == approx(0) and not v_2 == approx(0))  # Skip cases where one of the vectors is zero
-    assume(not np.linalg.matrix_rank(np.column_stack([v_1, v_2])) < 2)  # Skip cases where the vectors are (anti)parallel
+    assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
+    assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
     # FIXME: I should be able to remove the line below, but sometimes hypothesis suddenly generates a numerically ill-conditioned counterexample.
-    assume(not np.linalg.norm(cross_product) == approx(0))  # Skip cases where cross product is numerically zero
+    assume(np.linalg.norm(cross_product) != approx(0))  # Skip cases where cross product is numerically zero
     assert abs(pes.utils.signed_angle(v_1, cross_product)) == approx(deg2rad(90)), \
         f"Expected signed angle between {v_1} and {cross_product} to be ±90 degrees when one is the cross product of the other, but got {rad2deg(pes.utils.signed_angle(v_1, cross_product))} degrees"
 
@@ -813,7 +873,7 @@ def test_signed_angle_random_3d_cross_product_perpendicular(vector_3d_pair):
 )
 def test_signed_angle_random_2d_or_3d_identical_inputs(vector_2d_or_3d):
     v = vector_2d_or_3d
-    assume(not v == approx(0))  # Skip cases where the vector is numerically zero
+    assume(v != approx(0))  # Skip cases where the vector is numerically zero
     assert pes.utils.signed_angle(v, v) == approx(0, atol=1E-6), f"The angle between a vector and itself should be zero, received {rad2deg(pes.utils.signed_angle(v, v))}"
 
 

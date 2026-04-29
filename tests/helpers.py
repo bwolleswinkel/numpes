@@ -1,7 +1,9 @@
 """Script containing helper functions for testing"""
 
-from typing import TYPE_CHECKING
+import importlib.util
+import inspect
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -79,3 +81,86 @@ def normalize(Ab: NDArray, eq: bool = False) -> NDArray:
         else:
             normalized[idx] = Ab[idx]
     return normalized
+
+
+# FROM: GitHub Copilot Raptor mini (Preview) | 2026/04/26[untested/unverified]
+def requires(import_name: str, exception: type[BaseException] = ImportError, match: str | None = None):
+    """Decorator for optional dependency tests.
+
+    If the named module is unavailable, the wrapped test is executed under
+    ``pytest.raises`` and must raise the expected exception with an optional
+    regular expression match.
+
+    If the module is available, the decorated test runs normally.
+
+    Supports decorating pytest test functions and test classes by wrapping
+    all class attributes whose names start with ``test``.
+    """
+
+    def decorator(test_obj):
+        if inspect.isclass(test_obj):
+            for attr_name in dir(test_obj):
+                if not attr_name.startswith('test'):
+                    continue
+                attr_value = getattr(test_obj, attr_name)
+                if not callable(attr_value):
+                    continue
+                if getattr(attr_value, '__requires_wrapped__', False):
+                    continue
+                setattr(test_obj, attr_name, decorator(attr_value))
+            return test_obj
+
+        @wraps(test_obj)
+        def wrapper(*args, **kwargs):
+            if importlib.util.find_spec(import_name) is None:
+                with pytest.raises(exception, match=match):
+                    test_obj(*args, **kwargs)
+                return None
+            return test_obj(*args, **kwargs)
+
+        wrapper.__requires_wrapped__ = True
+        return wrapper
+
+    return decorator
+
+
+# FROM: GitHub Copilot Raptor mini (Preview) | 2026/04/28[untested/unverified]
+def close_figures(test_obj):
+    """Decorator that closes matplotlib figures after each test execution.
+
+    When applied to a class, wraps all methods whose names start with ``test``
+    so each test automatically closes any matplotlib figures it created.
+
+    For Hypothesis-decorated tests, wraps the underlying ``inner_test`` so
+    cleanup happens after every generated example instead of only after the
+    whole Hypothesis run.
+    """
+    def close_all_figures():
+        try:
+            import matplotlib.pyplot as plt
+            plt.close('all')
+        except ImportError as _:
+            pass
+
+    def wrap_test_function(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            finally:
+                close_all_figures()
+
+        return wrapper
+
+    if inspect.isclass(test_obj):
+        for attr_name, attr_value in vars(test_obj).items():
+            if attr_name.startswith('test') and callable(attr_value):
+                if hasattr(attr_value, 'hypothesis') and hasattr(attr_value.hypothesis, 'inner_test'):
+                    inner = attr_value.hypothesis.inner_test
+                    if callable(inner):
+                        attr_value.hypothesis.inner_test = wrap_test_function(inner)
+                else:
+                    setattr(test_obj, attr_name, close_figures(attr_value))
+        return test_obj
+
+    return wrap_test_function(test_obj)

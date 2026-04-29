@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
-from .._config import CFG
+from numpes._config import CFG
 
 try:
     import cvxpy as cvx
@@ -80,10 +80,11 @@ def _solve_lp_scipy(
         3: Status.UNBOUNDED,
         4: Status.NUMERICAL_ISSUES_ENCOUNTERED,
     }.get(res_sp.status, Status.UNKNOWN)
+    success = status in {Status.OPTIMAL, Status.UNBOUNDED}
     return OptimizationProgramResult(
-        success=status in {Status.OPTIMAL, Status.UNBOUNDED},
-        value=res_sp.fun if res_sp.success else None,
-        x_star=res_sp.x if res_sp.success else None,
+        success=success,
+        value=res_sp.fun if status == Status.OPTIMAL else None,
+        x_star=res_sp.x if status == Status.OPTIMAL else None,
         status=status
     )
 
@@ -98,6 +99,10 @@ def _solve_lp_cvxpy(
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
     """Solve a linear program using CVXPY"""
+
+    if not CVXPY_INSTALLED:
+        raise ImportError("The package 'cvxpy' is not installed. Please install it to use the CVXPY backend.")
+    
     bounds_cvx: NDArray | None = None
     if bounds is not None:
         bounds_cvx = np.array([
@@ -129,8 +134,8 @@ def _solve_lp_cvxpy(
     }.get(problem.status if problem.status != cvx.USER_LIMIT else None, Status.UNKNOWN)
     return OptimizationProgramResult(
         success=success,
-        value=problem.value if success else None,
-        x_star=x.value if success else None,
+        value=problem.value if status == Status.OPTIMAL else None,
+        x_star=x.value if status == Status.OPTIMAL else None,
         status=status
     )
 
@@ -145,6 +150,10 @@ def _solve_lp_pulp(
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
     """Solve a linear program using PULP"""
+
+    if not PULP_INSTALLED:
+        raise ImportError("The package 'pulp' is not installed. Please install it to use the PuLP backend.")
+
     n = c.size
     prob = pulp.LpProblem()
     if bounds is None:
@@ -190,8 +199,8 @@ def _solve_lp_pulp(
 
     return OptimizationProgramResult(
         success=success,
-        value=prob.objective.value() if success else None,
-        x_star=np.array([var.varValue for var in x]) if success else None,
+        value=prob.objective.value() if status == Status.OPTIMAL else None,
+        x_star=np.array([var.varValue for var in x]) if status == Status.OPTIMAL else None,
         status=status,
     )
 
@@ -260,12 +269,8 @@ def solve_lp(
         case 'scipy':
             res = _solve_lp_scipy(c, A, b, A_eq, b_eq, bounds, x_0)
         case 'cvxpy':
-            if not CVXPY_INSTALLED:
-                raise ImportError("CVXPY is not installed. Please install it to use the 'cvxpy' backend.")
             res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
         case 'pulp':
-            if not PULP_INSTALLED:
-                raise ImportError("PuLP is not installed. Please install it to use the 'pulp' backend.")
             res = _solve_lp_pulp(c, A, b, A_eq, b_eq, bounds, x_0)
         case _:
             raise ValueError(f"Unknown LP backend '{backend}'")

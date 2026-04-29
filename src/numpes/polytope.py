@@ -18,7 +18,8 @@ poly_from_bounds
     A factory function for creating a Polytope instance from upper and lower bounds.
 """
 
-from typing import TYPE_CHECKING
+from __future__ import annotations
+from typing import TYPE_CHECKING, overload
 
 import numpy as np
 
@@ -30,10 +31,10 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from ._config import CFG
-from ._internal import multipledispatch
-from .exceptions import InvalidCombinationOfArguments, InvalidRepresentation
-from .utils import enum_facets, enum_gens, signed_angle
+from numpes._config import CFG
+from numpes._internal import multipledispatch, wraps
+from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
+from numpes.utils import enum_facets, enum_gens, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -68,7 +69,7 @@ class Polytope:
     # pylint: disable=unused-argument
     @multipledispatch
     def __init__(self,
-                 *_args: Any,
+                 *args: Any,
                  n: Optional[int] = None,
                  verts: Optional[NDArray | ArrayLike] = None,
                  rays: Optional[NDArray | ArrayLike] = None,
@@ -150,8 +151,18 @@ class Polytope:
         self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
-        raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided to the " \
-        "constructor of Polytope. Please refer to the documentation for more details on valid argument combinations.")
+        kwargs = {key: value for key, value in {
+            'n': n,
+            'verts': verts,
+            'rays': rays,
+            'A': A,
+            'b': b,
+            'A_eq': A_eq,
+            'b_eq': b_eq,
+        }.items() if value is not None}
+        raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided," \
+        f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
+        "combinations or arguments.")
 
     @__init__.register(len_args=0, exclude_kwargs=['verts', 'A', 'b'])
     def _init_empty(self,
@@ -214,11 +225,16 @@ class Polytope:
         self._vol = 0
         self._chebcr = (np.full(n + 1, np.nan), np.nan)
 
+    @overload
+    def _init_vrepr(self, *args: ArrayLike) -> None: ...
+    @overload
+    def _init_vrepr(self, *, verts: ArrayLike) -> None: ...
+
     @__init__.register(len_args=1)
     @__init__.register(len_args=0, include_kwargs=['verts'])
     def _init_vrepr(self,
-                    *args: tuple[()] | tuple[NDArray | ArrayLike],
-                    **kwargs: dict[Literal['verts'], NDArray | ArrayLike] | dict[str, Any]
+                    *args: ArrayLike,
+                    **kwargs: ArrayLike,
                     ) -> None:
         """Initialize a polytope from vertices (V-representation).
 
@@ -247,28 +263,32 @@ class Polytope:
             (verts,) = args
         else:
             verts = kwargs['verts']
-        assert isinstance(verts, (np.ndarray, list))  # For type checker
         verts = np.atleast_2d(verts)
         if verts.ndim != 2:
             raise ValueError(f"Vertices must be provided as a 2D array of shape (k, n)," \
                              f" but received an array of shape {verts.shape}")
-        n = verts.shape[1]
-        if 'rays' in kwargs:  # pylint: disable=consider-using-get
+        if 'rays' in kwargs:
             rays = kwargs['rays']
+            rays = np.atleast_2d(rays)
+            if rays.ndim != 2 or rays.shape[1] != verts.shape[1]:
+                raise ValueError(f"Rays must be provided as a 2D array of shape (k_rays, " \
+                                 f"n={verts.shape[1]}), but received an array of shape {rays.shape}")
         else:
-            rays = np.empty((0, n))
-        assert isinstance(rays, (np.ndarray, list))  # For type checker
-        rays = np.atleast_2d(rays)
+            rays = np.empty((0, verts.shape[1]))
 
-        # FIXME: Here we should have another check to see if verts and rays are compatible
         self.vrepr = (verts, rays)
         self._hrepr = None
+
+    @overload
+    def _init_hrepr(self, *args: ArrayLike) -> None: ...
+    @overload
+    def _init_hrepr(self, *, A: ArrayLike, b: ArrayLike) -> None: ...
 
     @__init__.register(len_args=2)
     @__init__.register(len_args=0, include_kwargs=['A', 'b'])
     def _init_hrepr(self,
-                    *args: tuple[()] | tuple[NDArray | ArrayLike, NDArray | ArrayLike],
-                    **kwargs: dict[Literal['A', 'b'], NDArray | ArrayLike] | dict[str, Any]
+                    *args: ArrayLike,
+                    **kwargs: ArrayLike,
                     ) -> None:
         """Initialize a polytope from half-spaces (H-representation).
 
@@ -298,19 +318,68 @@ class Polytope:
             A, b = args
         else:
             A, b = kwargs['A'], kwargs['b']
-        assert isinstance(A, (np.ndarray, list)) and isinstance(b, (np.ndarray, list))  # For type checker
         A, b = np.atleast_2d(A), np.atleast_1d(b)
-        n = A.shape[1]
         if A.ndim != 2 or b.ndim != 1 or A.shape[0] != b.size:
             raise ValueError(f"A must be a matrix of size (m, n) and b must be a vector of size (m,)," \
                              f" but received A={A.shape}, b={b.shape}.")
         if 'A_eq' in kwargs and 'b_eq' in kwargs:
             A_eq, b_eq = kwargs['A_eq'], kwargs['b_eq']
+            A_eq, b_eq = np.atleast_2d(A_eq), np.atleast_1d(b_eq)
+            if A_eq.ndim != 2 or b_eq.ndim != 1 or A_eq.shape[0] != b_eq.size or A_eq.shape[1] != A.shape[1]:
+                raise ValueError(f"A_eq must be a matrix of shape (m_eq, n={A.shape[1]}) and b_eq must be a vector " \
+                                 f"of size (m_eq,), but received shape A_eq={A_eq.shape}, b_eq={b_eq.shape}.")
         else:
-            A_eq, b_eq = np.empty((0, n)), np.empty((0,))
+            A_eq, b_eq = np.empty((0, A.shape[1])), np.empty((0,))
 
         self._vrepr = None
         self.hrepr = (np.column_stack((A, b)), np.column_stack((A_eq, b_eq)))
+
+    def _init_ambient(self,
+                      n: int
+                      ) -> None:
+        """Initialize a polytope covering R^n.
+
+        Parameters
+        ----------
+        n: int
+            Dimension of the ambient space.
+
+        Raises
+        ------
+        TypeError
+            If the argument `n` is of the wrong type.
+        ValueError
+            If the provided ambient dimension `n` is not a positive integer.
+        """
+
+        def _validate_inputs(n: int) -> None:
+            """Validate the inputs for polytope initialization covering R^n.
+            
+            Raises
+            ------
+            TypeError
+                If the argument `n` is of the wrong type.
+            ValueError
+                If the provided ambient dimension `n` is not a positive integer.
+            """
+            if not isinstance(n, int):
+                raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
+            if n <= 0:
+                raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
+
+        _validate_inputs(n)
+
+        self._vrepr = (np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n))))
+        self._hrepr = (np.empty((0, n + 1)), np.empty((0, n + 1)))
+        self._is_empty = False
+        self._is_degen = True
+        self._is_bounded = False
+        self._is_full_dim = True
+        self._is_pointed = False
+        self._is_singleton = False
+        self._dim = n
+        self._vol = np.inf
+        self._chebcr = (np.full(n + 1, np.nan), np.inf)
 
     @property
     def vrepr(self) -> tuple[NDArray, NDArray]:
@@ -471,13 +540,14 @@ class Polytope:
             elif self.n == 3:
                 fig = plt.figure()
                 ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
         else:
             fig = None
-        assert ax is not None  # for type checker
 
         if color is None:
             # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[attr-defined]
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
 
         # TODO: Also implement the logic when `self` is lower-dimensional, so when it is a single plane, or a line.
         # TODO: Also add a degeneracy check for plotting
@@ -532,3 +602,35 @@ class Polytope:
             plt.show()
 
         return ax
+
+
+@wraps(Polytope.__init__)  # pylint: disable=protected-access
+def poly(*args: NDArray, **kwargs: int | NDArray) -> Polytope:
+    """Wrapper function for `Polytope.__init__` to create a polytope"""
+    return Polytope(*args, **kwargs)
+
+
+@wraps(Polytope._init_empty)  # pylint: disable=protected-access
+def poly_empty(n: int) -> Polytope:
+    """Wrapper function for `Polytope._init_empty` to create an empty polytope"""
+    return Polytope(n=n)
+
+
+@wraps(Polytope._init_vrepr)  # pylint: disable=protected-access
+def poly_from_verts(verts: NDArray, rays: Optional[NDArray]) -> Polytope:
+    """Wrapper function for `Polytope._init_vrepr` to create a polytope from vertices, and optionally rays"""
+    return Polytope(verts=verts, rays=rays)
+
+
+@wraps(Polytope._init_hrepr)  # pylint: disable=protected-access
+def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq: Optional[NDArray] = None) -> Polytope:
+    """Wrapper function for `Polytope._init_hrepr` to create a polytope from inequalities, and optionally equalities"""
+    return Polytope(A=A, b=b, A_eq=A_eq, b_eq=b_eq)
+
+
+@wraps(Polytope._init_ambient)  # pylint: disable=protected-access
+def poly_ambient(n: int) -> Polytope:
+    """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
+    poly = Polytope(n=n)
+    poly._init_ambient(n)  # pylint: disable=protected-access
+    return poly

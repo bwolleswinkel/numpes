@@ -11,5 +11,5 @@ wraps
 
 """
 
-from .multipledispatch import *
-from .wraps import *
+from numpes._internal.multipledispatch import *
+from numpes._internal.wraps import *

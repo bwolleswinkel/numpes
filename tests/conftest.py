@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 RTOL: float = 1E-5
 ATOL: float = 1E-8
 N_MAX: int = 10
-MAX_EXAMPLES: int = 20
+MAX_EXAMPLES: int = 100
 
 settings.register_profile('default', max_examples=MAX_EXAMPLES, deadline=500)
 settings.load_profile('default')

@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .._config import CFG
-from .linprog import solve_lp
+from numpes._config import CFG
+from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -91,6 +91,7 @@ def reduce_ineq(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> NDArray:
         res = solve_lp(-Ab[idx, :-1], Ab[~redundant, :-1], Ab[~redundant, -1], Ab_eq[:, :-1], Ab_eq[:, -1], None)
         # If the LP is successful and the max value is <= b_i, it's redundant
         if (res.success
+            and res.status != Status.UNBOUNDED
             and -res.value < Ab[idx, -1]  # type: ignore[operator]
             and not np.isclose(-res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)):  # type: ignore[operator]
             redundant[idx] = True
@@ -101,21 +102,39 @@ def reduce_ineq(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> NDArray:
 
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/20[untested/unverified]
 def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
-    """Find implicit equalities using slack analysis from a single LP solve"""
+    """Find implicit equalities by checking whether each inequality is tight everywhere"""
     m, n = Ab.shape[0], Ab.shape[1] - 1
     if m == 0:
         return Ab, np.empty((0, n + 1))
 
-    # Solve feasibility LP to find any point in the polytope
-    A_eq, b_eq = (Ab_eq[:, :-1], Ab_eq[:, -1]) if Ab_eq.size > 0 else (None, None)
-    res = solve_lp(np.zeros(n), Ab[:, :-1], Ab[:, -1], A_eq, b_eq, None)
+    # Remove trivial all-zero inequalities before solving LPs.
+    # If 0*x <= b with b < 0, the system is infeasible.
+    zero_rows = np.all(np.isclose(Ab[:, :-1], 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+    if np.any(zero_rows):
+        bounds = Ab[zero_rows, -1]
+        if np.any(bounds <= -CFG.atol):
+            return np.array([[0] * n + [-1]]), np.empty((0, n + 1))
+        Ab = Ab[~zero_rows, :]
+        m = Ab.shape[0]
+        if m == 0:
+            return Ab, np.empty((0, n + 1))
 
-    if not res.success:
+    # Check feasibility of the full system first
+    A_eq, b_eq = (Ab_eq[:, :-1], Ab_eq[:, -1]) if Ab_eq.size > 0 else (None, None)
+    feasibility = solve_lp(np.zeros(n), Ab[:, :-1], Ab[:, -1], A_eq, b_eq, None)
+    if not feasibility.success:
         return np.array([[0] * n + [-1]]), np.empty((0, n + 1))
 
-    # Find constraints with zero slack (implicit equalities)
-    slacks = Ab[:, -1] - Ab[:, :-1] @ res.x_star
-    implicit_mask = np.isclose(slacks, 0, rtol=CFG.rtol, atol=CFG.atol)
-    Ab_eq_new = Ab[implicit_mask, :]
+    implicit_mask = np.zeros(m, dtype=bool)
+    for idx in range(m):
+        # If the minimum of a_i x over the feasible set equals b_i, then
+        # the inequality a_i x <= b_i is tight for every feasible x.
+        res = solve_lp(Ab[idx, :-1], Ab[:, :-1], Ab[:, -1], A_eq, b_eq, None)
+        if (res.success
+            and res.status != Status.UNBOUNDED
+            and res.value is not None
+            and np.isclose(res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)):
+            implicit_mask[idx] = True
 
+    Ab_eq_new = Ab[implicit_mask, :]
     return Ab[~implicit_mask], Ab_eq_new
