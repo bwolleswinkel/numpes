@@ -68,7 +68,7 @@ jobs:
                     brew install cddlib gmp
                 fi
 
-            - name: Cache vcpkg
+            - name: Cache vcpkg (cdd/gmp)
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               uses: actions/cache@v5
               with:
@@ -77,7 +77,7 @@ jobs:
                 restore-keys: |
                   vcpkg-${{ runner.os }}-
 
-            - name: Install system dependencies on Windows
+            - name: Install system dependencies on Windows (cdd/gmp)
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
