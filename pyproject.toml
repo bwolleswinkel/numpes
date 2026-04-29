@@ -67,6 +67,9 @@ env_list = [
   "full",
 ]
 
+[tool.tox.install_command]
+install_command = "uv pip install {opts} {packages}"
+
 [tool.tox.env.base]
 deps = [
   "pytest",
