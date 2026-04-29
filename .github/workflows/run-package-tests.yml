@@ -117,7 +117,7 @@ jobs:
                 python -m tox -e ${{ matrix.extra }}
 
             - name: Tests with tox on Windows
-              if: !matrix.cdd_gmp && matrix.os == 'windows-latest'
+              if: (!matrix.cdd_gmp) && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
                 python -m tox -e ${{ matrix.extra }}
