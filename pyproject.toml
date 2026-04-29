@@ -58,8 +58,8 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build"]
-build-backend = "uv_build"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "vcs"
