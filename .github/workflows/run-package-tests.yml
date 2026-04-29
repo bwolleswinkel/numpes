@@ -43,7 +43,9 @@ jobs:
                     - os: windows-latest
                       cdd_gmp: false
                       extra: full
-                    # - os: windows-latest
+                    # FIXME: Builds with cdd/gmp on Windows are still failing due to build issues with pycddlib
+                    - os: windows-latest
+                      cdd_gmp: true
 
         runs-on: ${{ matrix.os }}
 
@@ -56,6 +58,9 @@ jobs:
               uses: actions/setup-python@v5
               with:
                 python-version: ${{ matrix.python }}
+
+            - name: Set up uv
+              uses: astral-sh/setup-uv@v5
 
             - name: Install system dependencies
               if: matrix.cdd_gmp && matrix.os != 'windows-latest'
@@ -95,8 +100,7 @@ jobs:
             - name: Install dependencies
               shell: bash
               run: |
-                python -m pip install --upgrade pip
-                python -m pip install tox tox-gh-actions
+                  uv install tox tox-gh-actions
 
             - name: Tests with tox
               if: matrix.os != 'windows-latest'
@@ -143,25 +147,23 @@ jobs:
               shell: pwsh
               run: |
                 # FIXME: The following is still not building pycddlib properly 
-                # $triplet = "x64-windows-static-md-release"
-                # $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
-                # $include = "$prefix\include"
-                # $cddinclude = "$prefix\include\cddlib"
-                # $lib = "$prefix\lib"
-                # $bin = "$prefix\bin"
-                # $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
-                # $env:CPATH = "$cddinclude;$include"
-                # $env:LIB = "$lib;$env:LIB"
-                # $env:CFLAGS = "-I$cddinclude -I$include"
-                # $env:LDFLAGS = "-L$lib"
-                # $env:CL = "/I$cddinclude /I$include"
-                # $env:Path = "$env:Path;$bin"
-                # $env:DISTUTILS_USE_SDK = "1"
-                # $env:MSSdk = "1"
-                # Get-ChildItem Env:
-                # python -m tox -e ${{ matrix.extra }}
-                echo "Skipping tests with tox on Windows with cdd/gmp due to build issues with pycddlib. See debug steps for details."
-                exit 78
+                $triplet = "x64-windows-static-md-release"
+                $prefix = "${{ github.workspace }}\vcpkg\installed\$triplet"
+                $include = "$prefix\include"
+                $cddinclude = "$prefix\include\cddlib"
+                $lib = "$prefix\lib"
+                $bin = "$prefix\bin"
+                $env:INCLUDE = "$cddinclude;$include;$env:INCLUDE"
+                $env:CPATH = "$cddinclude;$include"
+                $env:LIB = "$lib;$env:LIB"
+                $env:CFLAGS = "-I$cddinclude -I$include"
+                $env:LDFLAGS = "-L$lib"
+                $env:CL = "/I$cddinclude /I$include"
+                $env:Path = "$env:Path;$bin"
+                $env:DISTUTILS_USE_SDK = "1"
+                $env:MSSdk = "1"
+                Get-ChildItem Env:
+                python -m tox -e ${{ matrix.extra }}
 
             - name: Tests with tox on Windows
               if: (!matrix.cdd_gmp) && matrix.os == 'windows-latest'
