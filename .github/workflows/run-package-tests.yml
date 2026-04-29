@@ -102,16 +102,23 @@ jobs:
                 fi
                 tox -e ${{ matrix.extra }}
 
+            - name: Debug vcpkg include contents (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows\include"
+
             - name: Tests with tox on Windows (cdd/gmp)
               if: matrix.cdd_gmp && matrix.os == 'windows-latest'
               shell: pwsh
               run: |
                 $include = "${{ github.workspace }}\vcpkg\installed\x64-windows\include"
+                $cddinclude = "${{ github.workspace }}\vcpkg\installed\x64-windows\include\cddlib"
                 $lib = "${{ github.workspace }}\vcpkg\installed\x64-windows\lib"
                 $bin = "${{ github.workspace }}\vcpkg\installed\x64-windows\bin"
-                $env:INCLUDE = "$include;$env:INCLUDE"
+                $env:INCLUDE = "$include;$cddinclude;$env:INCLUDE"
                 $env:LIB = "$lib;$env:LIB"
-                $env:CFLAGS = "-I$include"
+                $env:CFLAGS = "-I$include -I$cddinclude"
                 $env:LDFLAGS = "-L$lib"
                 $env:Path = "$env:Path;$bin"
                 python -m tox -e ${{ matrix.extra }}
