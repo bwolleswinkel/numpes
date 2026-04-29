@@ -100,7 +100,7 @@ jobs:
             - name: Install dependencies
               shell: bash
               run: |
-                  uv install tox tox-gh-actions
+                uv pip install tox tox-gh-actions
 
             - name: Tests with tox
               if: matrix.os != 'windows-latest'
