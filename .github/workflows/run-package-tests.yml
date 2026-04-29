@@ -85,6 +85,13 @@ jobs:
                 .\vcpkg\bootstrap-vcpkg.bat
                 .\vcpkg\vcpkg.exe install gmp:x64-windows-static-md-release cddlib:x64-windows-static-md-release
 
+            - name: Debug cddlib headers after vcpkg install (cdd/gmp)
+              if: matrix.cdd_gmp && matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                Write-Host "Listing all headers in vcpkg include directory:"
+                Get-ChildItem -Recurse "${{ github.workspace }}\vcpkg\installed\x64-windows-static-md-release\include"
+
             - name: Install dependencies
               shell: bash
               run: |
