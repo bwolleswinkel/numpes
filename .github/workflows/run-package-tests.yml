@@ -54,13 +54,10 @@ jobs:
         steps:
             - uses: actions/checkout@v5
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
+            - name: Install uv and set up Python
+              uses: astral-sh/setup-uv@v5
               with:
                 python-version: ${{ matrix.python }}
-
-            - name: Set up uv
-              uses: astral-sh/setup-uv@v5
 
             - name: Install system dependencies
               if: matrix.cdd_gmp && matrix.os != 'windows-latest'
