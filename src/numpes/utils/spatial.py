@@ -305,27 +305,16 @@ def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> 
 
     v_1_norm, v_2_norm = v_1 / np.linalg.norm(v_1), v_2 / np.linalg.norm(v_2)
     dot_prod = np.clip(np.dot(v_1_norm, v_2_norm), -1.0, 1.0)
-    angle = np.arccos(dot_prod)
 
-    # Robust sign computation
     if v_1.size == 2:
-        sign_val = v_1_norm[0] * v_2_norm[1] - v_1_norm[1] * v_2_norm[0]
-        sign = np.sign(sign_val)
-        # If look is provided in 2D, check if it points in negative z direction
-        if look is not None and look.size >= 3 and look[2] < 0:
-            sign = -sign
-        # If sign is zero due to collinearity, always return +|angle|
-        if np.isclose(sign_val, 0, atol=CFG.atol, rtol=CFG.rtol):
-            sign = 1
+        sin_val = v_1_norm[0] * v_2_norm[1] - v_1_norm[1] * v_2_norm[0]
+        if look is not None and look[2] < 0:
+            sin_val = -sin_val
+        return float(np.arctan2(sin_val, dot_prod))
     else:
         if look is None:
             look = np.array([0.0, 0.0, 1.0])
-        cross_prod = np.cross(v_1_norm, v_2_norm)
-        cross_dot = np.dot(cross_prod, look / np.linalg.norm(look))
-        # If cross product is nearly zero, treat as collinear and force sign=1
-        if np.isclose(cross_dot, 0, atol=CFG.atol, rtol=CFG.rtol):
-            sign = 1
-        else:
-            sign = np.sign(cross_dot)
-
-    return float(sign * angle)
+        angle = np.arccos(dot_prod)
+        cross_dot = np.dot(np.cross(v_1_norm, v_2_norm), look / np.linalg.norm(look))
+        sign = np.sign(cross_dot) if not np.isclose(cross_dot, 0, atol=CFG.atol, rtol=CFG.rtol) else 1
+        return float(sign * angle)

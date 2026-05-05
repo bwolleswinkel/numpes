@@ -19,6 +19,7 @@ poly_from_bounds
 """
 
 from __future__ import annotations
+from itertools import product as iterproduct
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -224,7 +225,7 @@ class Polytope:
         self._is_singleton = False
         self._dim = 0
         self._vol = 0
-        self._chebcr = (np.full(n + 1, np.nan), np.nan)
+        self._chebcr = (np.full(n, np.nan), np.nan)
 
     @overload
     def _init_vrepr(self, *args: ArrayLike) -> None: ...
@@ -416,7 +417,7 @@ class Polytope:
         self._is_singleton = False
         self._dim = n
         self._vol = np.inf
-        self._chebcr = (np.full(n + 1, np.nan), np.inf)
+        self._chebcr = (np.full(n, np.nan), np.inf)
 
     @property
     def vrepr(self) -> tuple[NDArray, NDArray]:
@@ -527,36 +528,151 @@ class Polytope:
     def m_eq(self) -> int:
         """Number of equality constraints in the H-representation of the polytope"""
         return self.Ab_eq.shape[0]
+    
+    @property
+    def is_empty(self) -> bool:
+        """Whether the polytope is empty (i.e., has no points)"""
+        if self._is_empty is None:
+            if self._vrepr is not None:
+                self._is_empty = self.verts.size == 0 and self.rays.size == 0
+            elif self._hrepr is not None:
+                self._is_empty = (np.all(self.Ab == np.array([[0] * self.n + [-1]])) and 
+                                  self.Ab_eq.size == 0)
+            else:
+                raise InvalidRepresentation("Polytope is not properly initialized with either " \
+                "V-representation or H-representation")
+        return self._is_empty
+    
+    @property
+    def vol(self) -> float:
+        """Volume of the polytope. Returns `np.inf` for unbounded polytopes and 0 for empty or lower-dimensional polytopes."""
+        if self._vol is None:
+            if self.is_empty or self.is_singleton or not self.is_full_dim:
+                self._vol = 0
+            elif not self.is_bounded:
+                self._vol = np.inf
+            else:
+                raise NotImplementedError("Volume computation for full-dimensional bounded polytopes is not implemented yet")
+        return self._vol
+    
+    @property
+    def chebcr(self) -> tuple[NDArray, float]:
+        """Chebyshev center and radius of the largest inscribed ball in the polytope"""
+        if self._chebcr is None:
+            if self.is_empty:
+                self._chebcr = (np.full(self.n, np.nan), np.nan)
+            else:
+                raise NotImplementedError("Chebyshev center computation for non-empty polytopes is not implemented yet")
+        return self._chebcr
+    
+    @property
+    def chebc(self) -> NDArray:
+        """Chebyshev center of the largest inscribed ball in the polytope. Returns NaN values if the center is ambiguous or not well-defined (e.g., for empty or unbounded polytopes)."""
+        return self.chebcr[0]
+    
+    @property
+    def chebr(self) -> float:
+        """Chebyshev radius of the largest inscribed ball in the polytope. Returns NaN if the radius is not well-defined (e.g., for empty polytopes) and returns `np.inf` for unbounded polytopes."""
+        return self.chebcr[1]
 
     @classmethod
-    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
-        """Create a polytope from upper and lower bounds on each coordinate."""
+    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Polytope:
+        """Create a polytope from upper and lower bounds on each coordinate.
+
+        Parameters
+        ----------
+        lb : ArrayLike
+            Lower bound of each coordinate. Use `-np.inf` or `float('-inf')` for an unbounded lower bound on a coordinate.
+        ub : ArrayLike
+            Upper bound of each coordinate. Use `np.inf` or `float('inf')` for an unbounded upper bound on a coordinate.
+
+        Returns
+        -------
+        Polytope
+            A polytope with V- and H-representations set analytically.
+            Returns an empty polytope if the bounds are infeasible.
+
+        Raises
+        ------
+        ValueError
+            If bounds are not 1-D arrays of equal length, contain NaN values,
+            or are otherwise malformed.
+        """
         lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
         if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
-            raise ValueError(f"Lower and upper bounds must be 1D arrays of the same size, but received "f"lb={lower.shape}, ub={upper.shape}")
+            raise ValueError(
+                f"Lower and upper bounds must be 1D arrays of the same size, but received "
+                f"lb={lower.shape}, ub={upper.shape}"
+            )
         if np.isnan(lower).any() or np.isnan(upper).any():
             raise ValueError("Lower and upper bounds cannot contain NaN values")
         n = lower.size
-        if (lower > upper).any():
+
+        if (lower == np.inf).any() or (upper == -np.inf).any():
             return cls(n=n)
-        A = np.vstack((np.eye(n), -np.eye(n)))
-        b = np.hstack((upper, -lower))
-        # Filter out any infinite bounds
-        mask = np.concatenate((np.isfinite(upper), np.isfinite(lower)))
-        A, b = A[mask], b[mask]
+        if ((lower > upper) & ~np.isclose(lower, upper, rtol=CFG.rtol, atol=CFG.atol)).any():
+            return cls(n=n)
+
+        is_eq = np.isclose(lower, upper, rtol=CFG.rtol, atol=CFG.atol)
+        lb_is_finite, ub_is_finite = np.isfinite(lower), np.isfinite(upper)
+        is_bounded = ~is_eq & lb_is_finite & ub_is_finite
+        lb_only = ~is_eq & lb_is_finite & ~ub_is_finite
+        ub_only = ~is_eq & ~lb_is_finite & ub_is_finite
+        is_unbounded = ~is_eq & ~lb_is_finite & ~ub_is_finite
+
+        I = np.eye(n)
+        ub_idx, lb_idx, eq_idx = (np.where(ub_is_finite & ~is_eq)[0],
+                                  np.where(lb_is_finite & ~is_eq)[0],
+                                  np.where(is_eq)[0])
+        Ab = np.vstack((
+            np.column_stack(( I[ub_idx],  upper[ub_idx])),
+            np.column_stack((-I[lb_idx], -lower[lb_idx])),
+        )) if ub_idx.size or lb_idx.size else np.empty((0, n + 1))
+        Ab_eq = np.column_stack((I[eq_idx], lower[eq_idx])
+                                ) if eq_idx.size else np.empty((0, n + 1))
+
+        anchor = np.where(lb_is_finite, lower, np.where(ub_is_finite, upper, 0.0))
+        verts = np.array(list(iterproduct(*[
+            (anchor[i], upper[i]) if is_bounded[i] else (anchor[i],) for i in range(n)
+        ])), dtype=float)
+        rays = np.vstack((
+             I[lb_only | is_unbounded],
+            -I[ub_only | is_unbounded],
+        )) if (lb_only | ub_only | is_unbounded).any() else np.empty((0, n))
+
         poly = cls()
-        poly._hrepr = (A, b)
-        # FIXME: We need a smart way to set the verts
-        # verts = np.array(np.meshgrid(*zip(lower, upper))).T.reshape(-1, n)
-        # poly._vrepr = ...
-        poly._is_empty = True
-        poly._is_singleton = np.allclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol)
-        poly._is_bounded = np.all(np.isfinite(upper)) and np.all(np.isfinite(lower))
-        poly._is_degen = poly._is_singleton or not poly._is_bounded
-        poly._is_full_dim = (not poly._is_singleton and
-                             not np.isclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol).any)()
-        # poly._is_pointed = ...
-        # poly._dim = ...
+        poly._vrepr = (verts, rays)
+        poly._hrepr = (Ab, Ab_eq)
+        poly._is_empty = False
+        poly._is_singleton = bool(is_eq.all())
+        poly._is_bounded = bool(~(lb_only | ub_only | is_unbounded).any())
+        poly._is_degen = bool(is_eq.any() or not poly._is_bounded)
+        poly._is_full_dim = bool(~is_eq.any())
+        poly._is_pointed = bool(~is_unbounded.any())
+        poly._dim = int(n - is_eq.sum())
+
+        if is_eq.any():
+            poly._vol = 0.0
+        elif not poly._is_bounded:
+            poly._vol = np.inf
+        else:
+            poly._vol = float(np.prod(upper - lower))
+
+        if poly._is_singleton:
+            poly._chebcr = (lower.copy(), 0.0)
+        elif not poly._is_full_dim:
+            bounds_is_finite = lb_is_finite & ub_is_finite
+            midpoints = np.full(n, np.nan)
+            midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
+            poly._chebcr = (np.where(is_eq, lower, midpoints), 0.0)
+        else:
+            bounds_is_finite = lb_is_finite & ub_is_finite
+            midpoints = np.full(n, np.nan)
+            midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
+            chebc = np.where(is_eq, lower, midpoints)
+            chebr = float(np.min(np.where(bounds_is_finite & ~is_eq, (upper - lower) / 2, np.inf)))
+            poly._chebcr = (chebc, chebr)
+
         return poly
 
     def minimal(self,
@@ -727,3 +843,9 @@ def poly_ambient(n: int) -> Polytope:
     poly = Polytope()
     poly._init_ambient(n)  # pylint: disable=protected-access
     return poly
+
+
+@wraps(Polytope.from_bounds)
+def poly_from_bounds(lb: ArrayLike, ub: ArrayLike) -> Polytope:
+    """Wrapper function for `Polytope.from_bounds` to create a polytope from lower and upper bounds"""
+    return Polytope.from_bounds(lb, ub)

@@ -53,7 +53,7 @@ from importlib.metadata import PackageNotFoundError
 from numpes import control, utils
 from numpes._config import algo_options, get_config, reset_config, set_algo_options
 from numpes.exceptions import ConversionError, InvalidCombinationOfArguments, InvalidRepresentation, NumpesException
-from numpes.polytope import Polytope, poly, poly_empty, poly_from_verts, poly_from_ineq, poly_ambient
+from numpes.polytope import Polytope, poly, poly_empty, poly_from_verts, poly_from_ineq, poly_ambient, poly_from_bounds
 
 try:
     from importlib.metadata import version

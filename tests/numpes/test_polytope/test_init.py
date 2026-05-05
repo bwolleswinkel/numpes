@@ -11,10 +11,11 @@ from hypothesis import given
 from hypothesis.strategies import integers
 
 from tests.conftest import ATOL, N_MAX
+from tests.helpers import lsort, normalize, approx
 
 if TYPE_CHECKING:
     from typing import Any, EllipsisType
-    from numpy.typing import NDArray
+    from numpy.typing import NDArray, ArrayLike
 
 
 def test_polytope_init_no_args_no_kwargs():
@@ -379,7 +380,7 @@ class TestInitAmbient:
         if attr_name == '_dim':
             attr_val = n
         elif attr_name == '_chebcr':
-            attr_val = (np.full(n + 1, np.nan), np.inf)
+            attr_val = (np.full(n, np.nan), np.inf)
         if attr_name == '_chebcr':
             assert (
                 np.array_equal(getattr(poly, attr_name)[0], attr_val[0], equal_nan=True) and
@@ -425,7 +426,6 @@ class TestInitAmbient:
             f"Expected the ambient polytope in dimension {n} to have 0 equalities in ambient dimension {n}, but got {poly.Ab_eq.shape}."
 
 
-@pytest.mark.skip(reason="The method `Polytope.from_bounds` is not yet implemented.")
 class TestInitFromBounds:
     """Tests for the classmethod `Polytope.from_bounds`"""
 
@@ -438,38 +438,102 @@ class TestInitFromBounds:
         (np.zeros(3), np.ones(3)),
         ([1, 2, 3], [4, 5, 6]),
         (-np.ones(4), np.ones(4)),
-        (np.arange(100), np.arange(100, 200)),
+        (np.arange(10), np.arange(10, 20)),
     ])
-    def test_parameterize_box(self, lb: NDArray, ub: NDArray):
+    def test_parameterize_box(self, lb: ArrayLike, ub: ArrayLike):
         poly = pes.poly_from_bounds(lb, ub)
+        lb, ub = np.atleast_1d(lb), np.atleast_1d(ub)
+        chebc, chebr = poly.chebcr
+        assert poly.verts.shape == (2 ** lb.size, lb.size), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 2^{lb.size} vertices in ambient dimension {lb.size}, but got {poly.verts.shape}."
+        assert poly.rays.shape == (0, lb.size), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 rays in ambient dimension {lb.size}, but got {poly.rays.shape}."
+        assert poly.Ab.shape == (2 * lb.size, lb.size + 1), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 2*{lb.size} inequalities in ambient dimension {lb.size}, but got {poly.Ab.shape}."
+        assert poly.Ab_eq.shape == (0, lb.size + 1), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 equalities in ambient dimension {lb.size}, but got {poly.Ab_eq.shape}."
+        # NOTE: These properties are not implemented yet, so we skip these assertions for now.
+        # assert poly.is_empty == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-empty, but got _is_empty={poly.is_empty}."
+        # assert poly.is_degen == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-degenerate, but got _is_degen={poly.is_degen}."
+        # assert poly.is_bounded == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be bounded, but got _is_bounded={poly.is_bounded}."
+        # assert poly.is_full_dim == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be full-dimensional, but got _is_full_dim={poly.is_full_dim}."
+        # assert poly.is_pointed == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be pointed, but got _is_pointed={poly.is_pointed}."
+        # assert poly.is_singleton == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-singleton, but got _is_singleton={poly.is_singleton}."
+        # assert poly.dim == lb.size, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to have dimension {lb.size}, but got _dim={poly.dim}."
+        assert poly.vol == np.prod(ub - lb), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have volume {np.prod(ub - lb)}, but got poly.vol={poly.vol}."
+        assert chebc == approx((lb + ub) / 2), \
+            f"Expected the Chebyshev center of the box defined by lb={lb} and ub={ub} to be at the midpoint of the bounds, but got chebc={chebc}."
+        assert chebr == approx(np.min(ub - lb) / 2), \
+            f"Expected the Chebyshev radius of the box defined by lb={lb} and ub={ub} to be half the minimum length between the bounds, but got chebr={chebr}."
 
     @pytest.mark.parametrize('lb, ub', [
         (np.array([-np.inf]), np.array([np.inf])),
         ([-10], [float('inf')]),
         (float('-inf'), np.pi),
         (np.array([-np.inf, 0]), np.array([1, np.inf])),
-        ([-1/2, -1/4], [float('-inf'), 1/5]),
+        ([-1/2, -1/4], [float('inf'), 1/5]),
         (np.zeros(3), np.full(3, np.inf)),
         ([float('-inf'), 2, 3], [4, 5, 6]),
         (-np.full(4, np.inf), np.ones(4)),
-        (np.arange(100), np.arange(100, 199).tolist() + [float('inf')]),
+        (np.arange(10), np.arange(10, 19).tolist() + [float('inf')]),
     ])
-    def test_parameterize_unbounded(self, lb: NDArray, ub: NDArray):
-        ...
+    def test_parameterize_unbounded(self, lb: ArrayLike, ub: ArrayLike):
+        poly = pes.poly_from_bounds(lb, ub)
+        lb, ub = np.atleast_1d(lb), np.atleast_1d(ub)
+        assert poly.rays.size > 0, \
+            f"Expected the box defined by lb={lb} and ub={ub} to have more than 0 rays in ambient dimension {lb.size}, but got {poly.rays.shape}."
+        assert poly.Ab_eq.shape == (0, lb.size + 1), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 equalities in ambient dimension {lb.size}, but got {poly.Ab_eq.shape}."
+        # NOTE: These properties are not implemented yet, so we skip these assertions for now.
+        # assert poly.is_empty == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-empty, but got _is_empty={poly.is_empty}."
+        # assert poly.is_degen == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-degenerate, but got _is_degen={poly.is_degen}."
+        # assert poly.is_bounded == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be bounded, but got _is_bounded={poly.is_bounded}."
+        # assert poly.is_full_dim == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be full-dimensional, but got _is_full_dim={poly.is_full_dim}."
+        # assert poly.is_pointed == True, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be pointed, but got _is_pointed={poly.is_pointed}."
+        # assert poly.is_singleton == False, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to be non-singleton, but got _is_singleton={poly.is_singleton}."
+        # assert poly.dim == lb.size, \
+        #     f"Expected the box defined by lb={lb} and ub={ub} to have dimension {lb.size}, but got _dim={poly.dim}."
+        assert poly.vol == np.inf, \
+            f"Expected the box defined by lb={lb} and ub={ub} to have infinite volume, but got poly.vol={poly.vol}."
 
     @pytest.mark.parametrize('lb, ub', [
         (np.array([1]), np.array([0])),
         ([2], [-2]),
         (0, -np.pi),
         (np.array([0, 0]), np.array([1, -1])),
+        ([-1/2, -1/4], [float('-inf'), 1/5]),
         ([-1/2, -1/4], [-20, 1/5]),
         (np.ones(3), np.zeros(3)),
         ([4, 5, 6], [1, 2, 3]),
         (np.ones(4), -np.ones(4)),
         (np.arange(100, 200), np.arange(100)),
     ])
-    def test_parameterize_unsatisfiable(self, lb: NDArray, ub: NDArray):
-        ...
+    def test_parameterize_unsatisfiable(self, lb: ArrayLike, ub: ArrayLike):
+        poly, n = pes.poly_from_bounds(lb, ub), np.atleast_1d(lb).size
+        assert poly.verts.shape == (0, n), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 vertices in ambient dimension {n}, but got {poly.verts.shape}."
+        assert poly.rays.shape == (0, n), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 rays in ambient dimension {n}, but got {poly.rays.shape}."
+        assert np.all(poly.Ab == np.array([[0] * n + [-1]])), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have an inequality of the form 0*x <= 1 to represent the unsatisfiability, but got Ab={poly.Ab}."
+        assert poly.Ab_eq.shape == (0, n + 1), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 equalities in ambient dimension {n + 1}, but got {poly.Ab_eq.shape}."
+        assert poly.is_empty == True, \
+            f"Expected the box defined by lb={lb} and ub={ub} to be empty, but got _is_empty={poly.is_empty}."
 
     @pytest.mark.parametrize('lb, ub', [
         (np.array([0]), np.array([0])),
@@ -480,10 +544,19 @@ class TestInitFromBounds:
         (np.zeros(3), np.zeros(3)),
         ([4, 5, 6], [4, 5, 6]),
         (-np.ones(4), -np.ones(4)),
-        (np.arange(100), np.arange(100)),
+        (np.arange(10), np.arange(10)),
     ])
-    def test_parameterize_singleton(self, lb: NDArray, ub: NDArray):
-        ...
+    def test_parameterize_singleton(self, lb: ArrayLike, ub: ArrayLike):
+        poly = pes.poly_from_bounds(lb, ub)
+        lb, ub = np.atleast_1d(lb), np.atleast_1d(ub)
+        assert poly.verts == approx(np.atleast_2d(lb)), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have a single vertex at the point defined by the (lower) bounds, but got verts={poly.verts}."
+        assert poly.rays.shape == (0, lb.size), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 rays in ambient dimension {lb.size}, but got {poly.rays.shape}."
+        assert poly.Ab.shape == (0, lb.size + 1), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have 0 inequalities in ambient dimension {lb.size}, but got {poly.Ab.shape}."
+        assert lsort(normalize(poly.Ab_eq)) == approx(lsort(normalize(np.column_stack((np.eye(lb.size), lb))))), \
+            f"Expected the box defined by lb={lb} and ub={ub} to have equalities of the form\n{np.column_stack((np.eye(lb.size), lb))}\nto represent the singleton, but got Ab_eq=\n{poly.Ab_eq}."
 
     @pytest.mark.parametrize('lb, ub', [
         (np.array([0, 1]), np.array([1, 1 - ATOL / 2])),
@@ -491,27 +564,46 @@ class TestInitFromBounds:
         (np.zeros(3), [0, 1, 2]),
         ([4 - 2 * ATOL, 5, 6], [4, 5, 6]),
         ([-1, -1, -2, -3], -np.ones(4)),
-        (np.arange(100), np.arange(100).tolist() + [150]),
+        (np.arange(10), np.arange(10).tolist() + [150]),
     ])
-    def test_parameterize_lower_dimensional(self, lb: NDArray, ub: NDArray):
+    def test_parameterize_lower_dimensional_bounded(self, lb: NDArray, ub: NDArray):
+        poly = pes.poly_from_bounds(lb, ub)
+        lb, ub = np.atleast_1d(lb), np.atleast_1d(ub)
+        chebc, chebr = poly.chebcr
         ...
+        assert poly.vol == 0, \
+            f"Expected the box defined by lb={lb} and ub={ub} to have zero volume, but got poly.vol={poly.vol}."
+        assert chebc == approx((lb + ub) / 2), \
+            f"Expected the Chebyshev center of the box defined by lb={lb} and ub={ub} to be at the midpoint of the bounds, but got chebc={chebc}."
+        assert chebr == 0, \
+            f"Expected the Chebyshev radius of the box defined by lb={lb} and ub={ub} to be zero, but got chebr={chebr}."
 
     # def test_parameterize_attributes(self, lb: NDArray, ub: NDArray):
     #     """Check if the private attributes are calculated and set correctly"""
 
     @pytest.mark.parametrize('lb, ub', [
-        (np.array([0]), np.array([np.nan])),
-        (['-2'], [2]),  # Should this be a TypeError instead of a ValueError? 
         (0, (np.pi, 5)),
         (np.array([0, 0]), np.array([1, 1, 1])),
-        ([-1/2, -1/4], [1/3, 'inf']),
         (np.zeros(3), np.ones(30)),
         ([1, 2, 3], [[4], [5], [6]]),
-        (np.full(4, np.nan), np.ones(4)),
-        (np.arange(100), np.full(100, '200')),  # Should this be a TypeError instead of a ValueError? 
     ])
-    def test_parameterize_invalid_value_error(self, lb: NDArray, ub: NDArray):
-        ...
+    def test_parameterize_invalid_value_error_shape(self, lb: NDArray, ub: NDArray):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Lower and upper bounds must be 1D arrays of the same size, but received "
+            f"lb={np.atleast_1d(lb).shape}, ub={np.atleast_1d(ub).shape}")
+        ):
+            _ = pes.poly_from_bounds(lb, ub)
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([0]), np.array([np.nan])),
+        # (['-2'], [2]),  # Should this be a TypeError instead of a ValueError? 
+        # ([-1/2, -1/4], [1/3, 'inf']),  # Should this be a TypeError instead of a ValueError?
+        (np.full(4, np.nan), np.ones(4)),
+        # (np.arange(10), np.full(10, '200')),  # Should this be a TypeError instead of a ValueError? 
+    ])
+    def test_parameterize_invalid_value_error_nan(self, lb: NDArray, ub: NDArray):
+        with pytest.raises(ValueError, match=re.escape("Lower and upper bounds cannot contain NaN values")):
+            _ = pes.poly_from_bounds(lb, ub)
 
     @pytest.mark.parametrize('lb, ub', [
         ({0}, np.array([1])),
@@ -522,3 +614,57 @@ class TestInitFromBounds:
     ])
     def test_parameterize_invalid_type_error(self, lb: NDArray, ub: NDArray):
         ...
+
+    @pytest.mark.parametrize('lb, ub, expected_verts, expected_Ab, expected_Ab_eq', [
+        ([1, 1, 0],
+         [2, 2, 0],
+         np.array([[1, 1, 0],
+                   [1, 2, 0],
+                   [2, 1, 0],
+                   [2, 2, 0]]),
+         np.array([[-1,  0, 0, -1],
+                   [ 0, -1, 0, -1],
+                   [ 1,  0, 0,  2],
+                   [ 0,  1, 0,  2]]),
+         np.array([[0, 0, 1, 0]]))
+    ])
+    def test_parameterize_lower_dimensional_bounded(self,
+                                            lb: NDArray,
+                                            ub: NDArray,
+                                            expected_verts: NDArray,
+                                            expected_Ab: NDArray,
+                                            expected_Ab_eq: NDArray):
+        poly = pes.poly_from_bounds(lb, ub)
+        assert lsort(poly.verts) == approx(lsort(expected_verts)), \
+            f"Expected verts\n{expected_verts}\nto be equal to\n{poly.verts}"
+        assert poly.rays.shape == (0, len(lb)), \
+            f"Expected no rays, but got rays with shape {poly.rays.shape} and values\n{poly.rays}"
+        assert lsort(normalize(poly.Ab)) == approx(lsort(normalize(expected_Ab))), \
+            f"Expected Ab\n{expected_Ab}\nto be equal to\n{poly.Ab}"
+        assert lsort(normalize(poly.Ab_eq, eq=True)) == approx(lsort(normalize(expected_Ab_eq, eq=True))), \
+            f"Expected Ab_eq\n{expected_Ab_eq}\nto be equal to\n{poly.Ab_eq}"
+        
+    @pytest.mark.parametrize('lb, ub, expected_vol, expected_chebcr', [
+        ([0, 0, 0],
+         [1, 0, 1],
+         0,
+         (np.array([0.5, 0, 0.5]), 0)),  # FIXME: Should this be ([nan, 0, nan], 0) instead?
+        ([     0,      0, 0],
+         [np.inf, np.inf, 1],
+         np.inf,
+         (np.array([np.nan, np.nan, 0.5]), 0.5)),
+    ])
+    def test_parameterize_lower_dimensional_vol_chebcr(self,
+                                                       lb: NDArray,
+                                                       ub: NDArray,
+                                                       expected_vol: float,
+                                                       expected_chebcr: NDArray,
+                                                       ):
+        poly = pes.poly_from_bounds(lb, ub)
+        chebc, chebr = poly.chebcr
+        assert poly.vol == approx(expected_vol), \
+            f"Expected volume {expected_vol} for the box defined by lb={lb} and ub={ub}, but got {poly.vol}."
+        assert chebc == approx(expected_chebcr[0], nan_ok=True), \
+            f"Expected chebyshev center {expected_chebcr[0]} for the box defined by lb={lb} and ub={ub}, but got {chebc}."
+        assert chebr == approx(expected_chebcr[1]), \
+            f"Expected chebyshev radius {expected_chebcr[1]} for the box defined by lb={lb} and ub={ub}, but got {chebr}."
