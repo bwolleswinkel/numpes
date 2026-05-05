@@ -31,7 +31,7 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from numpes._config import CFG
+from numpes._config import CFG, algo_options
 from numpes._internal import multipledispatch, wraps
 from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
 from numpes.utils import enum_facets, enum_gens, signed_angle
@@ -160,11 +160,12 @@ class Polytope:
             'A_eq': A_eq,
             'b_eq': b_eq,
         }.items() if value is not None}
-        raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided," \
-        f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
-        "combinations or arguments.")
+        if len(args) !=0 or len(kwargs) != 0:
+            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided," \
+            f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
+            "combinations or arguments.")
 
-    @__init__.register(len_args=0, exclude_kwargs=['verts', 'A', 'b'])
+    @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['verts', 'A', 'b'])
     def _init_empty(self,
                     **kwargs: int,
                     ) -> None:
@@ -250,6 +251,20 @@ class Polytope:
         InvalidCombinationOfArguments
             If the required keyword argument `verts` is missing or if the provided arguments are inconsistent.
         """
+        known_kwargs = {
+            'verts',
+            'rays',
+            'n',
+            'A',
+            'b',
+            'A_eq',
+            'b_eq'
+        }
+        unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
+        if unknown_kwargs:
+            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+                f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
+                "combinations or arguments.")
         if 'n' in kwargs:
             raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from vertices")
         if 'A' in kwargs or 'b' in kwargs:
@@ -308,6 +323,20 @@ class Polytope:
         InvalidCombinationOfArguments
             If the required keyword arguments `A` and `b` are missing or if the provided arguments are inconsistent.
         """
+        known_kwargs = {
+            'verts',
+            'rays',
+            'n',
+            'A',
+            'b',
+            'A_eq',
+            'b_eq'
+        }
+        unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
+        if unknown_kwargs:
+            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+                f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
+                "combinations or arguments.")
         if 'n' in kwargs:
             raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from half-spaces")
         if 'verts' in kwargs:
@@ -397,7 +426,7 @@ class Polytope:
             case 'pass':
                 pass
             case 'minimal':
-                raise NotImplementedError("The 'minimal' option for 'on_property_assign' is not yet implemented")
+                self.minimal(repr='vrepr')
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -413,6 +442,13 @@ class Polytope:
     def hrepr(self, value: tuple[NDArray, NDArray]) -> None:
         """Set the H-representation of the polytope as a tuple (A, b)"""
         self._hrepr = value
+        match CFG.on_property_assign:
+            case 'pass':
+                pass
+            case 'minimal':
+                self.minimal(repr='hrepr')
+            case _:
+                raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
     @property
     def n(self) -> int:
@@ -602,11 +638,60 @@ class Polytope:
             plt.show()
 
         return ax
+    
+    @classmethod
+    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
+        """Create a polytope from upper and lower bounds on each coordinate."""
+        lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
+        if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
+            raise ValueError(f"Lower and upper bounds must be 1D arrays of the same size, but received "f"lb={lower.shape}, ub={upper.shape}")
+        if np.isnan(lower).any() or np.isnan(upper).any():
+            raise ValueError("Lower and upper bounds cannot contain NaN values")
+        n = lower.size
+        if (lower > upper).any():
+            return cls(n=n)
+        A = np.vstack((np.eye(n), -np.eye(n)))
+        b = np.hstack((upper, -lower))
+        # Filter out any infinite bounds
+        mask = np.concatenate((np.isfinite(upper), np.isfinite(lower)))
+        A, b = A[mask], b[mask]
+        with algo_options(on_property_assign='pass'):
+            poly = cls(A, b)
+        # FIXME: We need a smart way to set the verts
+        # verts = np.array(np.meshgrid(*zip(lower, upper))).T.reshape(-1, n)
+        # poly._vrepr = (verts, np.empty((0, n)))
+        poly._is_empty = True
+        poly._is_singleton = np.allclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol)
+        poly._is_bounded = np.all(np.isfinite(upper)) and np.all(np.isfinite(lower))
+        poly._is_degen = poly._is_singleton or not poly._is_bounded
+        poly._is_full_dim = (not poly._is_singleton and
+                             not np.isclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol).any)()
+        # poly._is_pointed = ...
+        # poly._dim = ...
+        return poly
 
 
 @wraps(Polytope.__init__)  # pylint: disable=protected-access
-def poly(*args: NDArray, **kwargs: int | NDArray) -> Polytope:
+def poly(*args: NDArray,
+         n: Optional[int] = None,
+         verts: Optional[NDArray | ArrayLike] = None,
+         rays: Optional[NDArray | ArrayLike] = None,
+         A: Optional[NDArray | ArrayLike] = None,
+         b: Optional[NDArray | ArrayLike] = None,
+         A_eq: Optional[NDArray | ArrayLike] = None,
+         b_eq: Optional[NDArray | ArrayLike] = None,) -> Polytope:
     """Wrapper function for `Polytope.__init__` to create a polytope"""
+    kwargs = {key: value for key, value in {
+        'n': n,
+        'verts': verts,
+        'rays': rays,
+        'A': A,
+        'b': b,
+        'A_eq': A_eq,
+        'b_eq': b_eq,
+    }.items() if value is not None}
+    if len(args) == 0 and len(kwargs) == 0:
+        raise InvalidCombinationOfArguments("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
     return Polytope(*args, **kwargs)
 
 
@@ -631,6 +716,6 @@ def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq:
 @wraps(Polytope._init_ambient)  # pylint: disable=protected-access
 def poly_ambient(n: int) -> Polytope:
     """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
-    poly = Polytope(n=n)
+    poly = Polytope()
     poly._init_ambient(n)  # pylint: disable=protected-access
     return poly

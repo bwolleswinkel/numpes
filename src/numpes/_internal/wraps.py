@@ -123,7 +123,9 @@ def wraps(wrapped: Callable[P, Any]) -> Callable[[Callable[..., R]], Callable[P,
 
     def wrapper(fn: Callable[..., R]) -> Callable[P, R]:
         wrapper_return = _get_resolved_signature(fn).return_annotation
+        orig_qualname = fn.__qualname__
         res = functools_wraps(wrapped)(fn)
+        res.__qualname__ = orig_qualname
 
         orig_sig = _get_resolved_signature(wrapped)
 

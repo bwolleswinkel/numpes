@@ -10,11 +10,49 @@ import pytest
 from hypothesis import given
 from hypothesis.strategies import integers
 
-from tests.conftest import N_MAX
+from tests.conftest import ATOL, N_MAX
 
 if TYPE_CHECKING:
-    from typing import EllipsisType
+    from typing import Any, EllipsisType
     from numpy.typing import NDArray
+
+
+def test_polytope_init_no_args_no_kwargs():
+    poly = pes.Polytope()
+    assert isinstance(poly, pes.Polytope), \
+        "Expected the constructor to return an instance of Polytope when called with no arguments."
+    
+
+def test_polytope_init_no_args_no_kwargs_attr_none():
+    poly = pes.Polytope()
+    for attr_name in [
+        '_vrepr',
+        '_hrepr',
+        '_is_empty',
+        '_is_degen',
+        '_is_bounded',
+        '_is_full_dim',
+        '_is_pointed',
+        '_is_singleton',
+        '_dim',
+        '_vol',
+        '_chebcr'
+        ]:
+        assert getattr(poly, attr_name) is None, \
+            f"Expected attribute '{attr_name}' to be None for a polytope initialized with no arguments, but got {getattr(poly, attr_name)}."
+        
+
+@pytest.mark.parametrize('args, kwargs', [
+    ((..., ..., ...), {}),
+    ((1, 2, 3), {}),
+    ((...,), {'foo': 1, 'bar': 2, 'baz': 3}),  # NOTE: Should dispatch to `_init_vrepr` (as len_args=1)
+])
+def test_polytope_init_invalid_combination(args: Any, kwargs: dict[str, Any]):
+    with pytest.raises(InvalidCombinationOfArguments, match=re.escape(
+        "An invalid number or combination of arguments was provided," \
+        f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
+        "combinations or arguments.")):
+        pes.Polytope(*args, **kwargs)
 
 
 @pytest.mark.parametrize('args, kwargs', [
@@ -70,8 +108,6 @@ def test_polytope_init_empty_manual_facets():
 
 
 @pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((), {},
-     "Dimension 'n' must be provided for empty polytope initialization"),
     ((), {'n': 2, 'verts': ...},
      "Cannot provide 'n' when initializing from vertices"),  # NOTE: Should dispatch to `_init_vrepr`
     ((), {'n': 2, 'rays': ...},
@@ -234,6 +270,15 @@ def test_polytope_init_hrepr_invalid_combination(args: tuple[EllipsisType, Ellip
         pes.Polytope(*args, **kwargs)
 
 
+class TestPoly:
+    """Tests for the function `pes.poly`, which is a wrapper for the `Polytope` constructor"""
+
+    def test_poly_no_args_no_kwargs(self):
+        with pytest.raises(InvalidCombinationOfArguments, match=re.escape(
+            "No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")):
+            _ = pes.poly()
+
+
 class TestInitAmbient:
     """Tests for the method `Polytope._init_ambient`"""
 
@@ -342,3 +387,102 @@ class TestInitAmbient:
             f"Expected the ambient polytope in dimension {n} to have 0 inequalities in ambient dimension {n}, but got {poly.Ab.shape}."
         assert poly.Ab_eq.shape == (0, n + 1), \
             f"Expected the ambient polytope in dimension {n} to have 0 equalities in ambient dimension {n}, but got {poly.Ab_eq.shape}."
+
+
+@pytest.mark.skip(reason="The method `Polytope.from_bounds` is not yet implemented.")
+class TestInitFromBounds:
+    """Tests for the classmethod `Polytope.from_bounds`"""
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([0]), np.array([1])),
+        ([-2], [2]),
+        (0, np.pi),
+        (np.array([0, 0]), np.array([1, 1])),
+        ([-1/2, -1/4], [1/3, 1/5]),
+        (np.zeros(3), np.ones(3)),
+        ([1, 2, 3], [4, 5, 6]),
+        (-np.ones(4), np.ones(4)),
+        (np.arange(100), np.arange(100, 200)),
+    ])
+    def test_parameterize_box(self, lb: NDArray, ub: NDArray):
+        poly = pes.poly_from_bounds(lb, ub)
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([-np.inf]), np.array([np.inf])),
+        ([-10], [float('inf')]),
+        (float('-inf'), np.pi),
+        (np.array([-np.inf, 0]), np.array([1, np.inf])),
+        ([-1/2, -1/4], [float('-inf'), 1/5]),
+        (np.zeros(3), np.full(3, np.inf)),
+        ([float('-inf'), 2, 3], [4, 5, 6]),
+        (-np.full(4, np.inf), np.ones(4)),
+        (np.arange(100), np.arange(100, 199).tolist() + [float('inf')]),
+    ])
+    def test_parameterize_unbounded(self, lb: NDArray, ub: NDArray):
+        ...
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([1]), np.array([0])),
+        ([2], [-2]),
+        (0, -np.pi),
+        (np.array([0, 0]), np.array([1, -1])),
+        ([-1/2, -1/4], [-20, 1/5]),
+        (np.ones(3), np.zeros(3)),
+        ([4, 5, 6], [1, 2, 3]),
+        (np.ones(4), -np.ones(4)),
+        (np.arange(100, 200), np.arange(100)),
+    ])
+    def test_parameterize_unsatisfiable(self, lb: NDArray, ub: NDArray):
+        ...
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([0]), np.array([0])),
+        ([-2], [-2 + ATOL / 2]),
+        (np.pi, np.pi),
+        (np.array([1, 1]), np.array([1, 1])),
+        ([-1/2, 1/5 + ATOL / 2], [-1/2, 1/5]),
+        (np.zeros(3), np.zeros(3)),
+        ([4, 5, 6], [4, 5, 6]),
+        (-np.ones(4), -np.ones(4)),
+        (np.arange(100), np.arange(100)),
+    ])
+    def test_parameterize_singleton(self, lb: NDArray, ub: NDArray):
+        ...
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([0, 1]), np.array([1, 1 - ATOL / 2])),
+        ([-1/2, 1/5 + ATOL / 2], [1/2, 1/5]),
+        (np.zeros(3), [0, 1, 2]),
+        ([4 - 2 * ATOL, 5, 6], [4, 5, 6]),
+        ([-1, -1, -2, -3], -np.ones(4)),
+        (np.arange(100), np.arange(100).tolist() + [150]),
+    ])
+    def test_parameterize_lower_dimensional(self, lb: NDArray, ub: NDArray):
+        ...
+
+    # def test_parameterize_attributes(self, lb: NDArray, ub: NDArray):
+    #     """Check if the private attributes are calculated and set correctly"""
+
+    @pytest.mark.parametrize('lb, ub', [
+        (np.array([0]), np.array([np.nan])),
+        (['-2'], [2]),  # Should this be a TypeError instead of a ValueError? 
+        (0, (np.pi, 5)),
+        (np.array([0, 0]), np.array([1, 1, 1])),
+        ([-1/2, -1/4], [1/3, 'inf']),
+        (np.zeros(3), np.ones(30)),
+        ([1, 2, 3], [[4], [5], [6]]),
+        (np.full(4, np.nan), np.ones(4)),
+        (np.arange(100), np.full(100, '200')),  # Should this be a TypeError instead of a ValueError? 
+    ])
+    def test_parameterize_invalid_value_error(self, lb: NDArray, ub: NDArray):
+        ...
+
+    @pytest.mark.parametrize('lb, ub', [
+        ({0}, np.array([1])),
+        ('[-2]', [2]),
+        (0, {'ub': np.pi}),
+        (np.array([0, 0]), ...),
+        ([-1/2, -1/4], [..., ...]),
+    ])
+    def test_parameterize_invalid_type_error(self, lb: NDArray, ub: NDArray):
+        ...

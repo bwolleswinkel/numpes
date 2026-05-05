@@ -1,9 +1,53 @@
 """Module for multiple dispatch functionality used in the Polytope class"""
 
+import re
 from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable, Optional, Union
+
+
+_LEN_SPEC_PATTERN = re.compile(r'^(<=|>=|!=|<|>)(\d+)$')
+
+
+# FROM: GitHub Copilot, Claude Sonnet 4 | 2026/01/15[untested/unverified]
+def _check_len_spec(spec: "Union[int, str]", n: int, param_name: str = 'len') -> bool:
+    """Check if n satisfies a length specification.
+
+    Parameters
+    ----------
+    spec : int or str
+        If int, checks exact equality. If str, must match one of the patterns
+        '<X', '<=X', '>X', '>=X', '!=X' where X is a non-negative integer.
+    n : int
+        The length value to check.
+    param_name : str
+        Name of the parameter, used in error messages.
+
+    Returns
+    -------
+    bool
+        Whether n satisfies the specification.
+
+    """
+    if isinstance(spec, int):
+        return n == spec
+    match = _LEN_SPEC_PATTERN.match(spec.strip())
+    if match is None:
+        raise ValueError(
+            f"Invalid {param_name} pattern: {spec!r}. "
+            "Expected '<X', '<=X', '>X', '>=X', or '!=X' where X is a non-negative integer."
+        )
+    op, x = match.group(1), int(match.group(2))
+    if op == '<':
+        return n < x
+    if op == '<=':
+        return n <= x
+    if op == '>':
+        return n > x
+    if op == '>=':
+        return n >= x
+    return n != x  # op == '!='
 
 
 class DispatcherFunction(Protocol):
@@ -13,10 +57,11 @@ class DispatcherFunction(Protocol):
         pass
 
     def register(self,
-                 len_args: Optional[int] = None,
+                 len_args: Optional[Union[int, str]] = None,
                  exclude_kwargs: Optional[list] = None,
                  include_kwargs: Optional[list] = None,
                  kwargs_values: Optional[dict] = None,
+                 len_kwargs: Optional[Union[int, str]] = None,
                  ) -> Callable[[Callable], Callable]:
         """Method to register a new dispatch function with specific conditions"""
 
@@ -84,14 +129,14 @@ def multipledispatch(func: Callable[[Any], Any]) -> DispatcherFunction:
     def _match_dispatch_condition(condition, args, kwargs):
         """Check if the current call matches a dispatch condition"""
         if isinstance(condition, int):
-            # Simple length-based dispatch
+            # Simple length-based dispatch (exact int, no other criteria)
             return len(args) == condition
         if isinstance(condition, tuple):
             # Complex condition with multiple criteria
-            arg_len, exclude_kwargs, include_kwargs, kwargs_values = condition
+            arg_len_spec, exclude_kwargs, include_kwargs, kwargs_values, len_kwargs_spec = condition
 
-            # Check length condition
-            if arg_len != -1 and len(args) != arg_len:
+            # Check positional-argument length condition
+            if arg_len_spec is not None and not _check_len_spec(arg_len_spec, len(args), 'len_args'):
                 return False
 
             # Check kwargs exclusions
@@ -108,39 +153,55 @@ def multipledispatch(func: Callable[[Any], Any]) -> DispatcherFunction:
                     if kwargs.get(key) != expected_value:
                         return False
 
+            # Check number of keyword arguments
+            if len_kwargs_spec is not None and not _check_len_spec(len_kwargs_spec, len(kwargs), 'len_kwargs'):
+                return False
+
             return True
 
         return False
 
-    def register(len_args: Optional[int] = None,
+    def register(len_args: Optional["Union[int, str]"] = None,
                  exclude_kwargs: Optional[list] = None,
                  include_kwargs: Optional[list] = None,
                  kwargs_values: Optional[dict] = None,
+                 len_kwargs: Optional["Union[int, str]"] = None,
                  ) -> Callable[[Callable], Callable]:
         """Create a dispatcher that matches based on various conditions
-        
+
         Parameters
         ----------
-        len_args : int, optional
-            Required number of positional arguments
+        len_args : int or str, optional
+            Condition on the number of positional arguments. An int checks for
+            exact equality. A string must match one of the patterns '<X',
+            '<=X', '>X', '>=X', '!=X' where X is a non-negative integer.
         exclude_kwargs : list, optional
             List of kwarg keys that must NOT be present
         include_kwargs : list, optional
             List of kwarg keys that must be present
         kwargs_values : dict, optional
             Dictionary of kwarg key-value pairs that must match exactly
+        len_kwargs : int or str, optional
+            Condition on the number of keyword arguments. An int checks for
+            exact equality. A string must match one of the patterns '<X',
+            '<=X', '>X', '>=X', '!=X' where X is a non-negative integer.
         """
         def decorator(dispatch_func):
-            if len_args is not None and exclude_kwargs is None and include_kwargs is None and kwargs_values is None:
-                # Simple case - just length-based dispatch
+            if (isinstance(len_args, int)
+                    and exclude_kwargs is None
+                    and include_kwargs is None
+                    and kwargs_values is None
+                    and len_kwargs is None):
+                # Simple case - exact integer arg count, no other criteria
                 condition = len_args
             else:
                 # Complex case - build condition as a hashable tuple
                 condition = (
-                    len_args if len_args is not None else -1,
+                    len_args,
                     tuple(exclude_kwargs) if exclude_kwargs else (),
                     tuple(include_kwargs) if include_kwargs else (),
-                    tuple(sorted(kwargs_values.items())) if kwargs_values else ()
+                    tuple(sorted(kwargs_values.items())) if kwargs_values else (),
+                    len_kwargs,
                 )
 
             dispatchers[condition] = dispatch_func
@@ -152,6 +213,7 @@ def multipledispatch(func: Callable[[Any], Any]) -> DispatcherFunction:
 
     # Copy function attributes
     dispatcher_wrapper.__name__ = func.__name__
+    dispatcher_wrapper.__qualname__ = func.__qualname__
     dispatcher_wrapper.__doc__ = func.__doc__
     dispatcher_wrapper.__module__ = func.__module__
 
