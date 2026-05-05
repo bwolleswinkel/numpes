@@ -282,12 +282,16 @@ class Polytope:
         if verts.ndim != 2:
             raise ValueError(f"Vertices must be provided as a 2D array of shape (k, n)," \
                              f" but received an array of shape {verts.shape}")
+        if np.isnan(verts).any():
+            raise ValueError("Vertices 'verts' cannot contain NaN values")
         if 'rays' in kwargs:
             rays = kwargs['rays']
             rays = np.atleast_2d(rays)
             if rays.ndim != 2 or rays.shape[1] != verts.shape[1]:
                 raise ValueError(f"Rays must be provided as a 2D array of shape (k_rays, " \
                                  f"n={verts.shape[1]}), but received an array of shape {rays.shape}")
+            if np.isnan(rays).any():
+                raise ValueError("Rays 'rays' cannot contain NaN values")
         else:
             rays = np.empty((0, verts.shape[1]))
 
@@ -351,12 +355,16 @@ class Polytope:
         if A.ndim != 2 or b.ndim != 1 or A.shape[0] != b.size:
             raise ValueError(f"A must be a matrix of size (m, n) and b must be a vector of size (m,)," \
                              f" but received A={A.shape}, b={b.shape}.")
+        if np.isnan(A).any() or np.isnan(b).any():
+            raise ValueError("Inequality matrices 'A' and 'b' cannot contain NaN values")
         if 'A_eq' in kwargs and 'b_eq' in kwargs:
             A_eq, b_eq = kwargs['A_eq'], kwargs['b_eq']
             A_eq, b_eq = np.atleast_2d(A_eq), np.atleast_1d(b_eq)
             if A_eq.ndim != 2 or b_eq.ndim != 1 or A_eq.shape[0] != b_eq.size or A_eq.shape[1] != A.shape[1]:
                 raise ValueError(f"A_eq must be a matrix of shape (m_eq, n={A.shape[1]}) and b_eq must be a vector " \
                                  f"of size (m_eq,), but received shape A_eq={A_eq.shape}, b_eq={b_eq.shape}.")
+            if np.isnan(A_eq).any() or np.isnan(b_eq).any():
+                raise ValueError("Equality matrices 'A_eq' and 'b_eq' cannot contain NaN values")
         else:
             A_eq, b_eq = np.empty((0, A.shape[1])), np.empty((0,))
 
@@ -520,6 +528,37 @@ class Polytope:
         """Number of equality constraints in the H-representation of the polytope"""
         return self.Ab_eq.shape[0]
 
+    @classmethod
+    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
+        """Create a polytope from upper and lower bounds on each coordinate."""
+        lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
+        if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
+            raise ValueError(f"Lower and upper bounds must be 1D arrays of the same size, but received "f"lb={lower.shape}, ub={upper.shape}")
+        if np.isnan(lower).any() or np.isnan(upper).any():
+            raise ValueError("Lower and upper bounds cannot contain NaN values")
+        n = lower.size
+        if (lower > upper).any():
+            return cls(n=n)
+        A = np.vstack((np.eye(n), -np.eye(n)))
+        b = np.hstack((upper, -lower))
+        # Filter out any infinite bounds
+        mask = np.concatenate((np.isfinite(upper), np.isfinite(lower)))
+        A, b = A[mask], b[mask]
+        poly = cls()
+        poly._hrepr = (A, b)
+        # FIXME: We need a smart way to set the verts
+        # verts = np.array(np.meshgrid(*zip(lower, upper))).T.reshape(-1, n)
+        # poly._vrepr = ...
+        poly._is_empty = True
+        poly._is_singleton = np.allclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol)
+        poly._is_bounded = np.all(np.isfinite(upper)) and np.all(np.isfinite(lower))
+        poly._is_degen = poly._is_singleton or not poly._is_bounded
+        poly._is_full_dim = (not poly._is_singleton and
+                             not np.isclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol).any)()
+        # poly._is_pointed = ...
+        # poly._dim = ...
+        return poly
+
     def minimal(self,
                 repr: Literal['both', 'vrepr', 'hrepr'] = 'both',  # FIXME: Shadows built-in name 'repr(...)'
                 in_place: bool = True,
@@ -638,37 +677,6 @@ class Polytope:
             plt.show()
 
         return ax
-    
-    @classmethod
-    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
-        """Create a polytope from upper and lower bounds on each coordinate."""
-        lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
-        if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
-            raise ValueError(f"Lower and upper bounds must be 1D arrays of the same size, but received "f"lb={lower.shape}, ub={upper.shape}")
-        if np.isnan(lower).any() or np.isnan(upper).any():
-            raise ValueError("Lower and upper bounds cannot contain NaN values")
-        n = lower.size
-        if (lower > upper).any():
-            return cls(n=n)
-        A = np.vstack((np.eye(n), -np.eye(n)))
-        b = np.hstack((upper, -lower))
-        # Filter out any infinite bounds
-        mask = np.concatenate((np.isfinite(upper), np.isfinite(lower)))
-        A, b = A[mask], b[mask]
-        with algo_options(on_property_assign='pass'):
-            poly = cls(A, b)
-        # FIXME: We need a smart way to set the verts
-        # verts = np.array(np.meshgrid(*zip(lower, upper))).T.reshape(-1, n)
-        # poly._vrepr = (verts, np.empty((0, n)))
-        poly._is_empty = True
-        poly._is_singleton = np.allclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol)
-        poly._is_bounded = np.all(np.isfinite(upper)) and np.all(np.isfinite(lower))
-        poly._is_degen = poly._is_singleton or not poly._is_bounded
-        poly._is_full_dim = (not poly._is_singleton and
-                             not np.isclose(upper, lower, rtol=CFG.rtol, atol=CFG.atol).any)()
-        # poly._is_pointed = ...
-        # poly._dim = ...
-        return poly
 
 
 @wraps(Polytope.__init__)  # pylint: disable=protected-access

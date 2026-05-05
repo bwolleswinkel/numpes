@@ -176,6 +176,22 @@ def test_polytope_init_vrepr_value_error(args: tuple[NDArray], kwargs: dict[str,
         pes.Polytope(*args, **kwargs)
 
 
+@pytest.mark.parametrize('args, kwargs, expected_msg', [
+    ((np.array([[np.nan, 1],
+                [     1, 0]]),), {},
+     "Vertices 'verts' cannot contain NaN values"),
+    (tuple(), {'verts': np.array([[0,      1],
+                                  [1, np.nan]])},
+     "Vertices 'verts' cannot contain NaN values"),
+    (tuple(), {'verts': np.array([[0.1, 0.2],
+                                  [0.3, 0.4]]), 'rays': np.full((2, 2), np.nan)},
+     "Rays 'rays' cannot contain NaN values"),
+])
+def test_polytope_init_vrepr_nan_value_error(args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str):
+    with pytest.raises(ValueError, match=re.escape(expected_msg)):
+        pes.Polytope(*args, **kwargs)
+
+
 @pytest.mark.parametrize('args, kwargs', [
     ((np.array([[0, 1],
                 [1, 0],
@@ -258,6 +274,26 @@ def test_polytope_init_hrepr_value_error_eq(args: tuple[NDArray, NDArray], kwarg
     with pytest.raises(ValueError, match=re.escape(
         f"A_eq must be a matrix of shape (m_eq, n={args[0].shape[1]}) and b_eq must be a vector of size (m_eq,), " \
             f"but received shape A_eq={kwargs['A_eq'].shape}, b_eq={kwargs['b_eq'].shape}.")):
+        pes.Polytope(*args, **kwargs)
+
+
+@pytest.mark.parametrize('args, kwargs, expected_msg', [
+    ((np.array([[np.nan, 1],
+                [     1, 0]]), np.array([0, 1])), {},
+     "Inequality matrices 'A' and 'b' cannot contain NaN values"),
+    (tuple(), {'A': np.array([[-2, 0,      1],
+                              [ 3, 1, np.nan]]), 'b': np.array([0, 1])},
+     "Inequality matrices 'A' and 'b' cannot contain NaN values"),
+    ((np.array([[1, 2, 3],
+                [4, 5, 6],
+                [7, 8, 9]]), np.array([-1, 0, 1])),
+     {'A_eq': np.array([[1, 0, np.nan],
+                        [0, 1, np.nan],
+                        [0, 0, np.nan]]), 'b_eq': np.array([0, 1, 2])},
+     "Equality matrices 'A_eq' and 'b_eq' cannot contain NaN values"),
+])
+def test_polytope_init_hrepr_nan_value_error(args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str):
+    with pytest.raises(ValueError, match=re.escape(expected_msg)):
         pes.Polytope(*args, **kwargs)
 
 
