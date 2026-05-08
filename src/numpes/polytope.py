@@ -20,6 +20,7 @@ poly_from_bounds
 
 from __future__ import annotations
 from itertools import product as iterproduct
+import re
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -298,6 +299,15 @@ class Polytope:
 
         self.vrepr = (verts, rays)
         self._hrepr = None
+        self._is_empty = None
+        self._is_degen = None
+        self._is_bounded = None
+        self._is_full_dim = None
+        self._is_pointed = None
+        self._is_singleton = None
+        self._dim = None
+        self._vol = None
+        self._chebcr = None
 
     @overload
     def _init_hrepr(self, *args: ArrayLike) -> None: ...
@@ -371,6 +381,15 @@ class Polytope:
 
         self._vrepr = None
         self.hrepr = (np.column_stack((A, b)), np.column_stack((A_eq, b_eq)))
+        self._is_empty = None
+        self._is_degen = None
+        self._is_bounded = None
+        self._is_full_dim = None
+        self._is_pointed = None
+        self._is_singleton = None
+        self._dim = None
+        self._vol = None
+        self._chebcr = None
 
     def _init_ambient(self,
                       n: int
@@ -674,6 +693,82 @@ class Polytope:
             poly._chebcr = (chebc, chebr)
 
         return poly
+
+    def __str__(self) -> str:
+        raise NotImplementedError("The '__str__' method is not yet implemented")
+    
+    def _str_vrepr(self) -> str:
+        raise NotImplementedError("The '_str_vrepr' method is not yet implemented")
+    
+    def _str_hrepr(self) -> str:
+        raise NotImplementedError("The '_str_hrepr' method is not yet implemented")
+    
+    def __repr__(self) -> str:
+        """Return a representation of the polytopes attributes"""
+        attrs = ", ".join(f"{key}={value}" for key, value in self._repr_items())
+        return f"{self.__class__.__name__}({attrs})"
+    
+    def _repr_items(self) -> list[tuple[str, str]]:
+        """Return (attribute, formatted-value) pairs used by repr formatting"""
+        
+        def _format_repr_value(value: Any) -> str:
+            if isinstance(value, np.ndarray):
+                return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
+            if isinstance(value, tuple):
+                inner = ", ".join(_format_repr_value(item) for item in value)
+                if len(value) == 1:
+                    inner += ","
+                return f"({inner})"
+            return repr(value)
+
+        return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
+    
+    def __format__(self, format_spec: str) -> str:
+        if format_spec.startswith('r'):
+            if len(format_spec) != 1:
+                raise ValueError(f"Debug specifier 'r' must be used in isolation, got '{format_spec}'")
+            attrs = ",\n".join(f"    {key}={value}" for key, value in self._repr_items())
+            return f"{self.__class__.__name__}(\n{attrs}\n)"
+        
+        pattern = r'^(i)?([hv]{1,2})?(\.\d*[feE])?$'
+        match = re.match(pattern, format_spec)
+        if not match:
+            raise ValueError(f"Unknown format code '{format_spec}' for object of type '{self.__class__.__name__}'")
+        
+        tag_i, modes, num_part, str_prec, char_type = match.groups()
+        modes = modes or ""
+
+        overrides = None
+        if num_part:
+            if tag_i and not modes:
+                raise ValueError("Summary 'i' does not take numeric formatting")
+            overrides = {
+                'precision': int(str_prec) if str_prec else np.get_printoptions()['precision'],
+                'suppress': char_type == 'f'
+            }
+
+        res = []
+        if tag_i or not format_spec:  # Default to summary if no format spec is provided
+            res.append(f"{self.__class__.__name__} in R^{self.n}")
+
+        for char in modes:
+            match char:
+                case 'h':
+                    if overrides:
+                        with np.printoptions(**overrides):
+                            res.append(self._str_hrepr())
+                    else:
+                        res.append(self._str_hrepr())
+                case 'v':
+                    if overrides:
+                        with np.printoptions(**overrides):
+                            res.append(self._str_vrepr())
+                    else:
+                        res.append(self._str_vrepr())
+                case _:
+                    raise ValueError(f"Unknown format code '{char}' in format spec '{format_spec}' for object of type '{self.__class__.__name__}'")
+                
+        return "\n".join(res)
 
     def minimal(self,
                 repr: Literal['both', 'vrepr', 'hrepr'] = 'both',  # FIXME: Shadows built-in name 'repr(...)'
