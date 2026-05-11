@@ -11,7 +11,7 @@ NumPES is a control-oriented Python package for performings numerical operations
 
 The easiest way to instal NumPES is by running
 
-``` zsh
+``` bash
 pip install numpes
 ```
 
