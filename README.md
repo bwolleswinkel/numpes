@@ -38,7 +38,10 @@ b = [1, 1, 1, 0]
 
 poly = pes.poly(A, b)  # Defines a polytope A x <= b
 
-poly.plot(show=True)
+print(poly)
+```
+```
+Polytope in R^2 (4 half-spaces)
 ```
 
 ## Contribute to NumPES
