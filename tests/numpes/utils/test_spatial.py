@@ -775,7 +775,7 @@ def test_signed_angle_random_2d_in_range(vector_2d_pair: tuple[NDArray, NDArray]
     arrays(float, (2,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)), 
     arrays(float, (2,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False))
 ))
-def test_signed_angle_random_2d_commutative(vector_2d_pair: tuple[NDArray, NDArray]):
+def test_signed_angle_random_2d_anticommutative(vector_2d_pair: tuple[NDArray, NDArray]):
     v_1, v_2 = vector_2d_pair
     assume(v_1 != approx(0) and v_2 != approx(0))  # Skip cases where one of the vectors is zero
     assume(np.linalg.matrix_rank(np.column_stack([v_1, v_2])) >= 2)  # Skip cases where the vectors are (anti)parallel
