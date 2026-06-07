@@ -33,7 +33,7 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from numpes._config import CFG, algo_options
+from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
 from numpes.utils import enum_facets, enum_gens, signed_angle
@@ -547,7 +547,7 @@ class Polytope:
     def m_eq(self) -> int:
         """Number of equality constraints in the H-representation of the polytope"""
         return self.Ab_eq.shape[0]
-    
+
     @property
     def is_empty(self) -> bool:
         """Whether the polytope is empty (i.e., has no points)"""
@@ -555,13 +555,13 @@ class Polytope:
             if self._vrepr is not None:
                 self._is_empty = self.verts.size == 0 and self.rays.size == 0
             elif self._hrepr is not None:
-                self._is_empty = (np.all(self.Ab == np.array([[0] * self.n + [-1]])) and 
+                self._is_empty = (np.all(self.Ab == np.array([[0] * self.n + [-1]])) and
                                   self.Ab_eq.size == 0)
             else:
                 raise InvalidRepresentation("Polytope is not properly initialized with either " \
                 "V-representation or H-representation")
         return self._is_empty
-    
+
     @property
     def vol(self) -> float:
         """Volume of the polytope. Returns `np.inf` for unbounded polytopes and 0 for empty or lower-dimensional polytopes."""
@@ -573,7 +573,7 @@ class Polytope:
             else:
                 raise NotImplementedError("Volume computation for full-dimensional bounded polytopes is not implemented yet")
         return self._vol
-    
+
     @property
     def chebcr(self) -> tuple[NDArray, float]:
         """Chebyshev center and radius of the largest inscribed ball in the polytope"""
@@ -583,12 +583,12 @@ class Polytope:
             else:
                 raise NotImplementedError("Chebyshev center computation for non-empty polytopes is not implemented yet")
         return self._chebcr
-    
+
     @property
     def chebc(self) -> NDArray:
         """Chebyshev center of the largest inscribed ball in the polytope. Returns NaN values if the center is ambiguous or not well-defined (e.g., for empty or unbounded polytopes)."""
         return self.chebcr[0]
-    
+
     @property
     def chebr(self) -> float:
         """Chebyshev radius of the largest inscribed ball in the polytope. Returns NaN if the radius is not well-defined (e.g., for empty polytopes) and returns `np.inf` for unbounded polytopes."""
@@ -639,7 +639,7 @@ class Polytope:
         ub_only = ~is_eq & ~lb_is_finite & ub_is_finite
         is_unbounded = ~is_eq & ~lb_is_finite & ~ub_is_finite
 
-        I = np.eye(n)
+        I = np.eye(n)  # pylint: disable=invalid-name
         ub_idx, lb_idx, eq_idx = (np.where(ub_is_finite & ~is_eq)[0],
                                   np.where(lb_is_finite & ~is_eq)[0],
                                   np.where(is_eq)[0])
@@ -696,21 +696,21 @@ class Polytope:
 
     def __str__(self) -> str:
         raise NotImplementedError("The '__str__' method is not yet implemented")
-    
+
     def _str_vrepr(self) -> str:
         raise NotImplementedError("The '_str_vrepr' method is not yet implemented")
-    
+
     def _str_hrepr(self) -> str:
         raise NotImplementedError("The '_str_hrepr' method is not yet implemented")
-    
+
     def __repr__(self) -> str:
         """Return a representation of the polytopes attributes"""
         attrs = ", ".join(f"{key}={value}" for key, value in self._repr_items())
         return f"{self.__class__.__name__}({attrs})"
-    
+
     def _repr_items(self) -> list[tuple[str, str]]:
         """Return (attribute, formatted-value) pairs used by repr formatting"""
-        
+
         def _format_repr_value(value: Any) -> str:
             if isinstance(value, np.ndarray):
                 return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
@@ -722,19 +722,19 @@ class Polytope:
             return repr(value)
 
         return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
-    
+
     def __format__(self, format_spec: str) -> str:
         if format_spec.startswith('r'):
             if len(format_spec) != 1:
                 raise ValueError(f"Debug specifier 'r' must be used in isolation, got '{format_spec}'")
             attrs = ",\n".join(f"    {key}={value}" for key, value in self._repr_items())
             return f"{self.__class__.__name__}(\n{attrs}\n)"
-        
+
         pattern = r'^(i)?([hv]{1,2})?(\.\d*[feE])?$'
         match = re.match(pattern, format_spec)
         if not match:
             raise ValueError(f"Unknown format code '{format_spec}' for object of type '{self.__class__.__name__}'")
-        
+
         tag_i, modes, num_part, str_prec, char_type = match.groups()
         modes = modes or ""
 
@@ -767,7 +767,6 @@ class Polytope:
                         res.append(self._str_vrepr())
                 case _:
                     raise ValueError(f"Unknown format code '{char}' in format spec '{format_spec}' for object of type '{self.__class__.__name__}'")
-                
         return "\n".join(res)
 
     def minimal(self,

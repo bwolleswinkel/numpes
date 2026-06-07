@@ -152,7 +152,7 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
     """
     if not CDD_INSTALLED:
         raise ImportError("The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.")
-    
+
     # Validate input dimensions
     if verts.ndim != 2:
         raise ValueError(f"Verts should be a 2D array of shape (k, n), but received verts.shape={verts.shape}")
@@ -239,7 +239,7 @@ def conv(verts: NDArray) -> NDArray:
         return verts[0:1, :]  # To maintain 2D shape, use original
     if rank < verts_clean.shape[1]:
         # Points lie on a lower-dimensional manifold - project to intrinsic dimension
-        _, _, Vh = np.linalg.svd(centered, full_matrices=False)
+        _, _, Vh = np.linalg.svd(centered, full_matrices=False)  # pylint: disable=invalid-name
         coords_proj = centered @ Vh[:rank, :].T  # Project to rank-dimensional subspace
         if rank == 1:
             # For collinear points, find extremes along the line
@@ -311,10 +311,9 @@ def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> 
         if look is not None and look[2] < 0:
             sin_val = -sin_val
         return float(np.arctan2(sin_val, dot_prod))
-    else:
-        if look is None:
-            look = np.array([0.0, 0.0, 1.0])
-        angle = np.arccos(dot_prod)
-        cross_dot = np.dot(np.cross(v_1_norm, v_2_norm), look / np.linalg.norm(look))
-        sign = np.sign(cross_dot) if not np.isclose(cross_dot, 0, atol=CFG.atol, rtol=CFG.rtol) else 1
-        return float(sign * angle)
+    if look is None:
+        look = np.array([0.0, 0.0, 1.0])
+    angle = np.arccos(dot_prod)
+    cross_dot = np.dot(np.cross(v_1_norm, v_2_norm), look / np.linalg.norm(look))
+    sign = np.sign(cross_dot) if not np.isclose(cross_dot, 0, atol=CFG.atol, rtol=CFG.rtol) else 1
+    return float(sign * angle)
