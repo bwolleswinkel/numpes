@@ -102,7 +102,7 @@ def _solve_lp_cvxpy(
 
     if not CVXPY_INSTALLED:
         raise ImportError("The package 'cvxpy' is not installed. Please install it to use the CVXPY backend.")
-    
+
     bounds_cvx: NDArray | None = None
     if bounds is not None:
         bounds_cvx = np.array([

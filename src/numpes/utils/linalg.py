@@ -71,7 +71,7 @@ def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArra
         Ab_eq = reduce_eq(Ab_eq)
         n = Ab_eq.shape[1] - 1
 
-        Ab, Ab_eq_new = find_implicit(Ab, Ab_eq)
+        Ab, Ab_eq_new = find_implicit(Ab, Ab_eq)  # pylint: disable=invalid-name
         # Check if find_implicit returned the infeasible marker
         if Ab.shape[0] == 1 and Ab_eq_new.size == 0 and np.array_equal(Ab[0], [0] * n + [-1]):
             return Ab, Ab_eq_new
@@ -165,5 +165,5 @@ def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
             and np.isclose(res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)):
             implicit_mask[idx] = True
 
-    Ab_eq_new = Ab[implicit_mask, :]
+    Ab_eq_new = Ab[implicit_mask, :]  # pylint: disable=invalid-name
     return Ab[~implicit_mask], Ab_eq_new
