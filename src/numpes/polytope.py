@@ -480,7 +480,7 @@ class Polytope:
 
     @property
     def n(self) -> int:
-        """Dimension of the ambient space in which the polytope is defined"""
+        """Dimension of the ambient space"""
         if self._vrepr is not None:
             return self.verts.shape[1]
         if self._hrepr is not None:
