@@ -29,6 +29,35 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
+def is_square(A: NDArray) -> bool:
+    """Check whether a matrix `A` is square, meaning it has two dimensions with equal size"""
+    return A.ndim == 2 and A.shape[0] == A.shape[1]
+
+
+def is_sym(A: NDArray) -> bool:
+    """Check if a matrix `A` is symmetric, meaning `A == A.T`"""
+    if not is_square(A):
+        return False  # FIXME: Should this raise an error instead?
+    return np.allclose(A, A.T, rtol=CFG.rtol, atol=CFG.atol)
+
+
+def is_posdef(A: NDArray,
+              semi_def: bool = False,
+              ) -> bool:
+    """Check if a matrix `A` is positive definite or positive semi-definite"""
+    if semi_def:
+        if not is_sym(A):
+            return False
+        eigvals = np.linalg.eigvalsh(A)
+        return np.all(eigvals >= -CFG.atol).item()
+    try:
+        np.linalg.cholesky(A)
+        return True
+    except np.linalg.LinAlgError:
+        return False
+
+
+
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/19[untested/unverified]
 def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Minimize an H-representation by removing redundant inequalities
