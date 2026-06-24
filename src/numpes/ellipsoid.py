@@ -8,6 +8,7 @@ import numpy as np
 
 from numpes._config import CFG
 from numpes._internal.wraps import wraps
+from numpes._internal.printing import sym_replace, pad
 from numpes.utils.linalg import is_posdef
 
 if TYPE_CHECKING:
@@ -137,7 +138,7 @@ class Ellipsoid:
             R[:, -1] *= -1  # Ensure R is a proper rotation matrix with det(R) = 1
         with np.errstate(divide='ignore'):
             radii = 1 / np.sqrt(sing)
-        ellipsoid = cls(R, radii, Q)  # FIXME: Naming this `ellps` gives a shadowing warning, but I don't know if that is actually problematic?
+        ellipsoid = cls(R, radii, Q, c)  # FIXME: Naming this `ellps` gives a shadowing warning, but I don't know if that is actually problematic?
         return ellipsoid
 
     @classmethod
@@ -160,6 +161,50 @@ class Ellipsoid:
         if not cov.ndim == 2:
             raise ValueError(f"Covariance matrix 'cov' must be a two-dimensional array, received {cov.shape}")
         raise NotImplementedError(...)
+    
+    # [untested/unverified]
+    def __str__(self) -> str:
+        """Descriptive representation of the ellipsoid"""
+        header = self._str_header()
+        with np.printoptions(threshold=0):
+            c_as_str, Q_as_str = str(np.atleast_2d(self.c).T), str(self.Q)
+        c_lines, Q_lines = c_as_str.splitlines(), Q_as_str.splitlines()
+        nlines = len(Q_lines)
+        try:
+            idx_trunc = Q_lines.index(' ...')
+            # NOTE: This assumes the number of edgeitems above and below is always identical
+            c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]
+        except ValueError as _:
+            idx_trunc = None
+        idx_text = nlines - (1
+                            if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
+                            else 2)
+
+        c_text = ['   ' if idx != idx_text else 'c: ' for idx in range(nlines)]
+        c_vals = [pad(line, max([len(line) for line in c_lines])) for line in c_lines]
+        Q_text = ['     ' if idx != idx_text else ', Q: ' for idx in range(nlines)]
+        Q_vals = sym_replace(Q_as_str).splitlines()
+        comb = '\n'.join([''.join(line) for line in zip(c_text, c_vals, Q_text, Q_vals)])
+        if self.n == 1:
+            comb = comb.replace('[[', '[').replace(']]', ']')
+
+        comb = header + "\n" + comb 
+        return comb
+    
+    # [untested/unverified]
+    def _str_header(self) -> str:
+        # NOTE: These methods are not yet implemented
+        # if self.is_empty:
+        #     return f"Empty ellipsoid in R^{self.n}"
+        # if self.is_singleton:
+        #     return f"Singleton ellipsoid in R^{self.n}"
+        # if self.is_lower_dim:
+        #     return f"Lower dimensional ellipsoid in R^{self.n}"
+        # if not self.is_bounded:
+        #     return f"Unbounded ellipsoid in R^{self.n}"
+        # if self.is_full_space:
+        #     return f"Full space ellipsoid in R^{self.n}"
+        return f"Ellipsoid in R^{self.n}"
 
 
 @wraps(Ellipsoid.from_quad)
