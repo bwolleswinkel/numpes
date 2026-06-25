@@ -35,6 +35,7 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
+from numpes._internal.printing import format_as_set, pad
 from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
 from numpes.utils import enum_facets, enum_gens, signed_angle
 
@@ -695,13 +696,117 @@ class Polytope:
         return poly
 
     def __str__(self) -> str:
-        raise NotImplementedError("The '__str__' method is not yet implemented")
+        """Descriptive representation of the polytope in either V-represenation or H-representation"""
+        header = self._str_header()
+        if self._hrepr is not None:
+            return header + "\n" + self._str_hrepr()
+        if self._vrepr is not None:
+            return header + "\n" + self._str_vrepr()
+        raise InvalidRepresentation("Polytope is not properly initialized with either " \
+        "V-representation or H-representation")
+    
+    # [untested/unverified]
+    def _str_header(self) -> str:
+        # NOTE: These methods are not yet implemented
+        # if self.is_empty:
+        #     return f"Empty polytope in R^{self.n}"
+        # if self.is_singleton:
+        #     return f"Singleton polytope in R^{self.n}"
+        # if self.is_lower_dim:
+        #     return f"Lower dimensional polytope in R^{self.n}"
+        # if not self.is_bounded:
+        #     return f"Unbounded polytope in R^{self.n}"
+        # if self.is_full_space:
+        #     return f"Full space polytope in R^{self.n}"
+        return f"Polytope in R^{self.n}"
 
+    # [untested/unverified]
     def _str_vrepr(self) -> str:
-        raise NotImplementedError("The '_str_vrepr' method is not yet implemented")
+        """"Descriptive representation of the polytope in V-represntation"""
+        if self._vrepr is None:
+            raise ValueError("The polytope must be initialized in V-representation to use this method")
+        verts, rays = self.vrepr
+        edgeitems = np.get_printoptions()['edgeitems']
+        if verts.size != 0:
+            with np.printoptions(threshold=0):
+                verts_lines = format_as_set([str(np.atleast_2d(vert).T) for vert in verts], edgeitems).splitlines()
+            nlines = len(verts_lines)
+            idx_text = nlines // 2
+            conv_lines = ["     " if idx != idx_text else "conv " for idx in range(nlines)]
+            comb_verts = "\n".join(["".join(line) for line in zip(conv_lines, verts_lines)])
+        else:
+            comb_verts = None
+        if rays.size != 0:
+            with np.printoptions(threshold=0):
+                rays_lines = format_as_set([str(np.atleast_2d(ray).T) for ray in rays], edgeitems).splitlines()
+            if comb_verts is None:
+                nlines = len(rays_lines)
+                idx_text = nlines // 2
+            nonneg_lines = ["       " if idx != idx_text else "nonneg " for idx in range(nlines)]
+            comb_rays = "\n".join(["".join(line) for line in zip(nonneg_lines, rays_lines)])
+        else:
+            comb_rays = None
+        if comb_verts is not None and comb_rays is not None:
+            comb =  "\n".join(["".join(line) for line in zip(comb_verts.splitlines(),
+                                                             ["   " if idx != idx_text else " + " for idx in range(nlines)],
+                                                             comb_rays.splitlines())])
+        elif comb_verts is not None:
+            comb = comb_verts
+        elif comb_rays is not None:
+            comb = comb_rays
+        else:  # This must be an empty polytope
+            comb = "conv {/}"
+        return comb
 
+    # [untested/unverified]
     def _str_hrepr(self) -> str:
-        raise NotImplementedError("The '_str_hrepr' method is not yet implemented")
+        """"Descriptive representation of the polytope in V-represntation"""
+        if self._hrepr is None:
+            raise ValueError("The polytope must be initialized in V-representation to use this method")
+        A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+        if A.size != 0:
+            with np.printoptions(threshold=0):
+                A_as_str = str(A).splitlines()
+            nlines = len(A_as_str)
+            idx_text = nlines - (1 if nlines <= 2 else 2)
+            A_lines = [pad(line, len(A_as_str[-1])) for line in A_as_str]
+            x_lines = [" |    " if idx != idx_text else " x <= " for idx in range(nlines)]
+            with np.printoptions(threshold=0):
+                b_lines = str(np.atleast_2d(b).T).splitlines()
+            comb_Ab = "\n".join(["".join(line) for line in zip(A_lines, x_lines, b_lines)])
+        else:
+            comb_Ab = None
+        if A_eq.size != 0:
+            with np.printoptions(threshold=0):
+                A_eq_as_str = str(A_eq).splitlines()
+            nlines_eq = len(A_eq_as_str)
+            idx_text_eq = nlines_eq - (1 if nlines_eq <= 2 else 2)
+            A_eq_lines = [pad(line, len(A_eq_as_str[-1])) for line in A_eq_as_str]
+            x_eq_lines = [" |    " if idx != idx_text_eq else " x == " for idx in range(nlines_eq)]
+            with np.printoptions(threshold=0):
+                b_eq_lines = str(np.atleast_2d(b_eq).T).splitlines()
+            comb_Ab_eq = "\n".join(["".join(line) for line in zip(A_eq_lines, x_eq_lines, b_eq_lines)])
+        else:
+            comb_Ab_eq = None
+        if comb_Ab is not None and comb_Ab_eq is not None:
+            if nlines == 1:
+                comb_Ab = comb_Ab.replace("[[", " [" if nlines_eq != 1 else "[").replace("]]", "] " if nlines_eq != 1 else "]")
+                if comb_Ab[-1] == " ":
+                    comb_Ab = comb_Ab[:-1]
+            if nlines_eq == 1:
+                comb_Ab_eq = comb_Ab_eq.replace("[[", " [" if nlines != 1 else "[").replace("]]", "] " if nlines != 1 else "]")
+            comb = "\n".join(["".join(line) for line in zip(comb_Ab.splitlines(), ['' if idx != (nlines - 1) else ',' for idx in range(nlines)])]) + "\nand\n" + comb_Ab_eq
+        elif comb_Ab is not None:
+            if nlines == 1:
+                comb_Ab = comb_Ab.replace("[[", "[").replace("]]", "]")
+            comb = comb_Ab
+        elif comb_Ab_eq is not None:
+            if nlines_eq == 1:
+                comb_Ab_eq = comb_Ab_eq.replace("[[", "[").replace("]]", "]")
+            comb = comb_Ab_eq
+        else:  # This must be the entire ambient space
+            comb = f"No constraints on x"
+        return comb
 
     def __repr__(self) -> str:
         """Return a representation of the polytopes attributes"""
