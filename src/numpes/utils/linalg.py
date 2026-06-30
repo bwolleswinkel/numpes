@@ -143,15 +143,17 @@ def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
     return Ab[~implicit_mask], Ab_eq_new
 
 
+# [untested/unverified]
 def span(A: NDArray) -> NDArray:
     """Remove linearly dependent columns from a matrix. The columns are preserved in a left-to-right order."""
+    # FIXME: Should we just make this row-major ordering instead? to fix the "transpose-hell"?
     if A.ndim != 2:
         raise ValueError(f"Parameter 'A' must be a matrix of size `(m, n)`, but recieved {A.shape}")
     if np.isnan(A).any() or not np.isfinite(A).all():
         raise ValueError("Array 'A' must not contain NaN or inf values")
     
     if np.all(np.abs(A) <= CFG.atol):
-        return np.empty((0, A.shape[1]))
+        return np.empty((A.shape[0], 0))
     if A.shape[0] <= 1:
         return A
 

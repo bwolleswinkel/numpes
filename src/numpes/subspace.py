@@ -33,6 +33,7 @@ import numpy as np
 
 from numpes._config import CFG
 from numpes._internal import wraps
+from numpes._internal.printing import format_as_set
 from numpes.utils.linalg import span
 
 if TYPE_CHECKING:
@@ -150,10 +151,6 @@ class Subspace:
         which means linearly dependent rows of the representation will be removed on assignment.
         """
         self._basis = value
-        # TEMP
-        #
-        print(f"{CFG.on_property_assign = }")
-        #
         match CFG.on_property_assign:
             case 'pass':
                 pass
@@ -177,6 +174,61 @@ class Subspace:
         """Check whether the subspace is trivial (meaning it only contains the zero vector)"""
         return self.basis.size == 0
     
+    def __str__(self) -> str:
+        """Descriptive representation of the subspace"""
+        header = self._str_header()
+        return header + "\n" + self._str_basis()
+    
+    # [untested/unverified]
+    def _str_header(self) -> str:
+        # NOTE: These methods are not yet implemented
+        if self.is_trivial:
+            return f"Trivial subspace in R^{self.n}"
+        # if self.is_full_space:
+        #     return f"Full space subspace in R^{self.n}"
+        return f"Subspace in R^{self.n}"
+
+    # [untested/unverified]
+    def _str_basis(self) -> str:
+        """"Descriptive representation of the basis of the polytope"""
+        edgeitems = np.get_printoptions()['edgeitems']
+        basis = self.basis
+        if basis.size != 0:
+            with np.printoptions(threshold=0):
+                basis_lines = format_as_set([str(np.atleast_2d(base).T) for base in basis], edgeitems).splitlines()
+            nlines = len(basis_lines)
+            idx_text = nlines // 2
+            span_lines = ["     " if idx != idx_text else "span " for idx in range(nlines)]
+            comb = "\n".join(["".join(line) for line in zip(span_lines, basis_lines)])
+        else:  # This must be a trivial subspace
+            with np.printoptions(threshold=0):
+                comb = format_as_set([str(np.zeros((self.n, 1)))], edgeitems)
+        return comb
+
+    def __repr__(self) -> str:
+        """Return a representation of the subspace attributes"""
+        attrs = ", ".join(f"{key}={value}" for key, value in self._repr_items())
+        return f"{self.__class__.__name__}({attrs})"
+
+    def _repr_items(self) -> list[tuple[str, str]]:
+        """Return (attribute, formatted-value) pairs used by repr formatting"""
+
+        def _format_repr_value(value: Any) -> str:
+            if isinstance(value, np.ndarray):
+                return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
+            if isinstance(value, tuple):
+                inner = ", ".join(_format_repr_value(item) for item in value)
+                if len(value) == 1:
+                    inner += ","
+                return f"({inner})"
+            return repr(value)
+
+        return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
+
+    def __format__(self, format_spec: str) -> str:
+        raise NotImplementedError("Format specifiers are not yet implemented")
+    
+    # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
                 ) -> Subspace:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
