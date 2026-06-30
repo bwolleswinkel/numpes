@@ -33,6 +33,7 @@ import numpy as np
 
 from numpes._config import CFG
 from numpes._internal import wraps
+from numpes.utils.linalg import span
 
 if TYPE_CHECKING:
     from typing import Optional, Self
@@ -130,7 +131,7 @@ class Subspace:
             raise ValueError(f"Basis vectors must be provided as a 2D array of shape (d, n)," \
                              f" but received an array of shape {basis.shape}")
         if np.isnan(basis).any() or not np.isfinite(basis).all():
-            raise ValueError("Vertices 'basis' cannot contain NaN of inf values")
+            raise ValueError("Vertices 'basis' cannot contain NaN or inf values")
 
         self.basis = basis
 
@@ -149,6 +150,10 @@ class Subspace:
         which means linearly dependent rows of the representation will be removed on assignment.
         """
         self._basis = value
+        # TEMP
+        #
+        print(f"{CFG.on_property_assign = }")
+        #
         match CFG.on_property_assign:
             case 'pass':
                 pass
@@ -176,12 +181,12 @@ class Subspace:
                 in_place: bool = True,
                 ) -> Subspace:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
         """Compute a minimal representation of the subspace by removing linearly dependent basis vectors"""
-        # basis = span(self._basis)
-        # if in_place:
-        #     self._basis = basis
-        #     return self
-        # else:
-        #     return Subspace(basis)
+        basis = span(self._basis.T).T
+        if in_place:
+            self._basis = basis
+            return self
+        else:
+            return Subspace(basis)
 
 
 # FIXME: I need to change `wraps` such that only the docstring gets copied, but not the signature

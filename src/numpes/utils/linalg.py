@@ -12,6 +12,8 @@ reduce_ineq
     Remove redundant inequalities from a constraint matrix that are implied by other inequalities and equalities
 find_implicit
     Find implicit equalities using slack analysis from a single LP solve
+span
+    Remove linearly dependent columns from a matrix
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy as sp
 
 from numpes._config import CFG
 from numpes.utils.linprog import Status, solve_lp
@@ -138,3 +141,24 @@ def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
 
     Ab_eq_new = Ab[implicit_mask, :]  # pylint: disable=invalid-name
     return Ab[~implicit_mask], Ab_eq_new
+
+
+def span(A: NDArray) -> NDArray:
+    """Remove linearly dependent columns from a matrix. The columns are preserved in a left-to-right order."""
+    if A.ndim != 2:
+        raise ValueError(f"Parameter 'A' must be a matrix of size `(m, n)`, but recieved {A.shape}")
+    if np.isnan(A).any() or not np.isfinite(A).all():
+        raise ValueError("Array 'A' must not contain NaN or inf values")
+    
+    if np.all(np.abs(A) <= CFG.atol):
+        return np.empty((0, A.shape[1]))
+    if A.shape[0] <= 1:
+        return A
+
+    # FIXME: For some reason, left-to-right ordering is NOT preserved; the returned columns are always in order,
+    # but if columns i and i + delta are lin dependent, sometimes the i + delta column is returned instead of
+    # the 'first' encountered i column, which is a bit arbitrary. Off course this is not a huge problem, but might
+    # be nice to look into if we can actually preseve this ordering.
+    _, R, P = sp.linalg.qr(A, pivoting=True)
+    rank = np.sum(np.abs(np.diag(R)) > CFG.atol)
+    return A[:, sorted(P[:rank])]
