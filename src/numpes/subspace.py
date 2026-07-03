@@ -30,15 +30,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy as sp
+
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_INSTALLED: bool = True
+except ImportError as _:
+    MATPLOTLIB_INSTALLED = False
 
 from numpes._config import CFG
 from numpes._internal import wraps
 from numpes._internal.printing import format_as_set
 from numpes.utils.linalg import span
+from numpes.utils.plot import plot_line, plot_plane, plot_box, plot_vector
+from numpes.exceptions import InvalidRepresentation
 
 if TYPE_CHECKING:
     from typing import Optional, Any, Literal
 
+    from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -170,9 +180,26 @@ class Subspace:
         return self.basis.shape[0]
     
     @property
+    def dim(self) -> int:
+        """Dimension of the subspace"""
+        if self._dim is None:
+            self._dim = np.linalg.matrix_rank(self.basis, CFG.atol)
+        return self._dim
+    
+    # [untested/unverified]
+    @property
     def is_trivial(self) -> bool:
         """Check whether the subspace is trivial (meaning it only contains the zero vector)"""
-        return self.basis.size == 0
+        if self._is_trivial is None:
+            self._is_trivial = np.linalg.matrix_rank(self.basis, tol=CFG.atol) == 0
+        return self._is_trivial
+    
+    # [untested/unverified]
+    @property
+    def perp(self) -> Subspace:
+        """"Returns the subspace orthogonal to the currecnt subspace"""
+        basis_ortho = sp.linalg.null_space(self.basis).T
+        return Subspace(basis_ortho)
     
     def __str__(self) -> str:
         """Descriptive representation of the subspace"""
@@ -306,6 +333,10 @@ class Subspace:
         return comb
     
     # [untested/unverified]
+    def __iter__(self) -> NDArray:
+        return iter(self.basis)
+  
+    # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
                 ) -> Subspace:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
@@ -316,6 +347,94 @@ class Subspace:
             return self
         else:
             return Subspace(basis)
+        
+    # [untested/unverified]
+    def plot(self,
+             color: str | None = None,
+             alpha: float = 0.5,
+             plot_basis: bool = False,
+             show: bool = True,
+             ax: Optional[Axes] = None,
+             ) -> Axes:
+        """Plot the subspace"""
+        if not MATPLOTLIB_INSTALLED:
+            raise ImportError("Matplotlib is required for plotting." \
+            " Please install it with 'pip install matplotlib' and try again.")
+        
+        if ax is None:
+            if self.n == 1:
+                raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
+            if self.n == 2:
+                fig, ax = plt.subplots()
+            elif self.n == 3:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
+        else:
+            fig = None
+
+        if color is None:
+            # pylint: disable=protected-access
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+
+        if self.n > 3:
+            raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
+
+        match self.dim:
+            case 0: 
+                if self.n == 1:
+                    raise NotImplementedError("1d plotting is not yet implemented")
+                else:
+                    # FIXME: I should just remove this if-else statement
+                    ax.plot(*[0 for _ in range(self.n)], 'o', color=color)
+            case 1:
+                plot_line(ax, self.basis[0, :], color=color)
+            case 2:
+                if self.n == 1:
+                    raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                else:
+                    # FIXME: We need to make 'plot_plane' work for 2d, and not provide any normal
+                    plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+            case 3:
+                if self.n <= 2:
+                    raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                else:
+                    plot_box(ax, color=color, alpha=alpha)
+            case _:
+                raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+        
+        for idx in range(self.n):
+            exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(min(ax.get_{['x', 'y', 'z'][idx]}lim()[0], -1), max(ax.get_{['x', 'y', 'z'][idx]}lim()[1], 1))')
+
+        if plot_basis:
+            for basis_vector in self:
+                plot_vector(ax, basis_vector, color=color)
+
+        # match self.n:
+        #     case 1:
+        #         raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
+        #     case 2:
+        #         if ax.name == '3d':
+        #             raise ValueError("The dimension of the subspace" \
+        #             " does not match the dimension of the provided axes 'ax'")
+        #         ...
+        #         if plot_basis:
+        #             ...
+        #     case 3:
+        #         if ax.name != '3d':
+        #             raise ValueError("The dimension of the subspace" \
+        #             " does not match the dimension of the provided axes 'ax'")
+        #         ...
+        #         if plot_basis:
+        #             ...
+        #     case _:
+        #         raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+
+        if show:
+            plt.show()
+
+        return ax
 
 
 # FIXME: I need to change `wraps` such that only the docstring gets copied, but not the signature
