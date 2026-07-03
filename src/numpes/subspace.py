@@ -395,13 +395,7 @@ class Subspace:
                     raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 else:
                     # FIXME: We need to make 'plot_plane' work for 2d, and not provide any normal
-                    # TEMP
-                    if self.n == 2:
-                        print("Plane plotting not currently supported....")
-                    else:
-                        plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
-                    #
-                    # plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+                    plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
             case 3:
                 if self.n <= 2:
                     raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")

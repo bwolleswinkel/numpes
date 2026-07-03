@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 try:
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # type: ignore[import-untyped]
+    from mpl_toolkits.mplot3d.art3d import PolyCollection, Poly3DCollection  # type: ignore[import-untyped]
     from matplotlib.patches import FancyArrowPatch
     from mpl_toolkits.mplot3d import proj3d
     MATPLOTLIB_INSTALLED: bool = True
@@ -176,6 +176,29 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
                 poly_collection.set_verts([])
         else:
             poly_collection.set_verts([])
+
+    # FIXME: This is temporary code
+    if not ax.name in {'1d', '3d'} and plane_normal is None:
+        # Create polygon collection
+        poly_collection = PolyCollection([], linewidths=0, **kwargs)
+        ax.add_collection(poly_collection)
+        # Set the lambda function to call
+        def update_plane_full():
+            xlim, ylim = ax.get_xlim(), ax.get_ylim()
+            edges = [
+                (xlim[0], ylim[0]),
+                (xlim[0], ylim[1]),
+                (xlim[1], ylim[1]),
+                (xlim[1], ylim[0]),
+            ]
+            poly_collection.set_verts([edges])
+        # Add a callback
+        for callback in ['xlim_changed', 'ylim_changed']:
+            ax.callbacks.connect(callback, lambda _: update_plane_full())
+        # Call the function for the first time
+        update_plane_full()
+        # Return
+        return
     
     plane_normal = np.array(plane_normal, dtype=float)
     if np.allclose(plane_normal, 0):
