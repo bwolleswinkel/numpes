@@ -75,6 +75,7 @@ class Subspace:
         Convert the subspace to a AffineSubset
     """
 
+    # [untested/unverified]
     def __init__(self,
                  basis: Optional[ArrayLike] = None,
                  n: Optional[int] = None,
@@ -127,11 +128,15 @@ class Subspace:
         self._dim: int | None = None
         self._vol: float | None = None
 
-        # FIXME: Temporary fix
         if basis is None:
-            raise NotImplementedError("Providing a None basis (empty initializtion) is not yet implemented")
-        else:
-            self._init_basis(basis)
+            if n is None:
+                raise ValueError("If no basis is provided, the keyword argument 'n' must be provided")
+            if not isinstance(n, int):
+                raise ValueError(f"Ambient dimension 'n' must be of type integer, but received '{n}'")
+            if n <= 0:
+                raise ValueError(f"Ambient dimension 'n' must be positive integer, but received '{n}'")
+            basis = np.empty((0, n))
+        self._init_basis(basis)
 
     def _init_basis(self,
                     basis: ArrayLike,
