@@ -242,7 +242,7 @@ class Subspace:
             span_lines = ["     " if idx != idx_text else "span " for idx in range(nlines)]
             comb = "\n".join(["".join(line) for line in zip(span_lines, basis_lines)])
         else:  # This must be a trivial subspace
-            comb = format_as_set([str(np.zeros((self.n, 1)))], edgeitems)
+            comb = format_as_set([str(np.zeros((self.n, 1), dtype=int if to_dtype is None else eval(to_dtype)))], edgeitems)
         return comb
 
     def __repr__(self) -> str:
@@ -357,6 +357,7 @@ class Subspace:
     def plot(self,
              color: str | None = None,
              alpha: float = 0.5,
+             label: Optional[str] = None,
              plot_basis: bool = False,
              show: bool = True,
              ax: Optional[Axes] = None,
@@ -392,20 +393,26 @@ class Subspace:
                     raise NotImplementedError("1d plotting is not yet implemented")
                 else:
                     # FIXME: I should just remove this if-else statement
-                    ax.plot(*[0 for _ in range(self.n)], 'o', color=color)
+                    ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
             case 1:
-                plot_line(ax, self.basis[0, :], color=color)
+                line = plot_line(ax, self.basis[0, :], color=color)
+                if label is not None:
+                    line.set_label(label)
             case 2:
                 if self.n == 1:
                     raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 else:
                     # FIXME: We need to make 'plot_plane' work for 2d, and not provide any normal
-                    plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+                    plane = plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+                    if label is not None:
+                        plane.set_label(label)
             case 3:
                 if self.n <= 2:
                     raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 else:
-                    plot_box(ax, color=color, alpha=alpha)
+                    box = plot_box(ax, color=color, alpha=alpha)
+                    if label is not None:
+                        box.set_label(label)
             case _:
                 raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
         
@@ -415,26 +422,6 @@ class Subspace:
         if plot_basis:
             for basis_vector in self:
                 plot_vector(ax, basis_vector, color=color)
-
-        # match self.n:
-        #     case 1:
-        #         raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
-        #     case 2:
-        #         if ax.name == '3d':
-        #             raise ValueError("The dimension of the subspace" \
-        #             " does not match the dimension of the provided axes 'ax'")
-        #         ...
-        #         if plot_basis:
-        #             ...
-        #     case 3:
-        #         if ax.name != '3d':
-        #             raise ValueError("The dimension of the subspace" \
-        #             " does not match the dimension of the provided axes 'ax'")
-        #         ...
-        #         if plot_basis:
-        #             ...
-        #     case _:
-        #         raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 
         if show:
             plt.show()

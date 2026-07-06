@@ -16,13 +16,17 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from matplotlib.axes import Axes
+    from matplotlib.lines import Line2D
+    from mpl_toolkits.mplot3d.art3d import Line3D
+    from matplotlib.collections import PolyCollection
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
     from numpy.typing import ArrayLike
 
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
 # FIXME: We need to add the 'bidirectional' functionality
-def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidirectional: bool = True, **kwargs) -> None:
+def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidirectional: bool = True, **kwargs) -> Line2D | Line3D:
     """Plot an indefinite line in 2D or 3D, defined by a point and a direction vector"""
 
     def update_line():
@@ -117,11 +121,13 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
     
     update_line()
 
+    return line_obj
+
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
-def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwargs) -> None:
-    """Plot an indefinite plane in 3D, defined by a normal vector and a point"""
+def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwargs) -> PolyCollection | Poly3DCollection:
+    """Plot an indefinite plane in 2D or 3D, defined by a normal vector and a point"""
     
     def update_plane():
         xlim, ylim, zlim = ax.get_xlim(), ax.get_ylim(), ax.get_zlim()
@@ -177,7 +183,10 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
         else:
             poly_collection.set_verts([])
 
-    # FIXME: This is temporary code
+    if ax.name == '1d':
+        raise ValueError("Cannot plot a 2-dimensional on an 'ax' object which is 1-dimensional")
+
+    # FIXME: This is code that still needs to be reviewed
     if not ax.name in {'1d', '3d'} and plane_normal is None:
         # Create polygon collection
         poly_collection = PolyCollection([], linewidths=0, **kwargs)
@@ -197,8 +206,8 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
             ax.callbacks.connect(callback, lambda _: update_plane_full())
         # Call the function for the first time
         update_plane_full()
-        # Return
-        return
+        # Return the collection
+        return poly_collection
     
     plane_normal = np.array(plane_normal, dtype=float)
     if np.allclose(plane_normal, 0):
@@ -227,10 +236,12 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
     
     update_plane()
 
+    return poly_collection
+
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
-def plot_box(ax: Axes, **kwargs) -> None:
+def plot_box(ax: Axes, **kwargs) -> Poly3DCollection:
     """Plot an indefinite box in 3D, centered at the origin with edges from -inf to inf"""
     
     def update_box():
@@ -260,6 +271,8 @@ def plot_box(ax: Axes, **kwargs) -> None:
         ax.callbacks.connect(callback, lambda _: update_box())
     
     update_box()
+
+    return box_collection
 
 
 # [untested/unverified]
