@@ -8,9 +8,12 @@ try:
     from mpl_toolkits.mplot3d.art3d import PolyCollection, Poly3DCollection  # type: ignore[import-untyped]
     from matplotlib.patches import FancyArrowPatch
     from mpl_toolkits.mplot3d import proj3d
+    from matplotlib.figure import Figure
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
+
+from numpes._internal.axes import Axes1D
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -32,6 +35,13 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
     def update_line():
         # Get axis limits
         limits = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if ndim == 3 else [])
+
+        # Check if it is 1d
+        if ndim == 1:
+            # FIXME: The `bidirectional` also needs to be taken into account here
+            line_obj.set_xdata(limits[0])
+            line_obj.set_ydata([0, 0])
+            return
         
         # Calculate t-values for intersections
         t_values = []
@@ -106,7 +116,8 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
     
     # Create line object and setup callbacks
     if ndim == 1:
-        raise NotImplementedError("1D lines are not supported yet")
+        line_obj, *_ = ax.plot([], **kwargs)
+        callbacks = ['xlim_changed']
     elif ndim == 2:
         line_obj, = ax.plot([], [], **kwargs)
         callbacks = ['xlim_changed', 'ylim_changed']
@@ -298,10 +309,12 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
         raise ValueError(f"Vector must be 1-dimensional, recieved shape {vector.shape}")
     if vector.size > 3:
         raise ValueError(f"Vector must be 1, 2, or three-dimensional, recieved size {vector.size}")
-    if vector.size == 2 and ax.name == '3d':
-        raise ValueError(f"Provided vector is 2d, but axes object is 3d")
+    if vector.size == 1 and ax.name != '1d':
+        raise ValueError(f"Provided vector is 1d, but axes object is {'3d' if ax.name == '3d' else '2d'}")
+    if vector.size == 2 and ax.name in {'1d', '3d'}:
+        raise ValueError(f"Provided vector is 2d, but axes object is {ax.name}")
     if vector.size == 3 and ax.name != '3d':
-        raise ValueError(f"Provided vector is 3d, but axes object is 2d")
+        raise ValueError(f"Provided vector is 3d, but axes object is {'1d' if ax.name == '1d' else '2d'}")
 
     if point is None:
         point = np.zeros(vector.size)
@@ -312,6 +325,8 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
         if point.size != vector.size:
             raise ValueError(f"Point and vector must have the same size, but recieved size {point.size} and {vector.size} respectively")
 
+    if vector.size == 1:
+        raise NotImplementedError(f"Plotting vectors on 1D axes is not yet implemented")
     if vector.size == 2:
         arrow = FancyArrowPatch(point,
                                 vector,
@@ -335,3 +350,40 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
         exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(1.1 * min([ax_lim[0], vector[idx], point[idx]]), 1.1 * max([ax_lim[1], vector[idx], point[idx]]))')
 
     ax.add_patch(arrow)
+
+
+# FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
+def add_1d_subplot(fig: Figure, *args, **kwargs):
+    """Create and add an Axes1D subplot to a figure.
+    
+    Parameters:
+    -----------
+    fig : Figure
+        The figure to add the subplot to
+    *args : tuple
+        Position arguments (like subplot(111) or subplot(2,1,1))
+    **kwargs : dict
+        Additional keyword arguments passed to subplot creation
+    
+    Returns:
+    --------
+    Axes1D
+        The created 1D axes instance
+    """
+    # Default to 111 if no args provided
+    if not args:
+        args = (111,)
+    
+    # Use add_subplot instead of add_axes for proper subplot behavior
+    ax = fig.add_subplot(*args, projection=None)
+    
+    # Replace the default axes with our custom Axes1D
+    # Get the position and remove the old axes
+    pos = ax.get_position()
+    fig.delaxes(ax)
+    
+    # Create new Axes1D with the same position
+    ax = Axes1D(fig, pos, **kwargs)
+    fig.add_axes(ax)
+
+    return ax

@@ -42,7 +42,7 @@ from numpes._config import CFG
 from numpes._internal import wraps
 from numpes._internal.printing import format_as_set
 from numpes.utils.linalg import span
-from numpes.utils.plot import plot_line, plot_plane, plot_box, plot_vector
+from numpes.utils.plot import plot_line, plot_plane, plot_box, plot_vector, add_1d_subplot
 from numpes.exceptions import InvalidRepresentation
 
 if TYPE_CHECKING:
@@ -369,8 +369,9 @@ class Subspace:
         
         if ax is None:
             if self.n == 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
-            if self.n == 2:
+                fig = plt.figure()
+                ax = add_1d_subplot(fig)
+            elif self.n == 2:
                 fig, ax = plt.subplots()
             elif self.n == 3:
                 fig = plt.figure()
@@ -389,11 +390,7 @@ class Subspace:
 
         match self.dim:
             case 0: 
-                if self.n == 1:
-                    raise NotImplementedError("1d plotting is not yet implemented")
-                else:
-                    # FIXME: I should just remove this if-else statement
-                    ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
+                ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
             case 1:
                 line = plot_line(ax, self.basis[0, :], color=color)
                 if label is not None:
