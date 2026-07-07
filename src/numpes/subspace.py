@@ -392,7 +392,7 @@ class Subspace:
             case 0: 
                 ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
             case 1:
-                line = plot_line(ax, self.basis[0, :], color=color)
+                line = plot_line(ax, self.basis[0, :], color=color, alpha=alpha)
                 if label is not None:
                     line.set_label(label)
             case 2:

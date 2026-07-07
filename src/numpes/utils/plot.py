@@ -326,7 +326,13 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
             raise ValueError(f"Point and vector must have the same size, but recieved size {point.size} and {vector.size} respectively")
 
     if vector.size == 1:
-        raise NotImplementedError(f"Plotting vectors on 1D axes is not yet implemented")
+        arrow = FancyArrowPatch([point.item(), 0],
+                                [vector.item(), 0],
+                                mutation_scale=20,
+                                lw=2,
+                                arrowstyle="-|>",
+                                color=kwargs.get('color', None),
+                                )
     if vector.size == 2:
         arrow = FancyArrowPatch(point,
                                 vector,
@@ -344,10 +350,14 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
                                   color=kwargs.get('color', None),
                                   )
 
-    ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if vector.size == 3 else []) 
+    ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if vector.size == 3 else [])
     for idx, ax_lim in enumerate(ax_lims):
-        # FIXME: This 1.1 should not be hardcoded
-        exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(1.1 * min([ax_lim[0], vector[idx], point[idx]]), 1.1 * max([ax_lim[1], vector[idx], point[idx]]))')
+        if vector.size == 1 and idx == 0:
+            margin = 1 + ax.get_xmargin()
+            ax.set_xlim(margin * min([ax_lim[0], vector[idx], point[idx]]), margin * max([ax_lim[1], vector[idx], point[idx]]))
+            break
+        margin = 1 + eval(f'ax.get_{['x', 'y', 'z'][idx]}margin()')
+        exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(margin * min([ax_lim[0], vector[idx], point[idx]]), margin * max([ax_lim[1], vector[idx], point[idx]]))')
 
     ax.add_patch(arrow)
 
