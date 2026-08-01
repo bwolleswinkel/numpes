@@ -9,6 +9,7 @@ try:
     from matplotlib.patches import FancyArrowPatch
     from mpl_toolkits.mplot3d import proj3d
     from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
@@ -288,7 +289,11 @@ def plot_box(ax: Axes, **kwargs) -> Poly3DCollection:
 
 # [untested/unverified]
 # TODO: For vectors, also add the callback mechanism such that they are properly displayed in 3d plots
-def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, **kwargs) -> None:
+def plot_vector(ax: Axes,
+                vector: ArrayLike,
+                point: Optional[ArrayLike] = None,
+                **kwargs,
+                ) -> None:
     """Plot a vector as an arrow"""
 
     class FancyArrowPatch3D(FancyArrowPatch):
@@ -331,7 +336,7 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
                                 mutation_scale=20,
                                 lw=2,
                                 arrowstyle="-|>",
-                                color=kwargs.get('color', None),
+                                **{key: value for key, value in kwargs.items() if key != 'label'},
                                 )
     if vector.size == 2:
         arrow = FancyArrowPatch(point,
@@ -339,7 +344,7 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
                                 mutation_scale=20,
                                 lw=2,
                                 arrowstyle="-|>",
-                                color=kwargs.get('color', None),
+                                **{key: value for key, value in kwargs.items() if key != 'label'},
                                 )
     elif vector.size == 3:
         arrow = FancyArrowPatch3D(point,
@@ -347,7 +352,7 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
                                   mutation_scale=20,
                                   lw=2,
                                   arrowstyle="-|>",
-                                  color=kwargs.get('color', None),
+                                  **{key: value for key, value in kwargs.items() if key != 'label'},
                                   )
 
     ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if vector.size == 3 else [])
@@ -360,6 +365,18 @@ def plot_vector(ax: Axes, vector: ArrayLike, point: Optional[ArrayLike] = None, 
         exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(margin * min([ax_lim[0], vector[idx], point[idx]]), margin * max([ax_lim[1], vector[idx], point[idx]]))')
 
     ax.add_patch(arrow)
+
+    if (label := kwargs.get('label', None)) is not None:
+        proxy = Line2D([np.nan, np.nan],
+                       [np.nan, np.nan],
+                       linestyle=(0, (8, 20)),  # FIXME: This is a bit of a dirty workaround
+                       marker='>',
+                       markersize=8,
+                       markevery=[1],
+                       color=kwargs.get('color', None),
+                       label=label,
+                       )
+        ax.add_line(proxy)
 
 
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
