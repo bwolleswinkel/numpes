@@ -355,7 +355,7 @@ class Subspace:
         
     # [untested/unverified]
     def plot(self,
-             color: str | None = None,
+             color: Optional[str] = None,
              alpha: float = 0.5,
              label: Optional[str] = None,
              plot_basis: bool = False,
@@ -386,7 +386,7 @@ class Subspace:
             color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
 
         if self.n > 3:
-            raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
+            raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n={self.n}")
 
         match self.dim:
             case 0: 
@@ -417,12 +417,52 @@ class Subspace:
             exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(min(ax.get_{['x', 'y', 'z'][idx]}lim()[0], -1), max(ax.get_{['x', 'y', 'z'][idx]}lim()[1], 1))')
 
         if plot_basis:
-            for basis_vector in self:
-                plot_vector(ax, basis_vector, color=color)
+            self.plot_basis(color=color, show=False, ax=ax)
 
         if show:
             plt.show()
 
+        return ax
+
+    # [untested/unverified]
+    def plot_basis(self,
+                   color: str | None = None,
+                   label: Optional[list[str]] = None,
+                   show: bool = True,
+                   ax: Optional[Axes] = None,
+                   ) -> Axes:
+        """Plot the basis of the subspace"""
+        if not MATPLOTLIB_INSTALLED:
+            raise ImportError("Matplotlib is required for plotting." \
+            " Please install it with 'pip install matplotlib' and try again.")
+        
+        if ax is None:
+            if self.n == 1:
+                fig = plt.figure()
+                ax = add_1d_subplot(fig)
+            elif self.n == 2:
+                fig, ax = plt.subplots()
+            elif self.n == 3:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
+        else:
+            fig = None
+
+        if color is None:
+            # pylint: disable=protected-access
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+
+        if self.n > 3:
+            raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n={self.n}")
+
+        for idx, basis_vector in enumerate(self):
+            plot_vector(ax, basis_vector, color=color, label=label if idx == 0 else None)
+
+        if show:
+            plt.show()
+        
         return ax
 
 
