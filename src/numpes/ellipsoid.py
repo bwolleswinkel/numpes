@@ -342,9 +342,9 @@ class Ellipsoid:
         if self.n > 3:
             raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
         for idx, (vec, radius) in enumerate(zip(self.R.T, self.radii)):
-            ax.plot(*(elem for elem in zip(np.zeros(self.n), vec * radius)), color=color, label=label)
+            ax.plot(*(elem for elem in zip(self.c, self.c + (vec * radius))), color=color, label=label)
             if annotate:
-                ax.text(*(vec * (radius / 2)), str(idx) if isinstance(annotate, bool) else annotate[idx])
+                ax.text(*(self.c + vec * (radius / 2)), str(idx) if isinstance(annotate, bool) else annotate[idx])
 
         if show:
             plt.show()
@@ -366,10 +366,10 @@ def ellps_empty(n: int) -> Ellipsoid:
 
 
 @wraps(Ellipsoid.__init__)
-def ellps_from_radii(radii: ArrayLike, R: Optional[ArrayLike] = None) -> Ellipsoid:
+def ellps_from_radii(radii: ArrayLike, R: Optional[ArrayLike] = None, c: Optional[ArrayLike] = None) -> Ellipsoid:
     """Construct an ellipsoid from a rotation matrix `R` and a set of radii `radii`"""
     if R is None:
         # FIXME: This is not correct! This should create an R matrix based on the sorted radii (I think), such that the major axis is always the largest. Oh no this is correct, this 'magic' should be done by the property assignment inside ellps
         R = np.eye(len(radii))
-    ellps = Ellipsoid(R, radii)
+    ellps = Ellipsoid(R, radii, c=c)
     return ellps
