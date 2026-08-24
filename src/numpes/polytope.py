@@ -886,8 +886,8 @@ class Polytope:
              color: str | None = None,
              alpha: float = 0.5,
              plot_edges: bool = True,
-             label_verts: list[str] | bool = False,
-             label_facets: list[str] | bool = False,
+             annotate_verts: list[str] | bool = False,
+             annotate_facets: list[str] | bool = False,
              show: bool = True,
              ax: Optional[Axes] = None,
              ) -> Axes:
@@ -949,13 +949,13 @@ class Polytope:
                     raise ValueError("The dimension of the polytope" \
                     " does not match the dimension of the provided axes 'ax'")
                 _plot_poly_2d(self.verts, ax, color, alpha, plot_edges=plot_edges)
-                if label_facets:
+                if annotate_facets:
                     for idx in range(self.m):
                         verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                             self.b[idx],
                                                             rtol=CFG.rtol,
                                                             atol=CFG.atol), :]
-                        label = label_facets[idx] if isinstance(label_facets, list) else fr"${idx}$"
+                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
             case 3:
                 if ax.name != '3d':
@@ -967,15 +967,15 @@ class Polytope:
                                                         rtol=CFG.rtol,
                                                         atol=CFG.atol), :]
                     _plot_facet_3d(verts_facet, ax, color, alpha, plot_edges=plot_edges)
-                    if label_facets:
-                        label = label_facets[idx] if isinstance(label_facets, list) else fr"${idx}$"
+                    if annotate_facets:
+                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 
-        if label_verts:
+        if annotate_verts:
             for idx in range(self.k):
-                label = label_verts[idx] if isinstance(label_verts, list) else fr"${idx}$"
+                label = annotate_verts[idx] if isinstance(annotate_verts, list) else fr"${idx}$"
                 if self.n == 2:
                     ax.text(self.verts[idx, 0],
                             self.verts[idx, 1],
