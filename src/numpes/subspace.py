@@ -196,7 +196,7 @@ class Subspace:
     def is_trivial(self) -> bool:
         """Check whether the subspace is trivial (meaning it only contains the zero vector)"""
         if self._is_trivial is None:
-            self._is_trivial = np.linalg.matrix_rank(self.basis, tol=CFG.atol) == 0
+            self._is_trivial = (np.linalg.matrix_rank(self.basis, tol=CFG.atol) == 0).item()
         return self._is_trivial
     
     # [untested/unverified]
