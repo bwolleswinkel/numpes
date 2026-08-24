@@ -6,14 +6,23 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+try:
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Ellipse
+    MATPLOTLIB_INSTALLED: bool = True
+except ImportError as _:
+    MATPLOTLIB_INSTALLED = False
+
 from numpes._config import CFG
 from numpes._internal.wraps import wraps
 from numpes._internal.printing import sym_replace, pad
-from numpes.utils.linalg import is_posdef
+from numpes.utils.linalg import is_posdef, angles_givens
 
 if TYPE_CHECKING:
     from typing import Literal, Optional
 
+    from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -69,7 +78,9 @@ class Ellipsoid:
         if np.isnan(radii).any():
             raise ValueError(f"Radii cannot be NaN value, received {radii}")
         self.radii: NDArray = radii
-        self.R: NDArray = R
+        self.R: NDArray = R  # FIXME: Here, upon assignment, I should do the reordering of R based on the order or radii
+        # FIXME: I should implement this instead | Or should I do both representations? Tough decision...
+        self._rrepr: tuple[NDArray, NDArray] | None = (R, radii)
         if Q is not None:
             Q = np.atleast_2d(Q)
             if not Q.ndim == 2:
@@ -80,7 +91,7 @@ class Ellipsoid:
                 raise ValueError(f"Quadratic matrix 'Q' must have size (n, n), n={self.n}, received {Q.shape}")
             self.Q: NDArray = Q
         else:
-            if not np.isclose(radii, 0, rtol=CFG.rtol, atol=CFG.atol) or np.isfinite(radii).all():
+            if not np.isclose(radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(radii).all():
                 self.Q = self.R @ np.diag(self.radii) @ self.R.T
             else:
                 self.Q = np.full((self.n, self.n), np.nan)
@@ -103,6 +114,7 @@ class Ellipsoid:
         self._is_bounded: bool | None = np.isfinite(radii).all()
         self._is_full_dim: bool | None = not np.isclose(radii, 0, atol=CFG.atol).any()
         self._is_singleton: bool | None = np.isclose(radii, 0, atol=CFG.atol).all()
+        self._angles: NDArray | None = None
         self._dim: int | None = None
         self._vol: float | None = None
 
@@ -110,6 +122,13 @@ class Ellipsoid:
     def n(self) -> int:
         """Dimension of the ambient space"""
         return self.radii.size
+
+    @property
+    def angles(self) -> list[float]:
+        """Rotation angles of the ellipsoid"""
+        if self._angles is None:
+            self._angles = angles_givens(self.R)
+        return self._angles
 
     @classmethod
     def from_quad(cls,
@@ -132,14 +151,17 @@ class Ellipsoid:
                 raise ValueError(f"Center 'c' must be a vector of size (n,), n={Q.shape[0]}, received {c.shape}")
         if not is_posdef(Q, semi_def=True):
             raise ValueError("Quadratic matrix 'Q' must be positive (semi)-definite")
-        U, sing, _ = np.linalg.svd(Q)
-        R = U
+        eigvals, R = np.linalg.eigh(Q)
+        with np.errstate(divide='ignore'):
+            radii = 1 / np.sqrt(np.maximum(eigvals, 0))
+        # FROM: Gemini 3.1 Pro | 2026/08/22[untested/unverified]
+        # Flip columns sign to map the Givens angles to [0, π)
+        for i in range(R.shape[1] - 1):
+            if R[i, i] < 0:
+                R[:, i] *= -1
         if np.linalg.det(R) < 0:
             R[:, -1] *= -1  # Ensure R is a proper rotation matrix with det(R) = 1
-        with np.errstate(divide='ignore'):
-            radii = 1 / np.sqrt(sing)
-        ellipsoid = cls(R, radii, Q, c)  # FIXME: Naming this `ellps` gives a shadowing warning, but I don't know if that is actually problematic?
-        return ellipsoid
+        return cls(R, radii, Q, c)
 
     @classmethod
     def from_cov(cls,
@@ -206,6 +228,128 @@ class Ellipsoid:
         #     return f"Full space ellipsoid in R^{self.n}"
         return f"Ellipsoid in R^{self.n}"
 
+    # untested/unverified
+    def plot(self,
+             color: Optional[str] = None,
+             alpha: float = 0.5,
+             plot_edges: bool = True,
+             plot_radii: bool = False,
+             label: Optional[str] = None,
+             show: bool = True,
+             ax: Optional[Axes] = None,
+             ) -> Axes:
+        """Plot a polytope"""
+
+        if not MATPLOTLIB_INSTALLED:
+            raise ImportError("Matplotlib is required for plotting." \
+                                " Please install it with 'pip install matplotlib' and try again.")
+
+        if ax is None:
+            if self.n == 1:
+                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
+            if self.n == 2:
+                fig, ax = plt.subplots()
+            elif self.n == 3:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+        else:
+            fig = None
+        if color is None:
+            # pylint: disable=protected-access
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+
+        match self.n:
+            case 1:
+                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
+            case 2:
+                if ax.name == '3d':
+                    raise ValueError("The dimension of the ellipsoid" \
+                                     " does not match the dimension of the provided axes 'ax'")
+                ax.add_patch(Ellipse(xy=self.c,
+                                     width=2 * self.radii[0],
+                                     height=2 * self.radii[1],
+                                     angle=np.rad2deg(self.angles).item(),
+                                     facecolor=mpl.colors.to_rgba(color, alpha=alpha),
+                                     edgecolor=(mpl.colors.to_rgba(color, alpha=1)
+                                                if plot_edges
+                                                else None),
+                                     label=label,
+                                     ))
+                ax.autoscale_view()
+            case 3:
+                if ax.name != '3d':
+                    raise ValueError("The dimension of the ellipsoid" \
+                                     " does not match the dimension of the provided axes 'ax'")
+                # FIXME: This should not be hardcoded
+                u, v = (np.linspace(0, 2 * np.pi, 100), 
+                        np.linspace(0,     np.pi, 100))
+                sphere = np.array([self.radii[0] * np.outer(np.cos(u), np.sin(v)),
+                                   self.radii[1] * np.outer(np.sin(u), np.sin(v)),
+                                   self.radii[2] * np.outer(np.ones_like(u), np.cos(v))])
+                xx, yy, zz = [(self.R @ sphere.reshape(3, -1)).reshape(3, *sphere.shape[1:])[i] + \
+                               self.c[i] for i in range(3)]
+                ax.plot_surface(xx,
+                                yy,
+                                zz,
+                                rstride=4,
+                                cstride=4,
+                                color=color,
+                                edgecolor=None if not plot_edges else color,
+                                alpha=alpha,
+                                label=label,
+                                )
+            case _:
+                raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
+
+        if plot_radii:
+            self.plot_radii(color=color, show=False, ax=ax)
+
+        if show:
+            plt.show()
+        return ax
+
+    # [untested/unverified]
+    def plot_radii(self,
+                   color: Optional[str] = None,
+                   label: Optional[str] = None,
+                   annotate: bool | list[str] = True,
+                   show: bool = True,
+                   ax: Optional[Axes] = None,
+                   ) -> Axes:
+        """Plot the radii of the ellipse"""
+        if not MATPLOTLIB_INSTALLED:
+            raise ImportError("Matplotlib is required for plotting." \
+                                " Please install it with 'pip install matplotlib' and try again.")
+
+        if ax is None:
+            if self.n == 1:
+                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
+            if self.n == 2:
+                fig, ax = plt.subplots()
+            elif self.n == 3:
+                fig = plt.figure()
+                ax = fig.add_subplot(111, projection='3d')
+            else:
+                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+        else:
+            fig = None
+        if color is None:
+            # pylint: disable=protected-access
+            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+
+        if self.n > 3:
+            raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
+        for idx, (vec, radius) in enumerate(zip(self.R.T, self.radii)):
+            ax.plot(*(elem for elem in zip(np.zeros(self.n), vec * radius)), color=color, label=label)
+            if annotate:
+                ax.text(*(vec * (radius / 2)), str(idx) if isinstance(annotate, bool) else annotate[idx])
+
+        if show:
+            plt.show()
+        return ax
+
 
 @wraps(Ellipsoid.from_quad)
 def ellps(Q: ArrayLike, c: Optional[ArrayLike] = None,) -> Ellipsoid:
@@ -222,7 +366,10 @@ def ellps_empty(n: int) -> Ellipsoid:
 
 
 @wraps(Ellipsoid.__init__)
-def ellps_from_radii(R: NDArray, radii: NDArray) -> Ellipsoid:
+def ellps_from_radii(radii: ArrayLike, R: Optional[ArrayLike] = None) -> Ellipsoid:
     """Construct an ellipsoid from a rotation matrix `R` and a set of radii `radii`"""
+    if R is None:
+        # FIXME: This is not correct! This should create an R matrix based on the sorted radii (I think), such that the major axis is always the largest. Oh no this is correct, this 'magic' should be done by the property assignment inside ellps
+        R = np.eye(len(radii))
     ellps = Ellipsoid(R, radii)
     return ellps
