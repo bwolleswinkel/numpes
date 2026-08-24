@@ -230,6 +230,7 @@ class Ellipsoid:
 
     # untested/unverified
     def plot(self,
+             num_points: int = 100,
              color: Optional[str] = None,
              alpha: float = 0.5,
              plot_edges: bool = True,
@@ -282,9 +283,8 @@ class Ellipsoid:
                 if ax.name != '3d':
                     raise ValueError("The dimension of the ellipsoid" \
                                      " does not match the dimension of the provided axes 'ax'")
-                # FIXME: This should not be hardcoded
-                u, v = (np.linspace(0, 2 * np.pi, 100), 
-                        np.linspace(0,     np.pi, 100))
+                u, v = (np.linspace(0, 2 * np.pi, num_points), 
+                        np.linspace(0,     np.pi, num_points))
                 sphere = np.array([self.radii[0] * np.outer(np.cos(u), np.sin(v)),
                                    self.radii[1] * np.outer(np.sin(u), np.sin(v)),
                                    self.radii[2] * np.outer(np.ones_like(u), np.cos(v))])
