@@ -11,9 +11,9 @@ import pytest
 from tests.conftest import ATOL, RTOL
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, Literal
 
-    from numpy.typing import NDArray
+    from numpy.typing import NDArray, ArrayLike
 
 
 @wraps(pytest.approx)
@@ -164,3 +164,18 @@ def close_figures(test_obj):
         return test_obj
 
     return wrap_test_function(test_obj)
+
+
+def wrap_angle(angle: float | ArrayLike, unit: Literal['rad', 'deg'] = 'rad') -> float | list[float]:
+    """Wrap angles to the range (-π, π] for radians or (-180, 180] for degrees."""
+    if isinstance(angle, (tuple, list, np.ndarray)):
+        return [wrap_angle(ang, unit) for ang in angle]
+    if unit == 'rad':
+        period, half_period = 2 * np.pi, np.pi
+    elif unit == 'deg':
+        period, half_period = 360.0, 180.0
+    else:
+        raise ValueError("Unit must be 'rad' or 'deg'")
+
+    res = ((angle + half_period) % period) - half_period
+    return half_period if np.isclose(res, -half_period, rtol=RTOL, atol=ATOL) else res
