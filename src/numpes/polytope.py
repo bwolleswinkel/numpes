@@ -19,8 +19,9 @@ poly_from_bounds
 """
 
 from __future__ import annotations
-from itertools import product as iterproduct
+
 import re
+from itertools import product as iterproduct
 from typing import TYPE_CHECKING, overload
 
 import numpy as np

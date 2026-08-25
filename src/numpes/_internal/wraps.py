@@ -9,7 +9,7 @@ from functools import partial
 from functools import wraps as functools_wraps
 from inspect import Signature, _empty
 from types import GetSetDescriptorType, ModuleType
-from typing import Any, Callable, Dict, ParamSpec, TypeVar, Tuple, cast
+from typing import Any, Callable, Dict, ParamSpec, Tuple, TypeVar, cast
 
 Annotations = Dict[str, Any]
 Globals = Dict[str, Any]
