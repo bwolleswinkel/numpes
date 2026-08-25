@@ -641,7 +641,7 @@ class Polytope:
         ub_only = ~is_eq & ~lb_is_finite & ub_is_finite
         is_unbounded = ~is_eq & ~lb_is_finite & ~ub_is_finite
 
-        I = np.eye(n)  # pylint: disable=invalid-name
+        I = np.eye(n)  # pylint: disable=invalid-name # noqa: E741
         ub_idx, lb_idx, eq_idx = (np.where(ub_is_finite & ~is_eq)[0],
                                   np.where(lb_is_finite & ~is_eq)[0],
                                   np.where(is_eq)[0])
@@ -806,7 +806,7 @@ class Polytope:
                 comb_Ab_eq = comb_Ab_eq.replace("[[", "[").replace("]]", "]")
             comb = comb_Ab_eq
         else:  # This must be the entire ambient space
-            comb = f"No constraints on x"
+            comb = "No constraints on x"
         return comb
 
     def __repr__(self) -> str:
