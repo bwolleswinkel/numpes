@@ -50,7 +50,7 @@ __version__
 
 from importlib.metadata import PackageNotFoundError
 
-from numpes import control, utils
+from numpes import control as control, utils as utils
 from numpes._config import algo_options, get_config, reset_config, set_algo_options
 from numpes.exceptions import ConversionError, InvalidCombinationOfArguments, InvalidRepresentation, NumpesException
 from numpes.polytope import Polytope, poly, poly_ambient, poly_empty, poly_from_bounds, poly_from_ineq, poly_from_verts
