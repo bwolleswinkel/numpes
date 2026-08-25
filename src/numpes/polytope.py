@@ -456,7 +456,7 @@ class Polytope:
             case 'pass':
                 pass
             case 'minimal':
-                self.minimal(repr='vrepr')
+                self.minimal(which_repr='vrepr')
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -476,7 +476,7 @@ class Polytope:
             case 'pass':
                 pass
             case 'minimal':
-                self.minimal(repr='hrepr')
+                self.minimal(which_repr='hrepr')
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -550,9 +550,10 @@ class Polytope:
         """Number of equality constraints in the H-representation of the polytope"""
         return self.Ab_eq.shape[0]
 
+    # TODO: Reorder these alphabetically/logically
     @property
     def is_empty(self) -> bool:
-        """Whether the polytope is empty (i.e., has no points)"""
+        """Check whether the polytope is empty (i.e., has no points)"""
         if self._is_empty is None:
             if self._vrepr is not None:
                 self._is_empty = self.verts.size == 0 and self.rays.size == 0
@@ -563,6 +564,27 @@ class Polytope:
                 raise InvalidRepresentation("Polytope is not properly initialized with either " \
                 "V-representation or H-representation")
         return self._is_empty
+
+    @property
+    def is_singleton(self) -> bool:
+        """Check whether the polytope is a singleton (i.e., contains a single point)"""
+        if self._is_singleton is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_singleton
+
+    @property
+    def is_full_dim(self) -> bool:
+        """Check whether the polytope is full-dimensional"""
+        if self._is_full_dim is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_full_dim
+
+    @property
+    def is_bounded(self) -> bool:
+        """Check whether the polytope bounded"""
+        if self._is_bounded is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_bounded
 
     @property
     def vol(self) -> float:
@@ -661,40 +683,40 @@ class Polytope:
             -I[ub_only | is_unbounded],
         )) if (lb_only | ub_only | is_unbounded).any() else np.empty((0, n))
 
-        poly = cls()
-        poly._vrepr = (verts, rays)
-        poly._hrepr = (Ab, Ab_eq)
-        poly._is_empty = False
-        poly._is_singleton = bool(is_eq.all())
-        poly._is_bounded = bool(~(lb_only | ub_only | is_unbounded).any())
-        poly._is_degen = bool(is_eq.any() or not poly._is_bounded)
-        poly._is_full_dim = bool(~is_eq.any())
-        poly._is_pointed = bool(~is_unbounded.any())
-        poly._dim = int(n - is_eq.sum())
+        polytope = cls()
+        polytope._vrepr = (verts, rays)
+        polytope._hrepr = (Ab, Ab_eq)
+        polytope._is_empty = False
+        polytope._is_singleton = bool(is_eq.all())
+        polytope._is_bounded = bool(~(lb_only | ub_only | is_unbounded).any())
+        polytope._is_degen = bool(is_eq.any() or not polytope._is_bounded)
+        polytope._is_full_dim = bool(~is_eq.any())
+        polytope._is_pointed = bool(~is_unbounded.any())
+        polytope._dim = int(n - is_eq.sum())
 
         if is_eq.any():
-            poly._vol = 0.0
-        elif not poly._is_bounded:
-            poly._vol = np.inf
+            polytope._vol = 0.0
+        elif not polytope._is_bounded:
+            polytope._vol = np.inf
         else:
-            poly._vol = float(np.prod(upper - lower))
+            polytope._vol = float(np.prod(upper - lower))
 
-        if poly._is_singleton:
-            poly._chebcr = (lower.copy(), 0.0)
-        elif not poly._is_full_dim:
+        if polytope._is_singleton:
+            polytope._chebcr = (lower.copy(), 0.0)
+        elif not polytope._is_full_dim:
             bounds_is_finite = lb_is_finite & ub_is_finite
             midpoints = np.full(n, np.nan)
             midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
-            poly._chebcr = (np.where(is_eq, lower, midpoints), 0.0)
+            polytope._chebcr = (np.where(is_eq, lower, midpoints), 0.0)
         else:
             bounds_is_finite = lb_is_finite & ub_is_finite
             midpoints = np.full(n, np.nan)
             midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
             chebc = np.where(is_eq, lower, midpoints)
             chebr = float(np.min(np.where(bounds_is_finite & ~is_eq, (upper - lower) / 2, np.inf)))
-            poly._chebcr = (chebc, chebr)
+            polytope._chebcr = (chebc, chebr)
 
-        return poly
+        return polytope
 
     def __str__(self) -> str:
         """Descriptive representation of the polytope in either V-represenation or H-representation"""
@@ -705,7 +727,7 @@ class Polytope:
             return header + "\n" + self._str_vrepr()
         raise InvalidRepresentation("Polytope is not properly initialized with either " \
         "V-representation or H-representation")
-    
+
     # [untested/unverified]
     def _str_header(self) -> str:
         # NOTE: These methods are not yet implemented
@@ -760,6 +782,7 @@ class Polytope:
         return comb
 
     # [untested/unverified]
+    # pylint: disable=invalid-name
     def _str_hrepr(self) -> str:
         """"Descriptive representation of the polytope in V-represntation"""
         if self._hrepr is None:
@@ -876,7 +899,7 @@ class Polytope:
         return "\n".join(res)
 
     def minimal(self,
-                repr: Literal['both', 'vrepr', 'hrepr'] = 'both',  # FIXME: Shadows built-in name 'repr(...)'
+                which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
                 in_place: bool = True,
                 ) -> None | Self:
         """Return a minimal representation of the polytope by removing redundant vertices and facets"""
@@ -1040,9 +1063,9 @@ def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq:
 @wraps(Polytope._init_ambient)  # pylint: disable=protected-access
 def poly_ambient(n: int) -> Polytope:
     """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
-    poly = Polytope()
-    poly._init_ambient(n)  # pylint: disable=protected-access
-    return poly
+    polytope = Polytope()
+    polytope._init_ambient(n)  # pylint: disable=protected-access
+    return polytope
 
 
 @wraps(Polytope.from_bounds)
