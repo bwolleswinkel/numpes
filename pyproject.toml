@@ -195,3 +195,6 @@ disable = [
 
 [tool.pylint.basic]
 good-names = ["A", "A_eq", "Ab", "Ab_eq", "V"]
+
+[tool.isort]
+line_length = 9999
