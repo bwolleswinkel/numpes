@@ -198,3 +198,6 @@ good-names = ["A", "A_eq", "Ab", "Ab_eq", "V"]
 
 [tool.isort]
 line_length = 9999
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # Ignore unused imports (F401) and wildcard imports (F403) only in __init__.py files
