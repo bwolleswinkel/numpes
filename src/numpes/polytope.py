@@ -567,8 +567,10 @@ class Polytope:
             if self._vrepr is not None:
                 self._is_empty = self.verts.size == 0 and self.rays.size == 0
             elif self._hrepr is not None:
-                # FIXME: This is not the correct check, because the representation might be non-minimal; we also need to actually solve the LP
-                self._is_empty = np.all(self.Ab == np.array([[0] * self.n + [-1]])).item() and self.Ab_eq.size == 0
+                if np.all(self.Ab == np.array([[0] * self.n + [-1]])).item() and self.Ab_eq.size == 0:
+                    self._is_empty = True
+                else:
+                    raise NotImplementedError("This feature is not yer implemented")
             else:
                 raise InvalidRepresentation("Polytope is not properly initialized with either " \
                 "V-representation or H-representation")
