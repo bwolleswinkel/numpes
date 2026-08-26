@@ -605,6 +605,13 @@ class Polytope:
         return self._is_singleton
 
     @property
+    def dim(self) -> int:
+        """Dimension of the polytope"""
+        if self._dim is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._dim
+
+    @property
     def vol(self) -> float:
         """Volume of the polytope. Returns `np.inf` for unbounded polytopes and 0 for empty or lower-dimensional polytopes."""
         if self._vol is None:
@@ -615,6 +622,13 @@ class Polytope:
             else:
                 raise NotImplementedError("Volume computation for full-dimensional bounded polytopes is not implemented yet")
         return self._vol
+
+    @property
+    def diam(self) -> int:
+        """Diameters of the polytope"""
+        if self._diam is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._diam
 
     @property
     def chebcr(self) -> tuple[NDArray, float]:
