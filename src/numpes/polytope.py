@@ -522,7 +522,7 @@ class Polytope:
 
     @property
     def Ab(self) -> NDArray:
-        """Matrix Ab in the H-representation of the polytope (Abx <= 0)"""
+        """Matrix Ab in the H-representation of the polytope (Ab x <= 0, where Ab = [A | b])"""
         return self.hrepr[0]
 
     @property
@@ -542,7 +542,7 @@ class Polytope:
 
     @property
     def Ab_eq(self) -> NDArray:
-        """Matrix Ab_eq in the H-representation of the polytope (Ab_eq x = 0)"""
+        """Matrix Ab_eq in the H-representation of the polytope (Ab_eq x = 0, where Ab_eq = [A_eq | b_eq])"""
         return self.hrepr[1]
 
     @property
