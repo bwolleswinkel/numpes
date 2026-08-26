@@ -1118,3 +1118,131 @@ def poly_ambient(n: int) -> Polytope:
 def poly_from_bounds(lb: ArrayLike, ub: ArrayLike) -> Polytope:
     """Wrapper function for `Polytope.from_bounds` to create a polytope from lower and upper bounds"""
     return Polytope.from_bounds(lb, ub)
+
+
+def poly_from_name(name: Literal['triangle',
+                                 'square',
+                                 'pentagon',
+                                 'hexagon',
+                                 'heptagon',
+                                 'octagon',
+                                 'tetrahedron',
+                                 'simplex',
+                                 'cube',
+                                 'octahedron',
+                                 'dodecahedron',
+                                 'icosahedron',
+                                 'house',
+                                 'pyramid'],
+                   ) -> Polytope:
+    """Create a polytope from a libary based on a provided name.
+    
+    Parameters
+    ----------
+    name: str
+        Name of the polytope in the libary to be created. Options are:
+        - 'house' (2D)
+        - 'pyramid' (3D)
+    
+    Returns
+    -------
+    poly : Polytope
+        The resulting polytope in both V-representaion and H-representation
+        
+    Raises
+    ------
+    ValueError 
+        If the provided `name` is not recognized
+    """
+    match name:
+        case 'triangle':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'square':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'pentagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'hexagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'heptagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'octagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'tetrahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'simplex':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'cube':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'octahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'dodecahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'icosahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'house':
+            n = 2
+            verts = np.array([[  0,   0],
+                              [  0,   1],
+                              [  1,   0],
+                              [  1,   1],
+                              [0.5, 1.5]])
+            A = np.array([[              0.0,             -1.0],  # Bottom: y >= 0
+                          [             -1.0,              0.0],  # Left:   x >= 0
+                          [-1.0 / np.sqrt(2), 1.0 / np.sqrt(2)],  # Top-Left roof slant
+                          [              1.0,              0.0],  # Right:  x <= 1
+                          [ 1.0 / np.sqrt(2), 1.0 / np.sqrt(2)]])  # Top-Right roof slant
+            b = np.array([0, 0, 1 / np.sqrt(2), 1, np.sqrt(2)])
+            is_empty = False
+            is_degen = False
+            is_bounded = True
+            is_full_dim = True
+            is_pointed = True
+            is_singleton = False
+            dim = 2
+            vol = 1.25
+            diam = np.linalg.norm(verts[0] - verts[4], ord=2)
+            width = 1
+            chebcr = (np.array([0.5, 0.5]), 0.5)
+        case 'pyramid':
+            n = 3
+            verts = np.array([[  0,   0,  0],
+                              [  0,   1,  0],
+                              [  1,   0,  0],
+                              [  1,   1,  0],
+                              [0.5, 0.5,  1]])
+            A = np.array([[ 0,  0, -1],  # Base: z >= 0
+                          [-2,  0,  1],  # Left slant: -2x + z <= 0
+                          [ 0, -2,  1],  # Front slant: -2y + z <= 0
+                          [ 2,  0,  1],  # Right slant: 2x + z <= 2
+                          [ 0,  2,  1]   # Back slant: 2y + z <= 2
+            ])
+            b = np.array([0, 0, 0, 2, 2])
+            is_empty = False
+            is_degen = False
+            is_bounded = True
+            is_full_dim = True
+            is_pointed = True
+            is_singleton = False
+            dim = 3
+            vol = 1 / 3
+            diam = np.linalg.norm(verts[0] - verts[3], ord=2)
+            width = 1
+            chebcr = (np.array([0.5, 0.5, 0.25]), 0.75)
+        case _:
+            raise ValueError(f"Unrecognized name '{name}'")
+
+    polytope = poly(verts)
+    polytope._hrepr = (np.column_stack((A, b)), np.empty((0, n + 1)))
+    polytope._is_empty = is_empty
+    polytope._is_degen = is_degen
+    polytope._is_bounded = is_bounded
+    polytope._is_full_dim = is_full_dim
+    polytope._is_pointed = is_pointed
+    polytope._is_singleton = is_singleton
+    polytope._dim = dim
+    polytope._vol = vol
+    polytope._diam = diam
+    polytope._width = width
+    polytope._chebcr = chebcr
+
+    return polytope
