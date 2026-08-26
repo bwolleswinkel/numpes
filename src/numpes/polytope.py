@@ -625,7 +625,7 @@ class Polytope:
 
     @property
     def diam(self) -> int:
-        """Diameters of the polytope"""
+        """Geometric diameters of the polytope. For the combinatorial diameter, see method `comb_diam`."""
         if self._diam is None:
             raise NotImplementedError("This property is not yet implemented")
         return self._diam
