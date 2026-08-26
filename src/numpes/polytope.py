@@ -567,8 +567,8 @@ class Polytope:
             if self._vrepr is not None:
                 self._is_empty = self.verts.size == 0 and self.rays.size == 0
             elif self._hrepr is not None:
-                self._is_empty = (np.all(self.Ab == np.array([[0] * self.n + [-1]])) and
-                                  self.Ab_eq.size == 0)
+                # FIXME: This is not the correct check, because the representation might be non-minimal; we also need to actually solve the LP
+                self._is_empty = np.all(self.Ab == np.array([[0] * self.n + [-1]])).item() and self.Ab_eq.size == 0
             else:
                 raise InvalidRepresentation("Polytope is not properly initialized with either " \
                 "V-representation or H-representation")
@@ -629,14 +629,14 @@ class Polytope:
         return self._vol
 
     @property
-    def diam(self) -> int:
+    def diam(self) -> float:
         """Geometric diameter of the polytope. For the combinatorial diameter, see method `comb_diam`."""
         if self._diam is None:
             raise NotImplementedError("This property is not yet implemented")
         return self._diam
 
     @property
-    def width(self) -> int:
+    def width(self) -> float:
         """Width of the polytope (i.e., smallest distance between two parallel supporting hyperplanes that enclose the polytope)"""
         if self._width is None:
             raise NotImplementedError("This property is not yet implemented")
@@ -911,14 +911,13 @@ class Polytope:
         tag_i, modes, num_part, str_prec, char_type = match.groups()
         modes = modes or ""
 
-        overrides = None
+        precision: int | None = None
+        suppress: bool | None = None
         if num_part:
             if tag_i and not modes:
                 raise ValueError("Summary 'i' does not take numeric formatting")
-            overrides = {
-                'precision': int(str_prec) if str_prec else np.get_printoptions()['precision'],
-                'suppress': char_type == 'f'
-            }
+            precision = int(str_prec) if str_prec else np.get_printoptions()['precision']
+            suppress = char_type == 'f'
 
         res = []
         if tag_i or not format_spec:  # Default to summary if no format spec is provided
@@ -927,14 +926,14 @@ class Polytope:
         for char in modes:
             match char:
                 case 'h':
-                    if overrides:
-                        with np.printoptions(**overrides):
+                    if precision is not None:
+                        with np.printoptions(precision=precision, suppress=suppress):
                             res.append(self._str_hrepr())
                     else:
                         res.append(self._str_hrepr())
                 case 'v':
-                    if overrides:
-                        with np.printoptions(**overrides):
+                    if precision is not None:
+                        with np.printoptions(precision=precision, suppress=suppress):
                             res.append(self._str_vrepr())
                     else:
                         res.append(self._str_vrepr())
