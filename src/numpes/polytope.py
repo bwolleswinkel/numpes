@@ -152,6 +152,7 @@ class Polytope:
         self._is_singleton: bool | None = None
         self._dim: int | None = None
         self._vol: float | None = None
+        self._diam: float | None = None
         self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
@@ -228,6 +229,7 @@ class Polytope:
         self._is_singleton = False
         self._dim = 0
         self._vol = 0
+        self._diam = np.nan
         self._chebcr = (np.full(n, np.nan), np.nan)
 
     @overload
@@ -309,6 +311,7 @@ class Polytope:
         self._is_singleton = None
         self._dim = None
         self._vol = None
+        self._diam = None
         self._chebcr = None
 
     @overload
@@ -391,6 +394,7 @@ class Polytope:
         self._is_singleton = None
         self._dim = None
         self._vol = None
+        self._diam = None
         self._chebcr = None
 
     def _init_ambient(self,
@@ -438,6 +442,7 @@ class Polytope:
         self._is_singleton = False
         self._dim = n
         self._vol = np.inf
+        self._diam = None
         self._chebcr = (np.full(n, np.nan), np.inf)
 
     @property
@@ -550,7 +555,6 @@ class Polytope:
         """Number of equality constraints in the H-representation of the polytope"""
         return self.Ab_eq.shape[0]
 
-    # TODO: Reorder these alphabetically/logically
     @property
     def is_empty(self) -> bool:
         """Check whether the polytope is empty (i.e., has no points)"""
@@ -566,11 +570,18 @@ class Polytope:
         return self._is_empty
 
     @property
-    def is_singleton(self) -> bool:
-        """Check whether the polytope is a singleton (i.e., contains a single point)"""
-        if self._is_singleton is None:
+    def is_degen(self) -> bool:
+        """Check whether the polytope is degenerate"""
+        if self._is_degen is None:
             raise NotImplementedError("This property is not yet implemented")
-        return self._is_singleton
+        return self._is_degen
+
+    @property
+    def is_bounded(self) -> bool:
+        """Check whether the polytope is bounded"""
+        if self._is_bounded is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_bounded
 
     @property
     def is_full_dim(self) -> bool:
@@ -580,11 +591,18 @@ class Polytope:
         return self._is_full_dim
 
     @property
-    def is_bounded(self) -> bool:
-        """Check whether the polytope bounded"""
-        if self._is_bounded is None:
+    def is_pointed(self) -> bool:
+        """Check whether the polytope is pointed (i.e., contains at least one vertex)"""
+        if self._is_pointed is None:
             raise NotImplementedError("This property is not yet implemented")
-        return self._is_bounded
+        return self._is_pointed
+
+    @property
+    def is_singleton(self) -> bool:
+        """Check whether the polytope is a singleton (i.e., contains a single point)"""
+        if self._is_singleton is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_singleton
 
     @property
     def vol(self) -> float:
