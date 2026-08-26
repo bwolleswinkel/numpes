@@ -153,6 +153,7 @@ class Polytope:
         self._dim: int | None = None
         self._vol: float | None = None
         self._diam: float | None = None
+        self._width: float | None = None
         self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
@@ -230,6 +231,7 @@ class Polytope:
         self._dim = 0
         self._vol = 0
         self._diam = np.nan
+        self._width = 0
         self._chebcr = (np.full(n, np.nan), np.nan)
 
     @overload
@@ -312,6 +314,7 @@ class Polytope:
         self._dim = None
         self._vol = None
         self._diam = None
+        self._width = None
         self._chebcr = None
 
     @overload
@@ -395,6 +398,7 @@ class Polytope:
         self._dim = None
         self._vol = None
         self._diam = None
+        self._width = None
         self._chebcr = None
 
     def _init_ambient(self,
@@ -442,7 +446,8 @@ class Polytope:
         self._is_singleton = False
         self._dim = n
         self._vol = np.inf
-        self._diam = None
+        self._diam = np.nan
+        self._width = np.inf
         self._chebcr = (np.full(n, np.nan), np.inf)
 
     @property
@@ -625,10 +630,17 @@ class Polytope:
 
     @property
     def diam(self) -> int:
-        """Geometric diameters of the polytope. For the combinatorial diameter, see method `comb_diam`."""
+        """Geometric diameter of the polytope. For the combinatorial diameter, see method `comb_diam`."""
         if self._diam is None:
             raise NotImplementedError("This property is not yet implemented")
         return self._diam
+
+    @property
+    def width(self) -> int:
+        """Width of the polytope (i.e., smallest distance between two parallel supporting hyperplanes that enclose the polytope)"""
+        if self._width is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._width
 
     @property
     def chebcr(self) -> tuple[NDArray, float]:
