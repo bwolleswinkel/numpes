@@ -75,18 +75,18 @@ class Polytope:
     def __init__(self,
                  *args: Any,
                  n: Optional[int] = None,
-                 verts: Optional[NDArray | ArrayLike] = None,
-                 rays: Optional[NDArray | ArrayLike] = None,
-                 A: Optional[NDArray | ArrayLike] = None,
-                 b: Optional[NDArray | ArrayLike] = None,
-                 A_eq: Optional[NDArray | ArrayLike] = None,
-                 b_eq: Optional[NDArray | ArrayLike] = None,
+                 verts: Optional[ArrayLike] = None,
+                 rays: Optional[ArrayLike] = None,
+                 A: Optional[ArrayLike] = None,
+                 b: Optional[ArrayLike] = None,
+                 A_eq: Optional[ArrayLike] = None,
+                 b_eq: Optional[ArrayLike] = None,
                  ) -> None:
         """Initialize a Polytope from vertices or half-spaces.
 
         Parameters
         ----------
-        args: tuple[()] | tuple[NDArray] | tuple[NDArray, NDArray]
+        args: tuple[()] | tuple[ArrayLike] | tuple[ArrayLike, ArrayLike]
             Variable length positional arguments list. Must be of size 0, 1, or 2,
             according to the initialization method:
             - len(0) -> (): Initialize an empty polytope in R^n (requires `n`). Note that if the keywords `A` and `b` or
@@ -1063,14 +1063,15 @@ class Polytope:
 
 
 @wraps(Polytope.__init__)  # pylint: disable=protected-access
-def poly(*args: NDArray,
+def poly(*args: Any,
          n: Optional[int] = None,
-         verts: Optional[NDArray | ArrayLike] = None,
-         rays: Optional[NDArray | ArrayLike] = None,
-         A: Optional[NDArray | ArrayLike] = None,
-         b: Optional[NDArray | ArrayLike] = None,
-         A_eq: Optional[NDArray | ArrayLike] = None,
-         b_eq: Optional[NDArray | ArrayLike] = None,) -> Polytope:
+         verts: Optional[ArrayLike] = None,
+         rays: Optional[ArrayLike] = None,
+         A: Optional[ArrayLike] = None,
+         b: Optional[ArrayLike] = None,
+         A_eq: Optional[ArrayLike] = None,
+         b_eq: Optional[ArrayLike] = None,
+         ) -> Polytope:
     """Wrapper function for `Polytope.__init__` to create a polytope"""
     kwargs = {key: value for key, value in {
         'n': n,
@@ -1093,13 +1094,13 @@ def poly_empty(n: int) -> Polytope:
 
 
 @wraps(Polytope._init_vrepr)  # pylint: disable=protected-access
-def poly_from_verts(verts: NDArray, rays: Optional[NDArray]) -> Polytope:
+def poly_from_verts(verts: ArrayLike, rays: Optional[ArrayLike]) -> Polytope:
     """Wrapper function for `Polytope._init_vrepr` to create a polytope from vertices, and optionally rays"""
     return Polytope(verts=verts, rays=rays)
 
 
 @wraps(Polytope._init_hrepr)  # pylint: disable=protected-access
-def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq: Optional[NDArray] = None) -> Polytope:
+def poly_from_ineq(A: ArrayLike, b: ArrayLike, A_eq: Optional[ArrayLike] = None, b_eq: Optional[ArrayLike] = None) -> Polytope:
     """Wrapper function for `Polytope._init_hrepr` to create a polytope from inequalities, and optionally equalities"""
     return Polytope(A=A, b=b, A_eq=A_eq, b_eq=b_eq)
 
