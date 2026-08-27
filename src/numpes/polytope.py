@@ -764,6 +764,44 @@ class Polytope:
 
         return polytope
 
+    @classmethod
+    def from_point(cls, point: ArrayLike) -> Polytope:
+        """Create a singleton polytope containing the given point.
+
+        Parameters
+        ----------
+        point : ArrayLike
+            A point/vector in R^n.
+
+        Returns
+        -------
+        Polytope
+            A polytope that is a singleton containing the given point.
+        """
+        point = np.atleast_1d(point)
+        if point.ndim != 1:
+            raise ValueError(f"Point must be a 1D array, but received an array of shape {point.shape}")
+        if not np.isfinite(point).all() or np.isnan(point).any():
+            raise ValueError(f"Point vector cannot contain inf or NaN values, received point={point}")
+        n = point.size
+
+        polytope = cls(point)
+        polytope._hrepr = (np.empty((0, n + 1)),
+                           np.column_stack((np.eye(n), point)))
+        polytope._is_empty = False
+        polytope._is_singleton = True
+        polytope._is_bounded = True
+        polytope._is_degen = True
+        polytope._is_full_dim = False
+        polytope._is_pointed = True
+        polytope._dim = 0
+        polytope._vol = 0
+        polytope._diam = 0
+        polytope._width = 0
+        polytope._chebcr = (point.copy(), 0)
+
+        return polytope
+
     def __str__(self) -> str:
         """Descriptive representation of the polytope in either V-represenation or H-representation"""
         header = self._str_header()
@@ -1118,6 +1156,12 @@ def poly_ambient(n: int) -> Polytope:
 def poly_from_bounds(lb: ArrayLike, ub: ArrayLike) -> Polytope:
     """Wrapper function for `Polytope.from_bounds` to create a polytope from lower and upper bounds"""
     return Polytope.from_bounds(lb, ub)
+
+
+@wraps(Polytope.from_point)
+def poly_from_point(point: ArrayLike) -> Polytope:
+    """Wrapper function for `Polytope.from_point` to create a singleton polytope given a point/vector"""
+    return Polytope.from_point(point)
 
 
 def poly_from_name(name: Literal['triangle',

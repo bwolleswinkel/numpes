@@ -668,3 +668,7 @@ class TestInitFromBounds:
             f"Expected chebyshev center {expected_chebcr[0]} for the box defined by lb={lb} and ub={ub}, but got {chebc}."
         assert chebr == approx(expected_chebcr[1]), \
             f"Expected chebyshev radius {expected_chebcr[1]} for the box defined by lb={lb} and ub={ub}, but got {chebr}."
+
+
+class TestInitFromPoint:
+    """Tests for the classmethod `Polytope.from_point`"""

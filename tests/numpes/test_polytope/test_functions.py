@@ -1,21 +1,21 @@
 """Test module for the function in `polytope.py`"""
 
+from __future__ import annotations
 from typing import TYPE_CHECKING
 import re
 
 import numpy as np
 import numpes as pes
-from numpes import InvalidCombinationOfArguments
 import pytest
 from hypothesis import given
-from hypothesis.strategies import integers
+from hypothesis.strategies import integers, lists, floats
 
 from tests.conftest import ATOL, N_MAX
-from tests.helpers import lsort, normalize, approx
+from tests.helpers import lsort, approx
 
 if TYPE_CHECKING:
-    from typing import Any, EllipsisType
-    from numpy.typing import NDArray, ArrayLike
+    from typing import EllipsisType
+    from numpy.typing import ArrayLike
 
 
 class TestPolyFromName:
@@ -189,3 +189,113 @@ class TestPolyFromName:
 
     def test_pyramid_properties_recalculated(self) -> None:
         """Test that the properties of the 'pyramid' polytope agree with the recalculated values from the vertices and half-space representations"""
+
+
+class TestPolyFromPoint:
+    """Tests for the `pes.poly_from_point` factory function"""
+
+    @pytest.mark.parametrize('point', [
+        np.array([0]),
+        np.array([1]),
+        np.array([-1]),
+        np.array([-6.4, 4.1]),
+        np.array([1, 2]),
+        np.array([-1, -2]),
+        np.array([0, 0, 0]),
+        np.array([1.1, 2.2, 33.3]),
+        np.array([-1, -2, -3]),
+        np.arange(100),
+        [0],
+        (0, 0, 0),
+        [1, -1, -100],
+    ])
+    def test_parameterize_polytope(self, point: ArrayLike) -> None:
+        """Test that the polytope created from a point is a polytope"""
+        poly = pes.poly_from_point(point)
+        assert isinstance(poly, pes.Polytope), \
+            f"Expected a Polytope object for point '{point}', but got {type(poly)} instead."
+
+    @pytest.mark.parametrize('point', [
+        [0],
+        [1],
+        [-2.5],
+        [0, 0],
+        [1.5, 0.8, 1.4],
+        [-1, -2, -3, -4, -5],
+        np.full((10,), 0.25),
+    ])
+    def test_parameterize_private_attributes(self, point: ArrayLike) -> None:
+        """Test that the polytope created from a point has the correct properties"""
+        poly = pes.poly_from_point(point)
+        assert isinstance(poly, pes.Polytope), \
+            f"Expected a Polytope object for point '{point}', but got {type(poly)} instead."
+        assert poly._is_empty == False, \
+            f"Polytope created from point '{point}' should not be empty."
+        assert poly._is_singleton == True, \
+            f"Polytope created from point '{point}' should be a singleton."
+        assert poly._is_bounded == True, \
+            f"Polytope created from point '{point}' should be bounded."
+        assert poly._is_degen == True, \
+            f"Polytope created from point '{point}' should be degenerate."
+        assert poly._is_full_dim == False, \
+            f"Polytope created from point '{point}' should not be full-dimensional."
+        assert poly._is_pointed == True, \
+            f"Polytope created from point '{point}' should be pointed."
+        assert poly._dim == 0, \
+            f"Polytope created from point '{point}' should have dimension 0."
+        assert poly._vol == 0, \
+            f"Polytope created from point '{point}' should have volume 0."
+        assert poly._diam == 0, \
+            f"Polytope created from point '{point}' should have diameter 0."
+        assert poly._width == 0, \
+            f"Polytope created from point '{point}' should have width 0."
+        assert poly._chebcr[0] == approx(point), \
+            f"Polytope created from point '{point}' should have Chebyshev center equal to the point itself."
+        assert poly._chebcr[1] == 0, \
+            f"Polytope created from point '{point}' should have Chebyshev radius equal to 0."
+
+    def test_parameterize_properties(self) -> None:
+        """Test that the properties of the polytope created from a point are correct"""
+
+    def test_parameterize_properties_recalculated(self) -> None:
+        """Test that the properties of the polytope created from a point agree with the recalculated values from the vertices and half-space representations"""
+
+    @given(point=integers(min_value=1, max_value=N_MAX).flatmap(
+        lambda n: lists(floats(min_value=-1E3, max_value=1E3, allow_nan=False, allow_infinity=False), min_size=n, max_size=n)
+    ))
+    def test_random_nd_polytope(self, point: ArrayLike) -> None:
+        """Test that the polytope created from a random point in N dimensions is correct"""
+        poly = pes.poly_from_point(point)
+        assert isinstance(poly, pes.Polytope), \
+            f"Expected a Polytope object for point '{point}', but got {type(poly)} instead."
+
+    @pytest.mark.parametrize('point', [
+        [np.nan],
+        [np.inf],
+        [-float('inf')],
+        [0, float('nan')],
+        [1.5, 0.8, np.nan],
+    ])
+    def test_parameterize_invalid_values(self, point: ArrayLike) -> None:
+        """Test that the polytope created from a point with invalid values raises an error"""
+        with pytest.raises(ValueError, match=re.escape(
+            f"Point vector cannot contain inf or NaN values, received point={np.atleast_1d(point)}"
+            )):
+            _ = pes.poly_from_point(point)
+
+    @pytest.mark.parametrize('point', [
+        [[1, -2, 3, 4]],
+        [[0]],
+        np.array([0])[:, np.newaxis, np.newaxis, np.newaxis],
+        [[0, 0]],
+        [[1, 2, 3]],
+        [[[1, 2], [3, 4]]],
+        [[1, 2, 3], [4, 5, 6]],
+        np.array([[[1, 2, 3], [4, 5, 6]]]),
+    ])
+    def test_parameterize_invalid_shape(self, point: ArrayLike) -> None:
+        """Test that the polytope created from a point with invalid shape raises an error"""
+        with pytest.raises(ValueError, match=re.escape(
+            f"Point must be a 1D array, but received an array of shape {np.atleast_1d(point).shape}"
+            )):
+            _ = pes.poly_from_point(point)
