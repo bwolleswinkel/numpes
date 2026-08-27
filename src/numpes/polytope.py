@@ -777,6 +777,20 @@ class Polytope:
         -------
         Polytope
             A polytope that is a singleton containing the given point.
+
+        Raises
+        ------
+        ValueError
+            If the input point is not a 1D array or contains NaN or infinite values
+
+        Examples
+        --------
+        >>> poly = pes.poly_from_point([1, 2, 3])
+        >>> print(poly)
+        Singleton polytope in R^3
+        [[1. 0. 0.]  |    [[1.]
+         [0. 1. 0.]  x ==  [2.]
+         [0. 0. 1.]] |     [3.]]
         """
         point = np.atleast_1d(point)
         if point.ndim != 1:
