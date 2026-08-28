@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import re
 from itertools import product as iterproduct
+from copy import copy
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -37,8 +38,8 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
-from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
-from numpes.utils import enum_facets, enum_gens, signed_angle
+from numpes.exceptions import InvalidCombinationOfArgumentsError, InvalidRepresentationError, DimensionError
+from numpes.utils import enum_facets, enum_gens, signed_angle, is_square, is_sing
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -153,7 +154,7 @@ class Polytope:
         self._dim: int | None = None
         self._vol: float | None = None
         self._diam: float | None = None
-        self._width: float | None = None
+        self._width: float | None = None  # FIXME: We should create a method `width`, and call this`min_width`
         self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
@@ -167,7 +168,7 @@ class Polytope:
             'b_eq': b_eq,
         }.items() if value is not None}
         if len(args) !=0 or len(kwargs) != 0:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided," \
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided," \
             f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
             "combinations or arguments.")
 
@@ -205,11 +206,11 @@ class Polytope:
                 If the provided ambient dimension `n` is not a positive integer.
             """
             if 'n' not in kwargs:
-                raise InvalidCombinationOfArguments("Dimension 'n' must be provided for empty polytope initialization")
+                raise InvalidCombinationOfArgumentsError("Dimension 'n' must be provided for empty polytope initialization")
             if 'rays' in kwargs:
-                raise InvalidCombinationOfArguments("Cannot provide 'rays' when initializing an empty polytope")
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing an empty polytope")
             if 'A_eq' in kwargs or 'b_eq' in kwargs:
-                raise InvalidCombinationOfArguments("Cannot provide 'A_eq' or 'b_eq'" \
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq'" \
                 " when initializing an empty polytope")
             n = kwargs['n']
             if not isinstance(n, int):
@@ -270,15 +271,15 @@ class Polytope:
         }
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
                 f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
                 "combinations or arguments.")
         if 'n' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
         if 'A' in kwargs or 'b' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'A' or 'b' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'A' or 'b' when initializing from vertices")
         if 'A_eq' in kwargs or 'b_eq' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
         if len(args) == 1:
             if isinstance(*args, int):
                 raise TypeError("A single positional argument cannot be an integer (for an empty polytope " \
@@ -357,15 +358,15 @@ class Polytope:
         }
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
                 f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
                 "combinations or arguments.")
         if 'n' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from half-spaces")
         if 'verts' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'verts' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'verts' when initializing from half-spaces")
         if 'rays' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'rays' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing from half-spaces")
         if len(args) == 2:
             A, b = args
         else:
@@ -497,7 +498,7 @@ class Polytope:
             return self.verts.shape[1]
         if self._hrepr is not None:
             return self.A.shape[1]
-        raise InvalidRepresentation("Polytope is not properly initialized with either " \
+        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
         "V-representation or H-representation")
 
     @property
@@ -572,7 +573,7 @@ class Polytope:
                 else:
                     raise NotImplementedError("This feature is not yer implemented")
             else:
-                raise InvalidRepresentation("Polytope is not properly initialized with either " \
+                raise InvalidRepresentationError("Polytope is not properly initialized with either " \
                 "V-representation or H-representation")
         return self._is_empty
 
@@ -823,7 +824,7 @@ class Polytope:
             return header + "\n" + self._str_hrepr()
         if self._vrepr is not None:
             return header + "\n" + self._str_vrepr()
-        raise InvalidRepresentation("Polytope is not properly initialized with either " \
+        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
         "V-representation or H-representation")
 
     # [untested/unverified]
@@ -995,6 +996,108 @@ class Polytope:
                     raise ValueError(f"Unknown format code '{char}' in format spec '{format_spec}' for object of type '{self.__class__.__name__}'")
         return "\n".join(res)
 
+    # [untested/unverified]
+    def copy(self,
+             deepcopy: bool = True,
+             ) -> Polytope:
+        """Return a (deep)copy of the polytope. 
+
+        Parameters
+        ----------
+        deepcopy : bool, default=True
+            If True, a deep copy of the polytope is returned (totally isolated from the original polytope). If False, a shallow copy is returned.
+
+        Returns
+        -------
+        Polytope
+            A (deep)copy of the polytope
+
+        Warnings
+        --------
+        If `deepcopy` is set to False, the returned polytope will share the same underlying data as the original polytope. Modifications to the NumPy arrays (`verts`, `rays`, `Ab`, `Ab_eq`, and `chebc`) in either polytope will affect both polytopes.
+        """
+        obj = copy(self)
+        if not deepcopy:
+            return obj
+
+        if self._vrepr is not None:
+            obj._vrepr = (self.verts.copy(), self.rays.copy())
+        if self._hrepr is not None:
+            obj._hrepr = (self.Ab.copy(), self.Ab_eq.copy())
+        if self._chebcr is not None:
+            obj._chebcr = (self.chebc.copy(), self.chebr)
+
+        return obj
+
+    # [untested/unverified]
+    def mat_mul(self,
+                M: NDArray,
+                recalc_chebcr: bool = False,
+                in_place: bool = True,
+                ) -> Polytope:
+        """Matrix multiplication with a matrix `M`.
+        
+        Parameters
+        ----------
+        M : NDArray
+            A matrix to multiply the polytope by
+        recalc_chebcr : bool, default=False
+            Whether to recalculate the Chebyshev center and radius after the multiplication by solving an LP
+        in_place : bool, default=True
+            If True, the polytope is modified in place
+
+        Returns
+        -------
+        Polytope
+            The resulting polytope after the matrix multiplication
+
+        Raises
+        ------
+        TypeError
+            If `M` is not a NumPy array
+        ValueError
+            If `M` is not a valid matrix
+        DimensionError
+            If `M` has incompatible dimensions for multiplication with the polytope
+        """
+        if not isinstance(M, np.ndarray):
+            raise TypeError(f"Input 'M' must be a NumPy array, but received an object of type '{type(M).__name__}'")
+        if not np.isfinite(M).all() or np.isnan(M).any():
+            raise ValueError("Input 'M' must not contains NaN or inf values")
+        if not M.ndim == 2:
+            raise ValueError(f"Input matrix 'M' must be 2-dimensional, recieved shape={M.shape}")
+        if not (M_is_square := is_square(M)):
+            raise NotImplementedError("Projection with non-square matrices is not implemeted yet")
+        if M.shape[0] != self.n:
+            raise DimensionError(f"Input matrix 'M' must be of size m x n={self.n}, recieved shape={M.shape}")
+
+        vrepr, hrepr = self._vrepr, self._hrepr
+        if vrepr is None and hrepr is None:
+            raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                                        "V-representation or H-representation")
+        obj = self if in_place else self.copy()
+        M_is_sing = is_sing(M)
+        if vrepr is not None or M_is_sing:
+            obj.vrepr = (self.verts @ M.T, self.rays @ M.T)
+        if hrepr is not None:
+            obj.hrepr = (np.column_stack((self.A @ np.linalg.inv(M),
+                                          self.b)),
+                         np.column_stack((self.A_eq @ np.linalg.inv(M),
+                                          self.b_eq))) if not M_is_sing else None
+
+        if obj._dim is not None:
+            obj._dim = self._dim if not M_is_sing else None  # FIXME: Can we do better here?
+        if obj._vol is not None:
+            obj._vol *= np.linalg.det(M) if not M_is_sing else (0 if M_is_square else None)
+        if obj._diam is not None:
+            obj._dim = None  # FIXME: Maybe we can do better for `not is_square`?
+        if obj._width is not None:
+            obj._width = None if not M_is_sing else 0
+        if obj._chebcr is not None:
+            obj._chebcr = None  # FIXME: Apprantly, we can do better with solving an LP
+
+        return obj
+
     def minimal(self,
                 which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
                 in_place: bool = True,
@@ -1078,6 +1181,7 @@ class Polytope:
                                                             atol=CFG.atol), :]
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                ax.set_aspect('equal', adjustable='box')  # TODO: Add this to display_options with CFG.aspect or something similar
             case 3:
                 if ax.name != '3d':
                     raise ValueError("The dimension of the polytope" \
@@ -1091,6 +1195,7 @@ class Polytope:
                     if annotate_facets:
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # TODO: Add this to display_options with CFG.aspect or something similar
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 
@@ -1136,7 +1241,7 @@ def poly(*args: Any,
         'b_eq': b_eq,
     }.items() if value is not None}
     if len(args) == 0 and len(kwargs) == 0:
-        raise InvalidCombinationOfArguments("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
+        raise InvalidCombinationOfArgumentsError("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
     return Polytope(*args, **kwargs)
 
 

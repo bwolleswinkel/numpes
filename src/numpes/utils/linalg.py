@@ -29,6 +29,24 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
+def is_square(A: NDArray) -> bool:
+    """Check whether a matrix `A` is square"""
+    if not A.ndim == 2:
+        return False
+    if not A.shape[0] == A.shape[1]:
+        return False
+    return True
+
+
+def is_sing(A: NDArray) -> bool:
+    """Check whether the matrix is singular (i.e., non-invertible)"""
+    if not is_square(A):
+        return False
+    if np.linalg.matrix_rank(A, rtol=CFG.rtol) < A.shape[0]:
+        return False
+    return True
+
+
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/19[untested/unverified]
 def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Minimize an H-representation by removing redundant inequalities

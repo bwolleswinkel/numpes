@@ -76,3 +76,11 @@ class TestPolytopeMinkSum:
         poly_sum = poly_1.mink_sum(poly_2)
         assert poly_sum.vol ** (1 / poly_1.n) > poly_1.vol ** (1 / poly_1.n) + poly_2.vol ** (1 / poly_2.n) or poly_sum.vol ** (1 / poly_1.n) == approx(poly_1.vol ** (1 / poly_1.n) + poly_2.vol ** (1 / poly_2.n)), \
             f"Volume of Minkowski sum should be at most the sum of the volumes, but got {poly_sum.vol} > {poly_1.vol} + {poly_2.vol} for polytopes {poly_1} and {poly_2}"
+
+
+class TestPolytopeCopy:
+    """Tests for the `Polytope.copy()` method"""
+
+
+class TestPolytopeMatMul:
+    """Tests for the `Polytope.mat_mul()` method"""

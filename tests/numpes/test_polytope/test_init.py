@@ -5,7 +5,7 @@ import re
 
 import numpy as np
 import numpes as pes
-from numpes import InvalidCombinationOfArguments
+from numpes import InvalidCombinationOfArgumentsError
 import pytest
 from hypothesis import given
 from hypothesis.strategies import integers
@@ -49,7 +49,7 @@ def test_polytope_init_no_args_no_kwargs_attr_none():
     ((...,), {'foo': 1, 'bar': 2, 'baz': 3}),  # NOTE: Should dispatch to `_init_vrepr` (as len_args=1)
 ])
 def test_polytope_init_invalid_combination(args: Any, kwargs: dict[str, Any]):
-    with pytest.raises(InvalidCombinationOfArguments, match=re.escape(
+    with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
         "An invalid number or combination of arguments was provided," \
         f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
         "combinations or arguments.")):
@@ -123,7 +123,7 @@ def test_polytope_init_empty_manual_facets():
      "Cannot provide 'A_eq' or 'b_eq' when initializing an empty polytope")
 ])
 def test_polytope_init_empty_invalid_combination(args: tuple[()], kwargs: dict[str, int | EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArguments, match=re.escape(expected_msg)):
+    with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(expected_msg)):
         pes.Polytope(*args, **kwargs)
 
 
@@ -222,7 +222,7 @@ def test_polytope_init_vrepr_value_error_rays(args: tuple[NDArray], kwargs: dict
      "Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
 ])
 def test_polytope_init_vrepr_invalid_combination(args: tuple[NDArray], kwargs: dict[str, NDArray | EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArguments, match=expected_msg):
+    with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
         pes.Polytope(*args, **kwargs)
 
 
@@ -303,7 +303,7 @@ def test_polytope_init_hrepr_nan_value_error(args: tuple[NDArray], kwargs: dict[
      "Cannot provide 'verts' when initializing from half-spaces"),
 ])
 def test_polytope_init_hrepr_invalid_combination(args: tuple[EllipsisType, EllipsisType], kwargs: dict[str, EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArguments, match=expected_msg):
+    with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
         pes.Polytope(*args, **kwargs)
 
 
@@ -311,7 +311,7 @@ class TestPoly:
     """Tests for the function `pes.poly`, which is a wrapper for the `Polytope` constructor"""
 
     def test_poly_no_args_no_kwargs(self):
-        with pytest.raises(InvalidCombinationOfArguments, match=re.escape(
+        with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
             "No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")):
             _ = pes.poly()
 
