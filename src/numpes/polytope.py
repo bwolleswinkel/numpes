@@ -21,8 +21,8 @@ poly_from_bounds
 from __future__ import annotations
 
 import re
-from itertools import product as iterproduct
 from copy import copy
+from itertools import product as iterproduct
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -38,8 +38,8 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
-from numpes.exceptions import InvalidCombinationOfArgumentsError, InvalidRepresentationError, DimensionError
-from numpes.utils import enum_facets, enum_gens, signed_angle, is_square, is_sing
+from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidRepresentationError
+from numpes.utils import enum_facets, enum_gens, is_sing, is_square, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -997,6 +997,7 @@ class Polytope:
         return "\n".join(res)
 
     # [untested/unverified]
+    # pylint: disable=protected-access
     def copy(self,
              deepcopy: bool = True,
              ) -> Polytope:
@@ -1030,6 +1031,7 @@ class Polytope:
         return obj
 
     # [untested/unverified]
+    # pylint: disable=protected-access
     def mat_mul(self,
                 M: NDArray,
                 recalc_chebcr: bool = False,
@@ -1078,12 +1080,16 @@ class Polytope:
         obj = self if in_place else self.copy()
         M_is_sing = is_sing(M)
         if vrepr is not None or M_is_sing:
+            # FIXME: Should we use the `self._vrepr` instead?
             obj.vrepr = (self.verts @ M.T, self.rays @ M.T)
         if hrepr is not None:
-            obj.hrepr = (np.column_stack((self.A @ np.linalg.inv(M),
-                                          self.b)),
-                         np.column_stack((self.A_eq @ np.linalg.inv(M),
-                                          self.b_eq))) if not M_is_sing else None
+            if M_is_sing:
+                obj._hrepr = None
+            else:
+                obj.hrepr = (np.column_stack((self.A @ np.linalg.inv(M),
+                                            self.b)),
+                            np.column_stack((self.A_eq @ np.linalg.inv(M),
+                                            self.b_eq)))
 
         if obj._dim is not None:
             obj._dim = self._dim if not M_is_sing else None  # FIXME: Can we do better here?
@@ -1195,7 +1201,7 @@ class Polytope:
                     if annotate_facets:
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
-                ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # TODO: Add this to display_options with CFG.aspect or something similar
+                ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]  # TODO: Add this to display_options with CFG.aspect or something similar
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 
@@ -1283,6 +1289,7 @@ def poly_from_point(point: ArrayLike) -> Polytope:
     return Polytope.from_point(point)
 
 
+# pylint: disable=protected-access
 def poly_from_name(name: Literal['triangle',
                                  'square',
                                  'pentagon',
@@ -1363,7 +1370,7 @@ def poly_from_name(name: Literal['triangle',
             is_singleton = False
             dim = 2
             vol = 1.25
-            diam = np.linalg.norm(verts[0] - verts[4], ord=2)
+            diam = float(np.linalg.norm(verts[0] - verts[4], ord=2))
             width = 1
             chebcr = (np.array([0.5, 0.5]), 0.5)
         case 'pyramid':
@@ -1388,7 +1395,7 @@ def poly_from_name(name: Literal['triangle',
             is_singleton = False
             dim = 3
             vol = 1 / 3
-            diam = np.linalg.norm(verts[0] - verts[3], ord=2)
+            diam = float(np.linalg.norm(verts[0] - verts[3], ord=2))
             width = 1
             chebcr = (np.array([0.5, 0.5, 0.25]), 0.75)
         case _:
