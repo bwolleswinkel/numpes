@@ -38,8 +38,8 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
-from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidRepresentationError
-from numpes.utils import enum_facets, enum_gens, is_sing, is_square, signed_angle
+from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
+from numpes.utils import enum_facets, enum_gens, is_sing, is_square, signed_angle, conv, minimize_hrepr, minimize_vrepr
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -817,6 +817,19 @@ class Polytope:
 
         return polytope
 
+    __array_ufunc__ = None  # Disable NumPy ufuncs for Polytope objects to trigger fallback to dunder methods
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Polytope:
+        """Invoked when `copy.deepcopy` is called on the object"""
+        return self.copy(deepcopy=True, memo=memo)
+
+    def __matmul__(self, M: NDArray) -> NDArray:
+        """Invoked when right-hand matrix multiplication is performed (i.e., `self @ M`)"""
+        raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
+
+    def __rmatmul__(self, M: NDArray) -> NDArray:
+        return self.mat_mul(M, in_place=False)
+
     def __str__(self) -> str:
         """Descriptive representation of the polytope in either V-represenation or H-representation"""
         header = self._str_header()
@@ -1000,6 +1013,7 @@ class Polytope:
     # pylint: disable=protected-access
     def copy(self,
              deepcopy: bool = True,
+             memo: Optional[dict[int, Any]] = None,
              ) -> Polytope:
         """Return a (deep)copy of the polytope. 
 
@@ -1007,6 +1021,8 @@ class Polytope:
         ----------
         deepcopy : bool, default=True
             If True, a deep copy of the polytope is returned (totally isolated from the original polytope). If False, a shallow copy is returned.
+        memo : dict[int, Any], optional
+            A dictionary of objects already copied during the current copying pass, used by `copy.deepcopy` to avoid infinite recursion when copying objects with circular references. If None, a new empty dictionary is created.
 
         Returns
         -------
@@ -1015,11 +1031,18 @@ class Polytope:
 
         Warnings
         --------
-        If `deepcopy` is set to False, the returned polytope will share the same underlying data as the original polytope. Modifications to the NumPy arrays (`verts`, `rays`, `Ab`, `Ab_eq`, and `chebc`) in either polytope will affect both polytopes.
+        If `deepcopy` is set to False, the returned polytope will share references to the same underlying data as the original polytope. Modifications to the NumPy arrays (`verts`, `rays`, `Ab`, `Ab_eq`, and `chebc`) in either polytope will affect both polytopes.
         """
+        if deepcopy:
+            if memo is None:
+                memo = {}
+            if id(self) in memo:
+                return memo[id(self)]
+
         obj = copy(self)
         if not deepcopy:
             return obj
+        memo[id(self)] = obj
 
         if self._vrepr is not None:
             obj._vrepr = (self.verts.copy(), self.rays.copy())
@@ -1036,7 +1059,7 @@ class Polytope:
                 M: NDArray,
                 recalc_chebcr: bool = False,
                 in_place: bool = True,
-                ) -> Polytope:
+                ) -> Polytope | Self:
         """Matrix multiplication with a matrix `M`.
         
         Parameters
@@ -1068,33 +1091,29 @@ class Polytope:
             raise ValueError("Input 'M' must not contains NaN or inf values")
         if not M.ndim == 2:
             raise ValueError(f"Input matrix 'M' must be 2-dimensional, recieved shape={M.shape}")
-        if not (M_is_square := is_square(M)):
-            raise NotImplementedError("Projection with non-square matrices is not implemeted yet")
-        if M.shape[0] != self.n:
-            raise DimensionError(f"Input matrix 'M' must be of size m x n={self.n}, recieved shape={M.shape}")
+        if M.shape[1] != self.n:
+            raise DimensionError(f"Input matrix 'M' must be of size (m, {self.n}), received shape={M.shape}")
 
         vrepr, hrepr = self._vrepr, self._hrepr
         if vrepr is None and hrepr is None:
             raise InvalidRepresentationError("Polytope is not properly initialized with either " \
-                                        "V-representation or H-representation")
+                                             "V-representation or H-representation")
         obj = self if in_place else self.copy()
         M_is_sing = is_sing(M)
         if vrepr is not None or M_is_sing:
             # FIXME: Should we use the `self._vrepr` instead?
-            obj.vrepr = (self.verts @ M.T, self.rays @ M.T)
+            obj.vrepr = (obj.verts @ M.T, obj.rays @ M.T)
         if hrepr is not None:
             if M_is_sing:
                 obj._hrepr = None
             else:
-                obj.hrepr = (np.column_stack((self.A @ np.linalg.inv(M),
-                                            self.b)),
-                            np.column_stack((self.A_eq @ np.linalg.inv(M),
-                                            self.b_eq)))
+                obj.hrepr = (np.column_stack((obj.A @ np.linalg.inv(M), obj.b)),
+                             np.column_stack((obj.A_eq @ np.linalg.inv(M), obj.b_eq)))
 
         if obj._dim is not None:
-            obj._dim = self._dim if not M_is_sing else None  # FIXME: Can we do better here?
+            obj._dim = obj._dim if not M_is_sing else None  # FIXME: Can we do better here?
         if obj._vol is not None:
-            obj._vol *= np.linalg.det(M) if not M_is_sing else (0 if M_is_square else None)
+            obj._vol = obj._vol * np.linalg.det(M) if not M_is_sing else (0 if is_square(M) else None)
         if obj._diam is not None:
             obj._dim = None  # FIXME: Maybe we can do better for `not is_square`?
         if obj._width is not None:
@@ -1107,9 +1126,17 @@ class Polytope:
     def minimal(self,
                 which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
                 in_place: bool = True,
-                ) -> None | Self:
+                ) -> Polytope | Self:
         """Return a minimal representation of the polytope by removing redundant vertices and facets"""
-        raise NotImplementedError("The 'minimal' method is not yet implemented")
+        obj = self if in_place else self.copy()
+        if which_repr in {'vrepr', 'both'}:
+            if obj.rays.size > 0:
+                obj._vrepr = minimize_vrepr(obj.verts, obj.rays)
+            else:
+                obj._vrepr = (conv(obj.verts), obj.rays)
+        if which_repr in {'hrepr', 'both'}:
+            obj._hrepr = minimize_hrepr(obj.Ab, obj.Ab_eq)
+        return obj
 
     # pylint: disable=too-many-branches,too-many-statements
     def plot(self,
@@ -1187,7 +1214,8 @@ class Polytope:
                                                             atol=CFG.atol), :]
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
-                ax.set_aspect('equal', adjustable='box')  # TODO: Add this to display_options with CFG.aspect or something similar
+                if CFG.aspect == 'equal':
+                    ax.set_aspect('equal', adjustable='box')
             case 3:
                 if ax.name != '3d':
                     raise ValueError("The dimension of the polytope" \
@@ -1201,7 +1229,8 @@ class Polytope:
                     if annotate_facets:
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
-                ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]  # TODO: Add this to display_options with CFG.aspect or something similar
+                if CFG.aspect == 'equal':
+                    ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 

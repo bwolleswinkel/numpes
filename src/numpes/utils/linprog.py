@@ -261,6 +261,18 @@ def solve_lp(
             raise ValueError("Length of x_0 must match length of c")
 
     _validate_inputs(c, A, b, A_eq, b_eq, bounds, x_0)
+
+    # FIXME: I don't know if this implementation makes mathematical sense
+    if c.size == 0:
+        feasible = ((b is None or (b > 0 or np.allclose(b, 0, rtol=CFG.rtol, atol=CFG.atol)))
+                    and (b_eq is None or np.allclose(b_eq, 0, rtol=CFG.rtol, atol=CFG.atol)))
+        return OptimizationProgramResult(
+            success=feasible,
+            status=Status.OPTIMAL if feasible else Status.INFEASIBLE,
+            value=0.0 if feasible else None,
+            x_star=np.empty(0) if feasible else None,
+        )
+
     if CFG.lp_backend == 'auto':
         backend = 'cvxpy' if CVXPY_INSTALLED else 'scipy'
     else:
@@ -269,7 +281,15 @@ def solve_lp(
         case 'scipy':
             res = _solve_lp_scipy(c, A, b, A_eq, b_eq, bounds, x_0)
         case 'cvxpy':
-            res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
+            try:
+                res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
+            except cvx.SolverError as _:
+                # FIXME: Maybe I should propagate this error in a different manner, by raising an actual RunTimeError; this is a somewhat dangerous workaround
+                res = OptimizationProgramResult(success=False,
+                                                status=Status.NUMERICAL_ISSUES_ENCOUNTERED,
+                                                value=None,
+                                                x_star=None,
+                                                )
         case 'pulp':
             res = _solve_lp_pulp(c, A, b, A_eq, b_eq, bounds, x_0)
         case _:

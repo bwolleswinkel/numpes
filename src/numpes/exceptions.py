@@ -9,6 +9,10 @@ class InvalidCombinationOfArgumentsError(NumpesException, TypeError):
     """An invalid combination of arguments is provided to a function, method, or constructor"""
 
 
+class InvalidOperationError(NumpesException, ValueError):
+    """The (order of) operation between these two objects is invalid or undefined"""
+
+
 class InvalidRepresentationError(NumpesException, AssertionError):
     """The object has an invalid or unresolvable representation"""
 

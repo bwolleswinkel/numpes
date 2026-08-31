@@ -27,6 +27,10 @@ def approx(*args, rtol: Optional[float] = None, atol: Optional[float] = None, **
 @wraps(np.lexsort)
 def lsort(arr: NDArray) -> NDArray:
     """Lexicographical sort the rows of a 2D array"""
+    if not isinstance(arr, np.ndarray):
+        raise TypeError(f"Input must be a NumPy array, but got '{type(arr).__name__}' instead")
+    if arr.ndim > 2:
+        raise ValueError(f"Input array must not have more than 2 dimensions, but got {arr.ndim} dimensions instead")
     return arr[np.lexsort(arr.T[::-1])]
 
 
