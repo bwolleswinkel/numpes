@@ -3,3 +3,8 @@ ruff check src/numpes
 # C0301=lines-to-long, W0511=fixme, R0912=too-many-branches, R0911=too-many-return statements, R0904=too-many-public-methods
 pylint --disable=C0301,W0511 src/numpes
 mypy src/numpes
+
+# For building the website
+cd docs
+conda activate venvnumpesdocs && python -m sphinx -b html source /tmp/numpes-docs && open /tmp/numpes-docs/index.html
+rm -rf /tmp/numpes-docs
