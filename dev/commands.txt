@@ -8,3 +8,7 @@ mypy src/numpes
 cd docs
 conda activate venvnumpesdocs && python -m sphinx -b html source /tmp/numpes-docs && open /tmp/numpes-docs/index.html
 rm -rf /tmp/numpes-docs
+
+# For building the documentation
+cd docs
+sphinx-apidoc -f -o api ../src/numpes  # FIXME: Doesn't really give the intended effect
