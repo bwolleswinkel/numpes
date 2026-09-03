@@ -278,7 +278,7 @@ def span(A: NDArray) -> NDArray:
         raise ValueError(f"Parameter 'A' must be a matrix of size `(m, n)`, but recieved {A.shape}")
     if np.isnan(A).any() or not np.isfinite(A).all():
         raise ValueError("Array 'A' must not contain NaN or inf values")
-    
+
     if np.all(np.abs(A) <= CFG.atol):
         return np.empty((A.shape[0], 0))
     if A.shape[0] <= 1:

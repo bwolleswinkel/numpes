@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 try:
-    from mpl_toolkits.mplot3d.art3d import PolyCollection, Poly3DCollection  # type: ignore[import-untyped]
-    from matplotlib.patches import FancyArrowPatch
-    from mpl_toolkits.mplot3d import proj3d
     from matplotlib.figure import Figure
     from matplotlib.lines import Line2D
+    from matplotlib.patches import FancyArrowPatch
+    from mpl_toolkits.mplot3d import proj3d  # type: ignore[import-untyped]
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
@@ -20,17 +20,21 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from matplotlib.axes import Axes
-    from matplotlib.lines import Line2D
-    from mpl_toolkits.mplot3d.art3d import Line3D
     from matplotlib.collections import PolyCollection
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    from matplotlib.lines import Line2D
+    from mpl_toolkits.mplot3d.art3d import Line3D, Poly3DCollection
     from numpy.typing import ArrayLike
 
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
 # FIXME: We need to add the 'bidirectional' functionality
-def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidirectional: bool = True, **kwargs) -> Line2D | Line3D:
+def plot_line(ax: Axes,
+              line: ArrayLike,
+              point: Optional[ArrayLike] = None,
+              bidirectional: bool = True,
+              **kwargs,
+              ) -> Line2D | Line3D:
     """Plot an indefinite line in 2D or 3D, defined by a point and a direction vector"""
 
     def update_line():
@@ -43,11 +47,11 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
             line_obj.set_xdata(limits[0])
             line_obj.set_ydata([0, 0])
             return
-        
+
         # Calculate t-values for intersections
         t_values = []
         coords = []
-        
+
         for i, (lim, d, c) in enumerate(zip(limits, line, center)):
             if abs(d) > 1e-10:
                 t_left, t_right = (lim[0] - c) / d, (lim[1] - c) / d
@@ -58,7 +62,7 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
                     # Hide line if outside bounds in any parallel direction
                     coords = [[] for _ in range(ndim)]
                     break
-        
+
         if coords == [] and t_values:  # Line is visible
             if ndim == 2:
                 # 2D case with extension
@@ -73,17 +77,17 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
                 # 3D case with clipping
                 dir_checks = [(limits[i], line[i], center[i]) for i in range(3)]
                 t_bounds = []
-                
+
                 for lim, d, c in dir_checks:
                     if abs(d) > 1e-10:
                         t1, t2 = (lim[0] - c) / d, (lim[1] - c) / d
                         t_bounds.append([min(t1, t2), max(t1, t2)])
                     else:
                         t_bounds.append([-1e10, 1e10])
-                
+
                 t_enter = max(tb[0] for tb in t_bounds)
                 t_exit = min(tb[1] for tb in t_bounds)
-                
+
                 if t_enter <= t_exit:
                     coords = [center + t * line for t in [t_enter, t_exit]]
                     line_obj.set_data_3d([c[0] for c in coords], [c[1] for c in coords], [c[2] for c in coords])
@@ -99,22 +103,22 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
                 line_obj.set_ydata([c[1] for c in coords])
             elif ndim == 3:
                 line_obj.set_data_3d([], [], [])
-    
+
     line = np.array(line, dtype=float)
     if np.allclose(line, 0):
         raise ValueError("Vector cannot be zero")
-    
+
     ndim = len(line)
-    
+
     if point is None:
         point = np.zeros(ndim)
     point = np.array(point, dtype=float)
     if len(point) != ndim:
         raise ValueError(f"Point must be {ndim}D for {ndim}D line")
-    
+
     # Calculate center point
     center = point + line / 2
-    
+
     # Create line object and setup callbacks
     if ndim == 1:
         line_obj, *_ = ax.plot([], **kwargs)
@@ -127,10 +131,10 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
         callbacks = ['xlim_changed', 'ylim_changed', 'zlim_changed']
     else:
         raise ValueError("Line vector must be 2D or 3D")
-    
+
     for callback in callbacks:
         ax.callbacks.connect(callback, lambda _: update_line())
-    
+
     update_line()
 
     return line_obj
@@ -138,12 +142,16 @@ def plot_line(ax: Axes, line: ArrayLike, point: Optional[ArrayLike] = None, bidi
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
-def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwargs) -> PolyCollection | Poly3DCollection:
+def plot_plane(ax: Axes,
+               plane_normal: ArrayLike,
+               point: Optional[ArrayLike] = None,
+               **kwargs,
+               ) -> PolyCollection | Poly3DCollection:
     """Plot an indefinite plane in 2D or 3D, defined by a normal vector and a point"""
-    
+
     def update_plane():
         xlim, ylim, zlim = ax.get_xlim(), ax.get_ylim(), ax.get_zlim()
-        
+
         # Find intersections with cube edges
         intersections = []
         edges = [
@@ -154,7 +162,7 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
             (xlim[0], ylim[0], [zlim[0], zlim[1]]), (xlim[0], ylim[1], [zlim[0], zlim[1]]),
             (xlim[1], ylim[0], [zlim[0], zlim[1]]), (xlim[1], ylim[1], [zlim[0], zlim[1]]),
         ]
-        
+
         for edge in edges:
             if isinstance(edge[0], list):
                 y_val, z_val = edge[1], edge[2]
@@ -174,7 +182,7 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
                     z_intersect = (d - normal[0]*x_val - normal[1]*y_val) / normal[2]
                     if zlim[0] <= z_intersect <= zlim[1]:
                         intersections.append([x_val, y_val, z_intersect])
-        
+
         if intersections:
             intersections = np.unique(np.array(intersections), axis=0)
             if len(intersections) >= 3:
@@ -199,7 +207,7 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
         raise ValueError("Cannot plot a 2-dimensional on an 'ax' object which is 1-dimensional")
 
     # FIXME: This is code that still needs to be reviewed
-    if not ax.name in {'1d', '3d'} and plane_normal is None:
+    if ax.name not in {'1d', '3d'} and plane_normal is None:
         # Create polygon collection
         poly_collection = PolyCollection([], linewidths=0, **kwargs)
         ax.add_collection(poly_collection)
@@ -220,32 +228,32 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
         update_plane_full()
         # Return the collection
         return poly_collection
-    
+
     plane_normal = np.array(plane_normal, dtype=float)
     if np.allclose(plane_normal, 0):
         raise ValueError("Normal vector cannot be zero")
-    
+
     if len(plane_normal) != 3:
         raise ValueError("Plane normal must be 3D")
-    
+
     if point is None:
         point = np.zeros(3)
     point = np.array(point, dtype=float)
     if len(point) != 3:
         raise ValueError("Point must be 3D for 3D plane")
-    
+
     # Normalize normal vector and calculate plane constant
     normal = plane_normal / np.linalg.norm(plane_normal)
     d = np.dot(normal, point)
-    
+
     # Create polygon collection
     poly_collection = Poly3DCollection([], linewidths=0, **kwargs)
     ax.add_collection3d(poly_collection)
-    
+
     # Set up callbacks
     for callback in ['xlim_changed', 'ylim_changed', 'zlim_changed']:
         ax.callbacks.connect(callback, lambda _: update_plane())
-    
+
     update_plane()
 
     return poly_collection
@@ -255,7 +263,7 @@ def plot_plane(ax: Axes, plane_normal: ArrayLike, point: ArrayLike = None, **kwa
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
 def plot_box(ax: Axes, **kwargs) -> Poly3DCollection:
     """Plot an indefinite box in 3D, centered at the origin with edges from -inf to inf"""
-    
+
     def update_box():
         xlim, ylim, zlim = ax.get_xlim(), ax.get_ylim(), ax.get_zlim()
         corners = np.array([[xlim[0], ylim[0], zlim[0]],
@@ -266,22 +274,22 @@ def plot_box(ax: Axes, **kwargs) -> Poly3DCollection:
                             [xlim[1], ylim[0], zlim[1]],
                             [xlim[1], ylim[1], zlim[1]],
                             [xlim[0], ylim[1], zlim[1]]])
-        
+
         faces = [[corners[j] for j in [0, 1, 2, 3]],
                  [corners[j] for j in [4, 5, 6, 7]],
                  [corners[j] for j in [0, 1, 5, 4]],
                  [corners[j] for j in [2, 3, 7, 6]],
                  [corners[j] for j in [1, 2, 6, 5]],
                  [corners[j] for j in [4, 7, 3, 0]]]
-        
+
         box_collection.set_verts(faces)
-    
+
     box_collection = Poly3DCollection([], linewidths=0, **kwargs)
     ax.add_collection3d(box_collection)
-    
+
     for callback in ['xlim_changed', 'ylim_changed', 'zlim_changed']:
         ax.callbacks.connect(callback, lambda _: update_box())
-    
+
     update_box()
 
     return box_collection
@@ -303,7 +311,7 @@ def plot_vector(ax: Axes,
             super().__init__((0, 0), (0, 0), *args, **kwargs)
             self._verts3d = tuple(elem for elem in zip(point, vector))
 
-        def do_3d_projection(self, renderer=None):
+        def do_3d_projection(self):
             xs3d, ys3d, zs3d = self._verts3d
             xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
             self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
@@ -338,7 +346,7 @@ def plot_vector(ax: Axes,
                                 arrowstyle="-|>",
                                 **{key: value for key, value in kwargs.items() if key != 'label'},
                                 )
-    if vector.size == 2:
+    elif vector.size == 2:
         arrow = FancyArrowPatch(point,
                                 vector,
                                 mutation_scale=20,
@@ -354,6 +362,8 @@ def plot_vector(ax: Axes,
                                   arrowstyle="-|>",
                                   **{key: value for key, value in kwargs.items() if key != 'label'},
                                   )
+    else:
+        raise ValueError(f"Vector size should be 1, 2, or 3, received {vector.size}")
 
     ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if vector.size == 3 else [])
     for idx, ax_lim in enumerate(ax_lims):
@@ -361,8 +371,9 @@ def plot_vector(ax: Axes,
             margin = 1 + ax.get_xmargin()
             ax.set_xlim(margin * min([ax_lim[0], vector[idx], point[idx]]), margin * max([ax_lim[1], vector[idx], point[idx]]))
             break
-        margin = 1 + eval(f'ax.get_{['x', 'y', 'z'][idx]}margin()')
-        exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(margin * min([ax_lim[0], vector[idx], point[idx]]), margin * max([ax_lim[1], vector[idx], point[idx]]))')
+        margin = 1 + getattr(ax, f'get_{['x', 'y', 'z'][idx]}margin')()
+        getattr(ax, f'set_{['x', 'y', 'z'][idx]}lim')(margin * min([ax_lim[0], vector[idx], point[idx]]),
+                                                      margin * max([ax_lim[1], vector[idx], point[idx]]))
 
     ax.add_patch(arrow)
 
@@ -400,15 +411,15 @@ def add_1d_subplot(fig: Figure, *args, **kwargs):
     # Default to 111 if no args provided
     if not args:
         args = (111,)
-    
+
     # Use add_subplot instead of add_axes for proper subplot behavior
     ax = fig.add_subplot(*args, projection=None)
-    
+
     # Replace the default axes with our custom Axes1D
     # Get the position and remove the old axes
     pos = ax.get_position()
     fig.delaxes(ax)
-    
+
     # Create new Axes1D with the same position
     ax = Axes1D(fig, pos, **kwargs)
     fig.add_axes(ax)

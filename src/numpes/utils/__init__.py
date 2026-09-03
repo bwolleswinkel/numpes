@@ -15,6 +15,6 @@ linprog
 
 from numpes.utils.linalg import *
 from numpes.utils.linprog import *
-from numpes.utils.spatial import *
 from numpes.utils.plot import *
+from numpes.utils.spatial import *
 from numpes.utils.timeout import *

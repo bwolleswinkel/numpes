@@ -27,6 +27,7 @@ aff_subs
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -41,12 +42,12 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import wraps
 from numpes._internal.printing import format_as_set
+from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
-from numpes.utils.plot import plot_line, plot_plane, plot_box, plot_vector, add_1d_subplot
-from numpes.exceptions import InvalidRepresentation
+from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
 
 if TYPE_CHECKING:
-    from typing import Optional, Any, Literal
+    from typing import Any, Literal, Optional
 
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
@@ -118,7 +119,7 @@ class Subspace:
         | [0] |
         \ [0]]/
         """
-        self._basis: NDArray = None
+        self._basis: NDArray
         self._is_minimal: bool | None = None  # FIXME: Should this be 'minimal'? 'reduced'? '(non)-redundant'?  'echelon'? 'canonical'?
         self._is_trivial: bool | None = None
         self._is_bounded: bool | None = None
@@ -155,7 +156,7 @@ class Subspace:
     def basis(self) -> NDArray:
         """Basis vectors of the subspace"""
         return self._basis
-    
+
     @basis.setter
     def basis(self, value: NDArray) -> None:
         """Set the basis vectors of the subspace.
@@ -178,19 +179,19 @@ class Subspace:
     def n(self) -> int:
         """Dimension of the ambient space"""
         return self.basis.shape[1]
-    
+
     @property
     def d(self) -> int:
         """Number of basis vectors of the subspace. Note that if the subspace is not reduced, `d >= dim`."""
         return self.basis.shape[0]
-    
+
     @property
     def dim(self) -> int:
         """Dimension of the subspace"""
         if self._dim is None:
             self._dim = np.linalg.matrix_rank(self.basis, CFG.atol)
         return self._dim
-    
+
     # [untested/unverified]
     @property
     def is_trivial(self) -> bool:
@@ -198,21 +199,21 @@ class Subspace:
         if self._is_trivial is None:
             self._is_trivial = (np.linalg.matrix_rank(self.basis, tol=CFG.atol) == 0).item()
         return self._is_trivial
-    
+
     # [untested/unverified]
     @property
     def perp(self) -> Subspace:
         """"Returns the subspace orthogonal to the currecnt subspace"""
         basis_ortho = sp.linalg.null_space(self.basis).T
         return Subspace(basis_ortho)
-    
+
     def __str__(self) -> str:
         """Descriptive representation of the subspace"""
         header = self._str_header()
         with np.printoptions(threshold=0):
             str_basis = self._str_basis()
         return header + "\n" + str_basis
-    
+
     # [untested/unverified]
     def _str_header(self) -> str:
         # NOTE: These methods are not yet implemented
@@ -242,7 +243,8 @@ class Subspace:
             span_lines = ["     " if idx != idx_text else "span " for idx in range(nlines)]
             comb = "\n".join(["".join(line) for line in zip(span_lines, basis_lines)])
         else:  # This must be a trivial subspace
-            comb = format_as_set([str(np.zeros((self.n, 1), dtype=int if to_dtype is None else eval(to_dtype)))], edgeitems)
+            dtype = int if to_dtype in {None, 'int'} else float
+            comb = format_as_set([str(np.zeros((self.n, 1), dtype=dtype))], edgeitems)
         return comb
 
     def __repr__(self) -> str:
@@ -336,11 +338,11 @@ class Subspace:
             comb += ("" if len(comb) == 0 else "\n") + str_basis
 
         return comb
-    
+
     # [untested/unverified]
     def __iter__(self) -> NDArray:
         return iter(self.basis)
-  
+
     # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
@@ -350,9 +352,8 @@ class Subspace:
         if in_place:
             self._basis = basis
             return self
-        else:
-            return Subspace(basis)
-        
+        return Subspace(basis)
+
     # [untested/unverified]
     def plot(self,
              color: Optional[str] = None,
@@ -366,7 +367,7 @@ class Subspace:
         if not MATPLOTLIB_INSTALLED:
             raise ImportError("Matplotlib is required for plotting." \
             " Please install it with 'pip install matplotlib' and try again.")
-        
+
         if ax is None:
             if self.n == 1:
                 fig = plt.figure()
@@ -389,7 +390,7 @@ class Subspace:
             raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n={self.n}")
 
         match self.dim:
-            case 0: 
+            case 0:
                 ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
             case 1:
                 line = plot_line(ax, self.basis[0, :], color=color, alpha=alpha)
@@ -397,24 +398,22 @@ class Subspace:
                     line.set_label(label)
             case 2:
                 if self.n == 1:
-                    raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
-                else:
-                    # FIXME: We need to make 'plot_plane' work for 2d, and not provide any normal
-                    plane = plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
-                    if label is not None:
-                        plane.set_label(label)
+                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                plane = plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+                if label is not None:
+                    plane.set_label(label)
             case 3:
                 if self.n <= 2:
-                    raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
-                else:
-                    box = plot_box(ax, color=color, alpha=alpha)
-                    if label is not None:
-                        box.set_label(label)
+                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                box = plot_box(ax, color=color, alpha=alpha)
+                if label is not None:
+                    box.set_label(label)
             case _:
-                raise InvalidRepresentation(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
-        
+                raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+
         for idx in range(self.n):
-            exec(f'ax.set_{['x', 'y', 'z'][idx]}lim(min(ax.get_{['x', 'y', 'z'][idx]}lim()[0], -1), max(ax.get_{['x', 'y', 'z'][idx]}lim()[1], 1))')
+            lims = getattr(ax, f'get_{['x', 'y', 'z'][idx]}lim')()
+            getattr(ax, f'set_{['x', 'y', 'z'][idx]}lim')(min(lims[0], -1), max(lims[1], 1))
 
         if plot_basis:
             self.plot_basis(color=color, show=False, ax=ax)
@@ -435,7 +434,7 @@ class Subspace:
         if not MATPLOTLIB_INSTALLED:
             raise ImportError("Matplotlib is required for plotting." \
             " Please install it with 'pip install matplotlib' and try again.")
-        
+
         if ax is None:
             if self.n == 1:
                 fig = plt.figure()
@@ -462,7 +461,7 @@ class Subspace:
 
         if show:
             plt.show()
-        
+
         return ax
 
 

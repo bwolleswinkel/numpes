@@ -57,7 +57,7 @@ else:
             self.spines['top'].set_color('none')      # Hide top x-axis line
             # Remove y-axis ticks and labels completely
             self.yaxis.set_ticks_position('none')     # Remove tick marks
-            self.set_yticks([])                       # Remove tick labels
+            self.set_yticks([])  # pylint: disable=not-callable  # Remove tick labels
             # Show ticks only on bottom x-axis
             self.xaxis.set_ticks_position('bottom')
             # Set initial y-limits
@@ -96,15 +96,24 @@ else:
             # Call parent plot method
             return super().plot(*args, **kwargs)
 
-        def scatter(self, x, y=None, **kwargs):
-            """Override scatter method to handle 1D scatter plots. If y is not provided, defaults to 0.
+        def scatter(
+            self, x, y=None, s=None, c=None, marker=None, cmap=None, norm=None,
+            vmin=None, vmax=None, alpha=None, linewidths=None, edgecolors=None,
+            *, colorizer=None, plotnonfinite=False, **kwargs,
+        ):
+            """Handle 1D scatter plots, defaulting y-values to zero.
+
             """
             # FIXME: Do I actually want to do this?
-            if 's' not in kwargs:
-                kwargs['s'] = 10
+            if s is None:
+                s = 10
             if y is None:
                 y = np.zeros_like(x)
-            return super().scatter(x, y, **kwargs)
+            return super().scatter(
+                x, y, s=s, c=c, marker=marker, cmap=cmap, norm=norm, vmin=vmin,
+                vmax=vmax, alpha=alpha, linewidths=linewidths, edgecolors=edgecolors,
+                colorizer=colorizer, plotnonfinite=plotnonfinite, **kwargs,
+            )
 
         def legend(self, *args, **kwargs):
             """Override legend method to position it at a fixed height above the x-axis"""
