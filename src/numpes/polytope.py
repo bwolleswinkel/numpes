@@ -39,7 +39,7 @@ from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
 from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
-from numpes.utils import enum_facets, enum_gens, is_sing, is_square, signed_angle, conv, minimize_hrepr, minimize_vrepr
+from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -58,9 +58,9 @@ class Polytope:
     
     Attributes
     ----------
-    A: NDArray[('m', 'n'), float]
+    A : NDArray[('m', 'n'), float]
         The matrix of shape (m, n) defining the m half-spaces in H-representation (Ax <= b).
-    b: NDArray[('m',), float]
+    b : NDArray[('m',), float]
         The vector of shape (m,) defining the m half-spaces in H-representation (Ax <= b).
     verts: NDArray[('k', 'n'), float]
         The matrix of shape (k, n) defining the k vertices in V-representation.
@@ -87,7 +87,7 @@ class Polytope:
 
         Parameters
         ----------
-        args: tuple[()] | tuple[ArrayLike] | tuple[ArrayLike, ArrayLike]
+        args : tuple[()] | tuple[ArrayLike] | tuple[ArrayLike, ArrayLike]
             Variable length positional arguments list. Must be of size 0, 1, or 2,
             according to the initialization method:
             - len(0) -> (): Initialize an empty polytope in R^n (requires `n`). Note that if the keywords `A` and `b` or
@@ -96,22 +96,22 @@ class Polytope:
             - len(1) -> (verts,): A matrix of shape (k, n) representing k vertices in R^n (V-representation).
             - len(2) -> (A, b): A matrix of shape (m, n) and a vector of length (m,),
             respectively, representing m half-spaces in R^n (H-representation).
-        n: int, optional
+        n : int, optional
             Dimension of the ambient space. Required if initializing an empty polytope (zero positional arguments).
-        verts: NDArray[("k", "n"), float], optional
+        verts : NDArray[("k", "n"), float], optional
             A matrix of shape (k, n) representing k vertices in R^n (V-representation). Required if 
             initializing from vertices (one positional argument).
-        rays: NDArray[("k", "n"), float], optional
+        rays : NDArray[("k", "n"), float], optional
             Rays for unbounded polytopes.
-        A: NDArray[("m", "n"), float], optional
+        A : NDArray[("m", "n"), float], optional
             A matrix of shape (m, n) representing m half-spaces in R^n (H-representation). Required if
             initializing from half-spaces (two positional arguments).
-        b: NDArray[("m",), float], optional
+        b : NDArray[("m",), float], optional
             A vector of shape (m,) representing m half-spaces in R^n (H-representation). Required if
             initializing from half-spaces (two positional arguments).
-        A_eq: NDArray[("m_eq", "n"), float], optional
+        A_eq : NDArray[("m_eq", "n"), float], optional
             Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b).
-        b_eq: NDArray[("m_eq",), float], optional
+        b_eq : NDArray[("m_eq",), float], optional
             Vector of shape (m_eq,) defining m_eq equality constraints in H-representation (Ax = b).
 
         Raises
@@ -180,7 +180,7 @@ class Polytope:
 
         Parameters
         ----------
-        n: int
+        n : int
             Dimension of the ambient space.
 
         Raises
@@ -250,9 +250,9 @@ class Polytope:
 
         Parameters
         ----------
-        verts: NDArray[("k", "n"), float]
+        verts : NDArray[("k", "n"), float]
             A matrix of shape (k, n) representing k vertices in R^n (V-representation).
-        rays: NDArray[("k", "n"), float], optional
+        rays : NDArray[("k", "n"), float], optional
             Rays for unbounded polytopes.
 
         Raises
@@ -333,13 +333,13 @@ class Polytope:
 
         Parameters
         ----------
-        A: NDArray[("m", "n"), float]
+        A : NDArray[("m", "n"), float]
             A matrix of shape (m, n) representing m half-spaces in R^n (H-representation).
-        b: NDArray[("m",), float]
+        b : NDArray[("m",), float]
             A vector of shape (m,) representing m half-spaces in R^n (H-representation).
-        A_eq: NDArray[("m_eq", "n"), float], optional
+        A_eq : NDArray[("m_eq", "n"), float], optional
             Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b).
-        b_eq: NDArray[("m_eq",), float], optional
+        b_eq : NDArray[("m_eq",), float], optional
             Vector of shape (m_eq,) defining m_eqp equality constraints in H-representation (Ax = b).
 
         Raises
@@ -409,7 +409,7 @@ class Polytope:
 
         Parameters
         ----------
-        n: int
+        n : int
             Dimension of the ambient space.
 
         Raises
@@ -574,7 +574,7 @@ class Polytope:
                     raise NotImplementedError("This feature is not yer implemented")
             else:
                 raise InvalidRepresentationError("Polytope is not properly initialized with either " \
-                "V-representation or H-representation")
+                                                 "V-representation or H-representation")
         return self._is_empty
 
     @property
@@ -823,22 +823,23 @@ class Polytope:
         """Invoked when `copy.deepcopy` is called on the object"""
         return self.copy(deepcopy=True, memo=memo)
 
-    def __matmul__(self, M: NDArray) -> NDArray:
+    def __matmul__(self, M: NDArray) -> Polytope:
         """Invoked when right-hand matrix multiplication is performed (i.e., `self @ M`)"""
         raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
 
-    def __rmatmul__(self, M: NDArray) -> NDArray:
+    def __rmatmul__(self, M: NDArray) -> Polytope:
+        """Invoked when left-hand matrix multiplication is performed (i.e., `M @ self`)"""
         return self.mat_mul(M, in_place=False)
 
     def __str__(self) -> str:
-        """Descriptive representation of the polytope in either V-represenation or H-representation"""
+        """Description of the polytope in either V-represenation or H-representation"""
         header = self._str_header()
         if self._hrepr is not None:
             return header + "\n" + self._str_hrepr()
         if self._vrepr is not None:
             return header + "\n" + self._str_vrepr()
         raise InvalidRepresentationError("Polytope is not properly initialized with either " \
-        "V-representation or H-representation")
+                                         "V-representation or H-representation")
 
     # [untested/unverified]
     def _str_header(self) -> str:
@@ -857,10 +858,12 @@ class Polytope:
 
     # [untested/unverified]
     def _str_vrepr(self) -> str:
-        """"Descriptive representation of the polytope in V-represntation"""
+        """"Description of the polytope in V-represntation"""
         if self._vrepr is None:
             raise ValueError("The polytope must be initialized in V-representation to use this method")
         verts, rays = self.vrepr
+        verts += np.zeros_like(verts)
+        rays += np.zeros_like(rays)
         edgeitems = np.get_printoptions()['edgeitems']
         if verts.size != 0:
             with np.printoptions(threshold=0):
@@ -896,10 +899,14 @@ class Polytope:
     # [untested/unverified]
     # pylint: disable=invalid-name
     def _str_hrepr(self) -> str:
-        """"Descriptive representation of the polytope in V-represntation"""
+        """"Description of the polytope in H-represntation"""
         if self._hrepr is None:
-            raise ValueError("The polytope must be initialized in V-representation to use this method")
+            raise ValueError("The polytope must be initialized in H-representation to use this method")
         A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+        A += np.zeros_like(A)
+        b += np.zeros_like(b)
+        A_eq += np.zeros_like(A_eq)
+        b_eq += np.zeros_like(b_eq)
         if A.size != 0:
             with np.printoptions(threshold=0):
                 A_as_str = str(A).splitlines()
@@ -965,6 +972,7 @@ class Polytope:
         return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
 
     def __format__(self, format_spec: str) -> str:
+        """Format specifier for f-strings (i.e., `f"{poly:format_spec}"`)"""
         if format_spec.startswith('r'):
             if len(format_spec) != 1:
                 raise ValueError(f"Debug specifier 'r' must be used in isolation, got '{format_spec}'")
@@ -979,8 +987,8 @@ class Polytope:
         tag_i, modes, num_part, str_prec, char_type = match.groups()
         modes = modes or ""
 
-        precision: int | None = None
-        suppress: bool | None = None
+        precision = None
+        suppress = None
         if num_part:
             if tag_i and not modes:
                 raise ValueError("Summary 'i' does not take numeric formatting")
@@ -1033,15 +1041,14 @@ class Polytope:
         --------
         If `deepcopy` is set to False, the returned polytope will share references to the same underlying data as the original polytope. Modifications to the NumPy arrays (`verts`, `rays`, `Ab`, `Ab_eq`, and `chebc`) in either polytope will affect both polytopes.
         """
-        if deepcopy:
-            if memo is None:
-                memo = {}
-            if id(self) in memo:
-                return memo[id(self)]
+        if not deepcopy:
+            return copy(self)
+
+        memo = {} if memo is None else memo
+        if id(self) in memo:
+            return memo[id(self)]
 
         obj = copy(self)
-        if not deepcopy:
-            return obj
         memo[id(self)] = obj
 
         if self._vrepr is not None:

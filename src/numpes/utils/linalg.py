@@ -94,6 +94,7 @@ def minimize_vrepr(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDAr
 # FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
 # FIXME: Should these also/only return the indices? That's more performant, right?
 def reduce_rays(rays: NDArray) -> NDArray:
+    """Minimize a collection of rays by removing directions already captured by other rays"""
     if (k_rays := rays.shape[0]) <= 1:
         return rays
     redundant = np.zeros(k_rays, dtype=bool)
@@ -115,7 +116,9 @@ def reduce_rays(rays: NDArray) -> NDArray:
 
 # FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
 # FIXME: Should these also/only return the indices? That's more performant, right?
+# pylint: disable=invalid-name
 def reduce_verts(verts: NDArray, rays: NDArray) -> NDArray:
+    """Minimize a collection of vertices by removing directions already implied by other vertices and rays"""
     if (k := verts.shape[0]) <= 1:
         return verts
     redundant = np.zeros(k, dtype=bool)
