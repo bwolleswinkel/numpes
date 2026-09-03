@@ -13,7 +13,209 @@ from tests.helpers import approx, lsort, normalize
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
-        
+
+
+class TestMinimizeVrepr:
+    """Tests for the `pes.utils.minimize_vrepr` function"""
+
+    @pytest.mark.parametrize('verts, rays', [
+        (np.empty((0, 2)),
+         np.array([[0, 0]])),
+        (np.empty((0, 3)),
+         np.array([[0, 0, 0],
+                   [0, 0, 0]])),
+    ])
+    def test_parametrize_no_verts_zero_ray_maps_to_zero_vertex(self, verts: NDArray, rays: NDArray):
+        """Test whether when provided with only a zero rays, this is correctly mapped to no rays, and a zero vertex"""
+        verts_res, rays_res = pes.utils.minimize_vrepr(verts, rays)
+        assert rays_res.shape[0] == 0, \
+            f"Given verts={verts} and rays={rays}, expected reduced rays to be empty array with shape (0, {verts.shape[1]}), but got rays_res=\n{rays_res} with shape {rays_res.shape}"
+        assert rays_res.size == 0, \
+            f"Given verts={verts} and rays={rays}, expected reduced rays to be empty array with size 0, but got rays_res=\n{rays_res} with size {rays_res.size}"
+        assert verts_res == approx(np.zeros((1, rays.shape[1]))), \
+            f"Given verts={verts} and rays={rays}, expected reduced verts to be equal to a zero vertex with shape (1, {rays.shape[1]}), but got verts_res=\n{verts_res}"
+
+    @pytest.mark.parametrize('verts, rays', [
+        (np.array([[1]]),
+         np.array([[ 1],
+                   [-2]])),
+        (np.empty((0, 1)),
+         np.array([[ 0.5],
+                   [-0.5]])),
+        (np.zeros((1, 2)),
+         np.array([[ 1,  0],
+                   [-1,  0],
+                   [ 0,  1],
+                   [ 0, -1]])),
+    ])
+    def test_parameterize_ambient_space(self, verts: NDArray, rays: NDArray) -> None:
+        """Test the reduction of rays that span the ambient space, which should return a canonical representation"""
+        verts_res, rays_res = pes.utils.minimize_vrepr(verts, rays)
+        expected_rays = np.vstack((np.eye(rays.shape[1]), -np.ones(rays.shape[1])))
+        assert verts_res.shape == (0, rays.shape[1]), \
+            f"Given verts=\n{verts}\nand rays=\n{rays},\nexpected reduced verts to empty array with shape (0, {rays.shape[1]}), but got verts_res=\n{verts_res}\nwith shape {verts_res.shape}"
+        assert verts_res.size == 0, \
+            f"Given verts=\n{verts}\nand rays=\n{rays},\nexpected reduced verts to empty array with size 0, but got verts_res=\n{verts_res}\nwith size {verts_res.size}"
+        assert lsort(rays_res) == approx(lsort(expected_rays)), \
+            f"Given verts=\n{verts}\nand rays=\n{rays},\nexpected reduced rays to be equal to the canonical representation [I; -1] (expected_rays=\n{expected_rays}),\nbut got rays_res=\n{rays_res}"
+
+    @pytest.mark.parametrize('rays', [
+        np.array([[1, 0],
+                  [0, 1]]),
+        np.array([[1, 1],
+                  [1, 1],
+                  [1, 0]]),
+        np.array([[0, 1, 0],
+                  [0, 0, 1]]),
+    ])
+    def test_parameterize_non_pointed_add_zero_vertex(self, rays: NDArray) -> None:
+        """Test the reduction of rays that are non-pointed, which should add a zero vertex to the representation"""
+        verts = np.empty((0, rays.shape[1]))
+        verts_res, _ = pes.utils.minimize_vrepr(verts, rays) 
+        assert verts_res == approx(np.zeros((1, rays.shape[1]))), \
+            f"Given non-pointed rays=\n{rays},\nexpected reduced verts to be equal to a zero vertex with shape (1, {rays.shape[1]}), but got verts_res=\n{verts_res}"
+
+
+class TestReduceRays:
+    """Tests for the `pes.utils.reduce_rays` function"""
+
+    @pytest.mark.parametrize('rays', [
+        np.array([[1, 0],
+                  [0, 1]]),
+        np.array([[1, 1],
+                  [1, 0]]),
+        np.array([[ 1, 0],
+                  [-1, 0]]),
+        np.array([[1, 2, 3],
+                  [4, 5, 6]]),
+    ])
+    def test_parameterize_non_redundant(self, rays: NDArray) -> None:
+        """Test the reduction of non-redundant rays, which should not change the rays"""
+        rays_res = pes.utils.reduce_rays(rays)
+        assert lsort(rays_res) == approx(lsort(rays)), \
+            f"Given (non-redundant) rays=\n{rays},\nexpected reduced rays to be equal to the original rays, but got rays_res=\n{rays_res}"
+    
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+    ])
+    def test_parameterize_empty(self, n: int) -> None:
+        """Test the reduction of an empty array of rays which should return an empty array"""
+        rays = np.empty((0, n))
+        rays_res = pes.utils.reduce_rays(rays)
+        assert rays_res.shape == (0, n), \
+            f"Given empty rays with shape (0, {n}), expected reduced rays to be empty array with shape (0, {n}), but got rays_res=\n{rays_res} with shape {rays_res.shape}"
+        assert rays_res.size == 0, \
+            f"Given empty rays with shape (0, {n}), expected reduced rays to be empty array with size 0, but got rays_res=\n{rays_res} with size {rays_res.size}"
+
+    @pytest.mark.parametrize('rays, expected_rays', [
+        (np.array([[1, 0],
+                   [0, 1],
+                   [0, 0]]),
+         np.array([[1, 0],
+                   [0, 1]])),
+        (np.array([[1, 0],
+                   [0, 0]]),
+         np.array([[1, 0]])),
+        (np.array([[ 0, 0],
+                   [ 1, 0],
+                   [-1, 0]]),
+         np.array([[ 1, 0],
+                   [-1, 0]])),
+        (np.array([[1, 2, 3],
+                   [0, 0, 0],
+                   [4, 5, 6]]),
+         np.array([[1, 2, 3],
+                   [4, 5, 6]])),
+        (np.array([[0, 0, 0]]),
+         np.array([[0, 0, 0]])),  # NOTE: A zero rays should actually return a zero ray, as that case is handled by `pes.utils.minimize_vrepr`
+        (np.array([[0],
+                   [0]]),
+         np.array([[0]])),
+    ])
+    def test_parameterize_zero_ray(self, rays: NDArray, expected_rays: NDArray) -> None:
+        """Test the reduction of rays which contain a zero vector, which should be removed as it is redundant"""
+        rays_res = pes.utils.reduce_rays(rays)
+        assert lsort(rays_res) == approx(lsort(expected_rays)), \
+            f"Given rays=\n{rays},\n with zero ray, expected reduced rays to be equal to expected_rays=\n{expected_rays},\nbut got rays_res=\n{rays_res}"
+
+    def test_parameterize_ambient_space(self) -> None:
+        """Test the reduction of rays that span the ambient space"""
+
+    def test_parameterize_single_ray(self) -> None:
+        """Test the reduction of a single ray, which should not change the ray"""
+
+
+class TestReduceVerts:
+    """Tests for the `pes.utils.reduce_verts` function"""
+
+    @pytest.mark.parametrize('verts, expected_verts', [
+        (np.array([[-1],
+                   [ 0],
+                   [ 1]]),
+         np.array([[-1],
+                   [ 1]])),
+        (np.array([[  0,   0],
+                   [  0,   1],
+                   [  1,   0],
+                   [0.5, 0.5]]),
+         np.array([[0, 0],
+                   [0, 1],
+                   [1, 0]])),
+        (np.array([[0, 0],
+                   [0, 1],
+                   [0, 1],
+                   [1, 0],
+                   [1, 0]]),
+         np.array([[0, 0],
+                   [0, 1],
+                   [1, 0]])),
+    ])
+    def test_parameterize_redundant_no_rays(self, verts: NDArray, expected_verts: NDArray) -> None:
+        """Test the reduction of redundant vertices when there are no rays"""
+        rays = np.empty((0, verts.shape[1]))
+        verts_res = pes.utils.reduce_verts(verts, rays)
+        assert lsort(verts_res) == approx(lsort(expected_verts)), \
+            f"Given verts=\n{verts},\n with no rays, expected reduced vertices to be equal to expected_verts=\n{expected_verts},\nbut got verts_res=\n{verts_res}"
+
+    def test_parameterize_redundant_repeated_verts(self) -> None:
+        """Test the reduction of redundant vertices when there are repeated vertices, which should remove the duplicates"""
+
+    def test_parameterize_non_redundant_no_rays(self) -> None:
+        """Test the reduction of non-redundant vertices when there are no rays, which should not change the vertices"""
+
+    @pytest.mark.parametrize('verts, rays, expected_verts', [
+        (np.array([[0, 0],
+                   [1, 1]]),
+         np.array([[1, 0],
+                   [0, 1]]),
+         np.array([[0, 0]])),
+    ])
+    def test_parameterize_redundant_with_rays(self, verts: NDArray, rays: NDArray, expected_verts: NDArray) -> None:
+        """Test the reduction of redundant vertices when there are rays"""
+        verts_res = pes.utils.reduce_verts(verts, rays)
+        assert lsort(verts_res) == approx(lsort(expected_verts)), \
+            f"Given verts=\n{verts},\n with rays=\n{rays},\nexpected reduced vertices to be equal to expected_verts=\n{expected_verts},\nbut got verts_res=\n{verts_res}"
+
+    def test_parameterize_non_redundant_with_rays(self) -> None:
+        """Test the reduction of non-redundant vertices when there are rays, which should not change the vertices"""
+
+    def test_parameterize_empty(self) -> None:
+        """Test the reduction of an empty array of vertices which should return an empty array"""
+
+    def test_parameterize_single_vertex(self) -> None:
+        """Test the reduction of a single vertex, which should not change the vertex"""
+
+    def test_parameterize_ambient_space(self) -> None:
+        """Test the reduction of vertices that span the ambient space, which should an empty array"""
+
+    @pytest.mark.coupled('pes.utils.conv')
+    def test_parameterize_no_rays_equivalent_conv(self) -> None:
+        """Test the reduction of vertices with no rays and verify that the result is equivalent to the convex hull of the vertices"""
+
 
 class TestMinimizeHrepr:
     """Test class for the `pes.utils.minimize_hrepr` function"""

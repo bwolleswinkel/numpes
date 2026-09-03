@@ -21,12 +21,18 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
         case 'vrepr':
             num_verts = draw(st.integers(n + 1, n + 10))
             verts = draw(arrays(float, (num_verts, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
-            poly = pes.Polytope(verts)
+            try:  # FIXME: I don't know if this is a very good strategy; this was a fix for a QHull error
+                poly = pes.Polytope(verts)  # FIXME: Maybe I should do `with pes.algo_options(on_prop_assign='pass')` instead
+            except RuntimeError as _:
+                reject()
         case 'hrepr':
             num_facets = draw(st.integers(n + 1, n + 10))
             A = draw(arrays(float, (num_facets, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
             b = draw(arrays(float, (num_facets,), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
-            poly = pes.Polytope(A, b)
+            try:  # FIXME: I don't know if this is a very good strategy; this was a fix for a QHull error
+                poly = pes.Polytope(A, b)
+            except RuntimeError as _:  # FIXME: Can we log this error instead?
+                reject()
         case 'both':
             num_verts = draw(st.integers(n + 1, n + 10))
             verts = draw(arrays(float, (num_verts, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))

@@ -84,17 +84,17 @@ def sym_replace(arr: str, char: str = '*') -> str:
         while idx_start + num_length < str_arr[i, :].size:
             if ''.join(str_arr[i, idx_start:(idx_start + 3)].tolist()) == '...':
                 idx_start += 4
-            else: 
+            else:
                 if j > i + (0 if (idx_trunc is None or i < idx_trunc) else 1):
                     str_arr[i, idx_start:(idx_start + num_length)] = list(f"{char:^{num_length}}")
                 idx_start += num_length + 1
             j += 1
 
-    A_list = [''.join(elem).strip('█') for (i, elem) in enumerate(str_arr.tolist())]
+    arr_list = [''.join(elem).strip('█') for (i, elem) in enumerate(str_arr.tolist())]
     if idx_trunc is not None:
-        A_list.insert(idx_trunc, ' ...')
+        arr_list.insert(idx_trunc, ' ...')
 
-    return '\n'.join(A_list)
+    return '\n'.join(arr_list)
 
 
 # [untested/unverified]

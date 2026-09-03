@@ -19,8 +19,10 @@ poly_from_bounds
 """
 
 from __future__ import annotations
-from itertools import product as iterproduct
+
 import re
+from copy import copy
+from itertools import product as iterproduct
 from typing import TYPE_CHECKING, overload
 
 import numpy as np
@@ -36,8 +38,8 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
-from numpes.exceptions import InvalidCombinationOfArguments, InvalidRepresentation
-from numpes.utils import enum_facets, enum_gens, signed_angle
+from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
+from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -56,9 +58,9 @@ class Polytope:
     
     Attributes
     ----------
-    A: NDArray[('m', 'n'), float]
+    A : NDArray[('m', 'n'), float]
         The matrix of shape (m, n) defining the m half-spaces in H-representation (Ax <= b).
-    b: NDArray[('m',), float]
+    b : NDArray[('m',), float]
         The vector of shape (m,) defining the m half-spaces in H-representation (Ax <= b).
     verts: NDArray[('k', 'n'), float]
         The matrix of shape (k, n) defining the k vertices in V-representation.
@@ -74,18 +76,18 @@ class Polytope:
     def __init__(self,
                  *args: Any,
                  n: Optional[int] = None,
-                 verts: Optional[NDArray | ArrayLike] = None,
-                 rays: Optional[NDArray | ArrayLike] = None,
-                 A: Optional[NDArray | ArrayLike] = None,
-                 b: Optional[NDArray | ArrayLike] = None,
-                 A_eq: Optional[NDArray | ArrayLike] = None,
-                 b_eq: Optional[NDArray | ArrayLike] = None,
+                 verts: Optional[ArrayLike] = None,
+                 rays: Optional[ArrayLike] = None,
+                 A: Optional[ArrayLike] = None,
+                 b: Optional[ArrayLike] = None,
+                 A_eq: Optional[ArrayLike] = None,
+                 b_eq: Optional[ArrayLike] = None,
                  ) -> None:
         """Initialize a Polytope from vertices or half-spaces.
 
         Parameters
         ----------
-        args: tuple[()] | tuple[NDArray] | tuple[NDArray, NDArray]
+        args : tuple[()] | tuple[ArrayLike] | tuple[ArrayLike, ArrayLike]
             Variable length positional arguments list. Must be of size 0, 1, or 2,
             according to the initialization method:
             - len(0) -> (): Initialize an empty polytope in R^n (requires `n`). Note that if the keywords `A` and `b` or
@@ -94,22 +96,22 @@ class Polytope:
             - len(1) -> (verts,): A matrix of shape (k, n) representing k vertices in R^n (V-representation).
             - len(2) -> (A, b): A matrix of shape (m, n) and a vector of length (m,),
             respectively, representing m half-spaces in R^n (H-representation).
-        n: int, optional
+        n : int, optional
             Dimension of the ambient space. Required if initializing an empty polytope (zero positional arguments).
-        verts: NDArray[("k", "n"), float], optional
+        verts : NDArray[("k", "n"), float], optional
             A matrix of shape (k, n) representing k vertices in R^n (V-representation). Required if 
             initializing from vertices (one positional argument).
-        rays: NDArray[("k", "n"), float], optional
+        rays : NDArray[("k", "n"), float], optional
             Rays for unbounded polytopes.
-        A: NDArray[("m", "n"), float], optional
+        A : NDArray[("m", "n"), float], optional
             A matrix of shape (m, n) representing m half-spaces in R^n (H-representation). Required if
             initializing from half-spaces (two positional arguments).
-        b: NDArray[("m",), float], optional
+        b : NDArray[("m",), float], optional
             A vector of shape (m,) representing m half-spaces in R^n (H-representation). Required if
             initializing from half-spaces (two positional arguments).
-        A_eq: NDArray[("m_eq", "n"), float], optional
+        A_eq : NDArray[("m_eq", "n"), float], optional
             Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b).
-        b_eq: NDArray[("m_eq",), float], optional
+        b_eq : NDArray[("m_eq",), float], optional
             Vector of shape (m_eq,) defining m_eq equality constraints in H-representation (Ax = b).
 
         Raises
@@ -151,6 +153,8 @@ class Polytope:
         self._is_singleton: bool | None = None
         self._dim: int | None = None
         self._vol: float | None = None
+        self._diam: float | None = None
+        self._width: float | None = None  # FIXME: We should create a method `width`, and call this`min_width`
         self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
@@ -164,7 +168,7 @@ class Polytope:
             'b_eq': b_eq,
         }.items() if value is not None}
         if len(args) !=0 or len(kwargs) != 0:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided," \
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided," \
             f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
             "combinations or arguments.")
 
@@ -176,7 +180,7 @@ class Polytope:
 
         Parameters
         ----------
-        n: int
+        n : int
             Dimension of the ambient space.
 
         Raises
@@ -202,11 +206,11 @@ class Polytope:
                 If the provided ambient dimension `n` is not a positive integer.
             """
             if 'n' not in kwargs:
-                raise InvalidCombinationOfArguments("Dimension 'n' must be provided for empty polytope initialization")
+                raise InvalidCombinationOfArgumentsError("Dimension 'n' must be provided for empty polytope initialization")
             if 'rays' in kwargs:
-                raise InvalidCombinationOfArguments("Cannot provide 'rays' when initializing an empty polytope")
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing an empty polytope")
             if 'A_eq' in kwargs or 'b_eq' in kwargs:
-                raise InvalidCombinationOfArguments("Cannot provide 'A_eq' or 'b_eq'" \
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq'" \
                 " when initializing an empty polytope")
             n = kwargs['n']
             if not isinstance(n, int):
@@ -227,6 +231,8 @@ class Polytope:
         self._is_singleton = False
         self._dim = 0
         self._vol = 0
+        self._diam = np.nan
+        self._width = 0
         self._chebcr = (np.full(n, np.nan), np.nan)
 
     @overload
@@ -244,9 +250,9 @@ class Polytope:
 
         Parameters
         ----------
-        verts: NDArray[("k", "n"), float]
+        verts : NDArray[("k", "n"), float]
             A matrix of shape (k, n) representing k vertices in R^n (V-representation).
-        rays: NDArray[("k", "n"), float], optional
+        rays : NDArray[("k", "n"), float], optional
             Rays for unbounded polytopes.
 
         Raises
@@ -265,15 +271,15 @@ class Polytope:
         }
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
                 f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
                 "combinations or arguments.")
         if 'n' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
         if 'A' in kwargs or 'b' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'A' or 'b' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'A' or 'b' when initializing from vertices")
         if 'A_eq' in kwargs or 'b_eq' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
         if len(args) == 1:
             if isinstance(*args, int):
                 raise TypeError("A single positional argument cannot be an integer (for an empty polytope " \
@@ -308,6 +314,8 @@ class Polytope:
         self._is_singleton = None
         self._dim = None
         self._vol = None
+        self._diam = None
+        self._width = None
         self._chebcr = None
 
     @overload
@@ -325,13 +333,13 @@ class Polytope:
 
         Parameters
         ----------
-        A: NDArray[("m", "n"), float]
+        A : NDArray[("m", "n"), float]
             A matrix of shape (m, n) representing m half-spaces in R^n (H-representation).
-        b: NDArray[("m",), float]
+        b : NDArray[("m",), float]
             A vector of shape (m,) representing m half-spaces in R^n (H-representation).
-        A_eq: NDArray[("m_eq", "n"), float], optional
+        A_eq : NDArray[("m_eq", "n"), float], optional
             Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b).
-        b_eq: NDArray[("m_eq",), float], optional
+        b_eq : NDArray[("m_eq",), float], optional
             Vector of shape (m_eq,) defining m_eqp equality constraints in H-representation (Ax = b).
 
         Raises
@@ -350,15 +358,15 @@ class Polytope:
         }
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
-            raise InvalidCombinationOfArguments("An invalid number or combination of arguments was provided,"
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
                 f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
                 "combinations or arguments.")
         if 'n' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'n' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from half-spaces")
         if 'verts' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'verts' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'verts' when initializing from half-spaces")
         if 'rays' in kwargs:
-            raise InvalidCombinationOfArguments("Cannot provide 'rays' when initializing from half-spaces")
+            raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing from half-spaces")
         if len(args) == 2:
             A, b = args
         else:
@@ -390,6 +398,8 @@ class Polytope:
         self._is_singleton = None
         self._dim = None
         self._vol = None
+        self._diam = None
+        self._width = None
         self._chebcr = None
 
     def _init_ambient(self,
@@ -399,7 +409,7 @@ class Polytope:
 
         Parameters
         ----------
-        n: int
+        n : int
             Dimension of the ambient space.
 
         Raises
@@ -437,6 +447,8 @@ class Polytope:
         self._is_singleton = False
         self._dim = n
         self._vol = np.inf
+        self._diam = np.nan
+        self._width = np.inf
         self._chebcr = (np.full(n, np.nan), np.inf)
 
     @property
@@ -455,7 +467,7 @@ class Polytope:
             case 'pass':
                 pass
             case 'minimal':
-                self.minimal(repr='vrepr')
+                self.minimal(which_repr='vrepr')
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -475,7 +487,7 @@ class Polytope:
             case 'pass':
                 pass
             case 'minimal':
-                self.minimal(repr='hrepr')
+                self.minimal(which_repr='hrepr')
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -486,7 +498,7 @@ class Polytope:
             return self.verts.shape[1]
         if self._hrepr is not None:
             return self.A.shape[1]
-        raise InvalidRepresentation("Polytope is not properly initialized with either " \
+        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
         "V-representation or H-representation")
 
     @property
@@ -511,7 +523,7 @@ class Polytope:
 
     @property
     def Ab(self) -> NDArray:
-        """Matrix Ab in the H-representation of the polytope (Abx <= 0)"""
+        """Matrix Ab in the H-representation of the polytope (Ab x <= 0, where Ab = [A | b])"""
         return self.hrepr[0]
 
     @property
@@ -531,7 +543,7 @@ class Polytope:
 
     @property
     def Ab_eq(self) -> NDArray:
-        """Matrix Ab_eq in the H-representation of the polytope (Ab_eq x = 0)"""
+        """Matrix Ab_eq in the H-representation of the polytope (Ab_eq x = 0, where Ab_eq = [A_eq | b_eq])"""
         return self.hrepr[1]
 
     @property
@@ -551,17 +563,61 @@ class Polytope:
 
     @property
     def is_empty(self) -> bool:
-        """Whether the polytope is empty (i.e., has no points)"""
+        """Check whether the polytope is empty (i.e., has no points)"""
         if self._is_empty is None:
             if self._vrepr is not None:
                 self._is_empty = self.verts.size == 0 and self.rays.size == 0
             elif self._hrepr is not None:
-                self._is_empty = (np.all(self.Ab == np.array([[0] * self.n + [-1]])) and
-                                  self.Ab_eq.size == 0)
+                if np.all(self.Ab == np.array([[0] * self.n + [-1]])).item() and self.Ab_eq.size == 0:
+                    self._is_empty = True
+                else:
+                    raise NotImplementedError("This feature is not yer implemented")
             else:
-                raise InvalidRepresentation("Polytope is not properly initialized with either " \
-                "V-representation or H-representation")
+                raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                                                 "V-representation or H-representation")
         return self._is_empty
+
+    @property
+    def is_degen(self) -> bool:
+        """Check whether the polytope is degenerate"""
+        if self._is_degen is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_degen
+
+    @property
+    def is_bounded(self) -> bool:
+        """Check whether the polytope is bounded"""
+        if self._is_bounded is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_bounded
+
+    @property
+    def is_full_dim(self) -> bool:
+        """Check whether the polytope is full-dimensional"""
+        if self._is_full_dim is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_full_dim
+
+    @property
+    def is_pointed(self) -> bool:
+        """Check whether the polytope is pointed (i.e., contains at least one vertex)"""
+        if self._is_pointed is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_pointed
+
+    @property
+    def is_singleton(self) -> bool:
+        """Check whether the polytope is a singleton (i.e., contains a single point)"""
+        if self._is_singleton is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._is_singleton
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the polytope"""
+        if self._dim is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._dim
 
     @property
     def vol(self) -> float:
@@ -574,6 +630,20 @@ class Polytope:
             else:
                 raise NotImplementedError("Volume computation for full-dimensional bounded polytopes is not implemented yet")
         return self._vol
+
+    @property
+    def diam(self) -> float:
+        """Geometric diameter of the polytope. For the combinatorial diameter, see method `comb_diam`."""
+        if self._diam is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._diam
+
+    @property
+    def width(self) -> float:
+        """Width of the polytope (i.e., smallest distance between two parallel supporting hyperplanes that enclose the polytope)"""
+        if self._width is None:
+            raise NotImplementedError("This property is not yet implemented")
+        return self._width
 
     @property
     def chebcr(self) -> tuple[NDArray, float]:
@@ -640,7 +710,7 @@ class Polytope:
         ub_only = ~is_eq & ~lb_is_finite & ub_is_finite
         is_unbounded = ~is_eq & ~lb_is_finite & ~ub_is_finite
 
-        I = np.eye(n)  # pylint: disable=invalid-name
+        I = np.eye(n)  # pylint: disable=invalid-name # noqa: E741
         ub_idx, lb_idx, eq_idx = (np.where(ub_is_finite & ~is_eq)[0],
                                   np.where(lb_is_finite & ~is_eq)[0],
                                   np.where(is_eq)[0])
@@ -660,51 +730,117 @@ class Polytope:
             -I[ub_only | is_unbounded],
         )) if (lb_only | ub_only | is_unbounded).any() else np.empty((0, n))
 
-        poly = cls()
-        poly._vrepr = (verts, rays)
-        poly._hrepr = (Ab, Ab_eq)
-        poly._is_empty = False
-        poly._is_singleton = bool(is_eq.all())
-        poly._is_bounded = bool(~(lb_only | ub_only | is_unbounded).any())
-        poly._is_degen = bool(is_eq.any() or not poly._is_bounded)
-        poly._is_full_dim = bool(~is_eq.any())
-        poly._is_pointed = bool(~is_unbounded.any())
-        poly._dim = int(n - is_eq.sum())
+        polytope = cls()
+        polytope._vrepr = (verts, rays)
+        polytope._hrepr = (Ab, Ab_eq)
+        polytope._is_empty = False
+        polytope._is_singleton = bool(is_eq.all())
+        polytope._is_bounded = bool(~(lb_only | ub_only | is_unbounded).any())
+        polytope._is_degen = bool(is_eq.any() or not polytope._is_bounded)
+        polytope._is_full_dim = bool(~is_eq.any())
+        polytope._is_pointed = bool(~is_unbounded.any())
+        polytope._dim = int(n - is_eq.sum())
 
         if is_eq.any():
-            poly._vol = 0.0
-        elif not poly._is_bounded:
-            poly._vol = np.inf
+            polytope._vol = 0.0
+        elif not polytope._is_bounded:
+            polytope._vol = np.inf
         else:
-            poly._vol = float(np.prod(upper - lower))
+            polytope._vol = float(np.prod(upper - lower))
 
-        if poly._is_singleton:
-            poly._chebcr = (lower.copy(), 0.0)
-        elif not poly._is_full_dim:
+        if polytope._is_singleton:
+            polytope._chebcr = (lower.copy(), 0.0)
+        elif not polytope._is_full_dim:
             bounds_is_finite = lb_is_finite & ub_is_finite
             midpoints = np.full(n, np.nan)
             midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
-            poly._chebcr = (np.where(is_eq, lower, midpoints), 0.0)
+            polytope._chebcr = (np.where(is_eq, lower, midpoints), 0.0)
         else:
             bounds_is_finite = lb_is_finite & ub_is_finite
             midpoints = np.full(n, np.nan)
             midpoints[bounds_is_finite] = (lower[bounds_is_finite] + upper[bounds_is_finite]) / 2
             chebc = np.where(is_eq, lower, midpoints)
             chebr = float(np.min(np.where(bounds_is_finite & ~is_eq, (upper - lower) / 2, np.inf)))
-            poly._chebcr = (chebc, chebr)
+            polytope._chebcr = (chebc, chebr)
 
-        return poly
+        return polytope
+
+    @classmethod
+    def from_point(cls, point: ArrayLike) -> Polytope:
+        """Create a singleton polytope containing the given point.
+
+        Parameters
+        ----------
+        point : ArrayLike
+            A point/vector in R^n.
+
+        Returns
+        -------
+        Polytope
+            A polytope that is a singleton containing the given point.
+
+        Raises
+        ------
+        ValueError
+            If the input point is not a 1D array or contains NaN or infinite values
+
+        Examples
+        --------
+        >>> poly = pes.poly_from_point([1, 2, 3])
+        >>> print(poly)
+        Singleton polytope in R^3
+        [[1. 0. 0.]  |    [[1.]
+         [0. 1. 0.]  x ==  [2.]
+         [0. 0. 1.]] |     [3.]]
+        """
+        point = np.atleast_1d(point)
+        if point.ndim != 1:
+            raise ValueError(f"Point must be a 1D array, but received an array of shape {point.shape}")
+        if not np.isfinite(point).all() or np.isnan(point).any():
+            raise ValueError(f"Point vector cannot contain inf or NaN values, received point={point}")
+        n = point.size
+
+        polytope = cls(point)
+        polytope._hrepr = (np.empty((0, n + 1)),
+                           np.column_stack((np.eye(n), point)))
+        polytope._is_empty = False
+        polytope._is_singleton = True
+        polytope._is_bounded = True
+        polytope._is_degen = True
+        polytope._is_full_dim = False
+        polytope._is_pointed = True
+        polytope._dim = 0
+        polytope._vol = 0
+        polytope._diam = 0
+        polytope._width = 0
+        polytope._chebcr = (point.copy(), 0)
+
+        return polytope
+
+    __array_ufunc__ = None  # Disable NumPy ufuncs for Polytope objects to trigger fallback to dunder methods
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Polytope:
+        """Invoked when `copy.deepcopy` is called on the object"""
+        return self.copy(deepcopy=True, memo=memo)
+
+    def __matmul__(self, M: NDArray) -> Polytope:
+        """Invoked when right-hand matrix multiplication is performed (i.e., `self @ M`)"""
+        raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
+
+    def __rmatmul__(self, M: NDArray) -> Polytope:
+        """Invoked when left-hand matrix multiplication is performed (i.e., `M @ self`)"""
+        return self.mat_mul(M, in_place=False)
 
     def __str__(self) -> str:
-        """Descriptive representation of the polytope in either V-represenation or H-representation"""
+        """Description of the polytope in either V-represenation or H-representation"""
         header = self._str_header()
         if self._hrepr is not None:
             return header + "\n" + self._str_hrepr()
         if self._vrepr is not None:
             return header + "\n" + self._str_vrepr()
-        raise InvalidRepresentation("Polytope is not properly initialized with either " \
-        "V-representation or H-representation")
-    
+        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                                         "V-representation or H-representation")
+
     # [untested/unverified]
     def _str_header(self) -> str:
         # NOTE: These methods are not yet implemented
@@ -722,10 +858,12 @@ class Polytope:
 
     # [untested/unverified]
     def _str_vrepr(self) -> str:
-        """"Descriptive representation of the polytope in V-represntation"""
+        """"Description of the polytope in V-represntation"""
         if self._vrepr is None:
             raise ValueError("The polytope must be initialized in V-representation to use this method")
         verts, rays = self.vrepr
+        verts += np.zeros_like(verts)
+        rays += np.zeros_like(rays)
         edgeitems = np.get_printoptions()['edgeitems']
         if verts.size != 0:
             with np.printoptions(threshold=0):
@@ -759,11 +897,16 @@ class Polytope:
         return comb
 
     # [untested/unverified]
+    # pylint: disable=invalid-name
     def _str_hrepr(self) -> str:
-        """"Descriptive representation of the polytope in V-represntation"""
+        """"Description of the polytope in H-represntation"""
         if self._hrepr is None:
-            raise ValueError("The polytope must be initialized in V-representation to use this method")
+            raise ValueError("The polytope must be initialized in H-representation to use this method")
         A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+        A += np.zeros_like(A)
+        b += np.zeros_like(b)
+        A_eq += np.zeros_like(A_eq)
+        b_eq += np.zeros_like(b_eq)
         if A.size != 0:
             with np.printoptions(threshold=0):
                 A_as_str = str(A).splitlines()
@@ -805,7 +948,7 @@ class Polytope:
                 comb_Ab_eq = comb_Ab_eq.replace("[[", "[").replace("]]", "]")
             comb = comb_Ab_eq
         else:  # This must be the entire ambient space
-            comb = f"No constraints on x"
+            comb = "No constraints on x"
         return comb
 
     def __repr__(self) -> str:
@@ -829,6 +972,7 @@ class Polytope:
         return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
 
     def __format__(self, format_spec: str) -> str:
+        """Format specifier for f-strings (i.e., `f"{poly:format_spec}"`)"""
         if format_spec.startswith('r'):
             if len(format_spec) != 1:
                 raise ValueError(f"Debug specifier 'r' must be used in isolation, got '{format_spec}'")
@@ -843,14 +987,13 @@ class Polytope:
         tag_i, modes, num_part, str_prec, char_type = match.groups()
         modes = modes or ""
 
-        overrides = None
+        precision = None
+        suppress = None
         if num_part:
             if tag_i and not modes:
                 raise ValueError("Summary 'i' does not take numeric formatting")
-            overrides = {
-                'precision': int(str_prec) if str_prec else np.get_printoptions()['precision'],
-                'suppress': char_type == 'f'
-            }
+            precision = int(str_prec) if str_prec else np.get_printoptions()['precision']
+            suppress = char_type == 'f'
 
         res = []
         if tag_i or not format_spec:  # Default to summary if no format spec is provided
@@ -859,14 +1002,14 @@ class Polytope:
         for char in modes:
             match char:
                 case 'h':
-                    if overrides:
-                        with np.printoptions(**overrides):
+                    if precision is not None:
+                        with np.printoptions(precision=precision, suppress=suppress):
                             res.append(self._str_hrepr())
                     else:
                         res.append(self._str_hrepr())
                 case 'v':
-                    if overrides:
-                        with np.printoptions(**overrides):
+                    if precision is not None:
+                        with np.printoptions(precision=precision, suppress=suppress):
                             res.append(self._str_vrepr())
                     else:
                         res.append(self._str_vrepr())
@@ -874,20 +1017,141 @@ class Polytope:
                     raise ValueError(f"Unknown format code '{char}' in format spec '{format_spec}' for object of type '{self.__class__.__name__}'")
         return "\n".join(res)
 
-    def minimal(self,
-                repr: Literal['both', 'vrepr', 'hrepr'] = 'both',  # FIXME: Shadows built-in name 'repr(...)'
+    # [untested/unverified]
+    # pylint: disable=protected-access
+    def copy(self,
+             deepcopy: bool = True,
+             memo: Optional[dict[int, Any]] = None,
+             ) -> Polytope:
+        """Return a (deep)copy of the polytope. 
+
+        Parameters
+        ----------
+        deepcopy : bool, default=True
+            If True, a deep copy of the polytope is returned (totally isolated from the original polytope). If False, a shallow copy is returned.
+        memo : dict[int, Any], optional
+            A dictionary of objects already copied during the current copying pass, used by `copy.deepcopy` to avoid infinite recursion when copying objects with circular references. If None, a new empty dictionary is created.
+
+        Returns
+        -------
+        Polytope
+            A (deep)copy of the polytope
+
+        Warnings
+        --------
+        If `deepcopy` is set to False, the returned polytope will share references to the same underlying data as the original polytope. Modifications to the NumPy arrays (`verts`, `rays`, `Ab`, `Ab_eq`, and `chebc`) in either polytope will affect both polytopes.
+        """
+        if not deepcopy:
+            return copy(self)
+
+        memo = {} if memo is None else memo
+        if id(self) in memo:
+            return memo[id(self)]
+
+        obj = copy(self)
+        memo[id(self)] = obj
+
+        if self._vrepr is not None:
+            obj._vrepr = (self.verts.copy(), self.rays.copy())
+        if self._hrepr is not None:
+            obj._hrepr = (self.Ab.copy(), self.Ab_eq.copy())
+        if self._chebcr is not None:
+            obj._chebcr = (self.chebc.copy(), self.chebr)
+
+        return obj
+
+    # [untested/unverified]
+    # pylint: disable=protected-access
+    def mat_mul(self,
+                M: NDArray,
+                recalc_chebcr: bool = False,
                 in_place: bool = True,
-                ) -> None | Self:
+                ) -> Polytope | Self:
+        """Matrix multiplication with a matrix `M`.
+        
+        Parameters
+        ----------
+        M : NDArray
+            A matrix to multiply the polytope by
+        recalc_chebcr : bool, default=False
+            Whether to recalculate the Chebyshev center and radius after the multiplication by solving an LP
+        in_place : bool, default=True
+            If True, the polytope is modified in place
+
+        Returns
+        -------
+        Polytope
+            The resulting polytope after the matrix multiplication
+
+        Raises
+        ------
+        TypeError
+            If `M` is not a NumPy array
+        ValueError
+            If `M` is not a valid matrix
+        DimensionError
+            If `M` has incompatible dimensions for multiplication with the polytope
+        """
+        if not isinstance(M, np.ndarray):
+            raise TypeError(f"Input 'M' must be a NumPy array, but received an object of type '{type(M).__name__}'")
+        if not np.isfinite(M).all() or np.isnan(M).any():
+            raise ValueError("Input 'M' must not contains NaN or inf values")
+        if not M.ndim == 2:
+            raise ValueError(f"Input matrix 'M' must be 2-dimensional, recieved shape={M.shape}")
+        if M.shape[1] != self.n:
+            raise DimensionError(f"Input matrix 'M' must be of size (m, {self.n}), received shape={M.shape}")
+
+        vrepr, hrepr = self._vrepr, self._hrepr
+        if vrepr is None and hrepr is None:
+            raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                                             "V-representation or H-representation")
+        obj = self if in_place else self.copy()
+        M_is_sing = is_sing(M)
+        if vrepr is not None or M_is_sing:
+            # FIXME: Should we use the `self._vrepr` instead?
+            obj.vrepr = (obj.verts @ M.T, obj.rays @ M.T)
+        if hrepr is not None:
+            if M_is_sing:
+                obj._hrepr = None
+            else:
+                obj.hrepr = (np.column_stack((obj.A @ np.linalg.inv(M), obj.b)),
+                             np.column_stack((obj.A_eq @ np.linalg.inv(M), obj.b_eq)))
+
+        if obj._dim is not None:
+            obj._dim = obj._dim if not M_is_sing else None  # FIXME: Can we do better here?
+        if obj._vol is not None:
+            obj._vol = obj._vol * np.linalg.det(M) if not M_is_sing else (0 if is_square(M) else None)
+        if obj._diam is not None:
+            obj._dim = None  # FIXME: Maybe we can do better for `not is_square`?
+        if obj._width is not None:
+            obj._width = None if not M_is_sing else 0
+        if obj._chebcr is not None:
+            obj._chebcr = None  # FIXME: Apprantly, we can do better with solving an LP
+
+        return obj
+
+    def minimal(self,
+                which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
+                in_place: bool = True,
+                ) -> Polytope | Self:
         """Return a minimal representation of the polytope by removing redundant vertices and facets"""
-        raise NotImplementedError("The 'minimal' method is not yet implemented")
+        obj = self if in_place else self.copy()
+        if which_repr in {'vrepr', 'both'}:
+            if obj.rays.size > 0:
+                obj._vrepr = minimize_vrepr(obj.verts, obj.rays)
+            else:
+                obj._vrepr = (conv(obj.verts), obj.rays)
+        if which_repr in {'hrepr', 'both'}:
+            obj._hrepr = minimize_hrepr(obj.Ab, obj.Ab_eq)
+        return obj
 
     # pylint: disable=too-many-branches,too-many-statements
     def plot(self,
              color: str | None = None,
              alpha: float = 0.5,
              plot_edges: bool = True,
-             label_verts: list[str] | bool = False,
-             label_facets: list[str] | bool = False,
+             annotate_verts: list[str] | bool = False,
+             annotate_facets: list[str] | bool = False,
              show: bool = True,
              ax: Optional[Axes] = None,
              ) -> Axes:
@@ -949,14 +1213,16 @@ class Polytope:
                     raise ValueError("The dimension of the polytope" \
                     " does not match the dimension of the provided axes 'ax'")
                 _plot_poly_2d(self.verts, ax, color, alpha, plot_edges=plot_edges)
-                if label_facets:
+                if annotate_facets:
                     for idx in range(self.m):
                         verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                             self.b[idx],
                                                             rtol=CFG.rtol,
                                                             atol=CFG.atol), :]
-                        label = label_facets[idx] if isinstance(label_facets, list) else fr"${idx}$"
+                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                if CFG.aspect == 'equal':
+                    ax.set_aspect('equal', adjustable='box')
             case 3:
                 if ax.name != '3d':
                     raise ValueError("The dimension of the polytope" \
@@ -967,15 +1233,17 @@ class Polytope:
                                                         rtol=CFG.rtol,
                                                         atol=CFG.atol), :]
                     _plot_facet_3d(verts_facet, ax, color, alpha, plot_edges=plot_edges)
-                    if label_facets:
-                        label = label_facets[idx] if isinstance(label_facets, list) else fr"${idx}$"
+                    if annotate_facets:
+                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                if CFG.aspect == 'equal':
+                    ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
 
-        if label_verts:
+        if annotate_verts:
             for idx in range(self.k):
-                label = label_verts[idx] if isinstance(label_verts, list) else fr"${idx}$"
+                label = annotate_verts[idx] if isinstance(annotate_verts, list) else fr"${idx}$"
                 if self.n == 2:
                     ax.text(self.verts[idx, 0],
                             self.verts[idx, 1],
@@ -995,14 +1263,15 @@ class Polytope:
 
 
 @wraps(Polytope.__init__)  # pylint: disable=protected-access
-def poly(*args: NDArray,
+def poly(*args: Any,
          n: Optional[int] = None,
-         verts: Optional[NDArray | ArrayLike] = None,
-         rays: Optional[NDArray | ArrayLike] = None,
-         A: Optional[NDArray | ArrayLike] = None,
-         b: Optional[NDArray | ArrayLike] = None,
-         A_eq: Optional[NDArray | ArrayLike] = None,
-         b_eq: Optional[NDArray | ArrayLike] = None,) -> Polytope:
+         verts: Optional[ArrayLike] = None,
+         rays: Optional[ArrayLike] = None,
+         A: Optional[ArrayLike] = None,
+         b: Optional[ArrayLike] = None,
+         A_eq: Optional[ArrayLike] = None,
+         b_eq: Optional[ArrayLike] = None,
+         ) -> Polytope:
     """Wrapper function for `Polytope.__init__` to create a polytope"""
     kwargs = {key: value for key, value in {
         'n': n,
@@ -1014,7 +1283,7 @@ def poly(*args: NDArray,
         'b_eq': b_eq,
     }.items() if value is not None}
     if len(args) == 0 and len(kwargs) == 0:
-        raise InvalidCombinationOfArguments("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
+        raise InvalidCombinationOfArgumentsError("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
     return Polytope(*args, **kwargs)
 
 
@@ -1025,13 +1294,13 @@ def poly_empty(n: int) -> Polytope:
 
 
 @wraps(Polytope._init_vrepr)  # pylint: disable=protected-access
-def poly_from_verts(verts: NDArray, rays: Optional[NDArray]) -> Polytope:
+def poly_from_verts(verts: ArrayLike, rays: Optional[ArrayLike]) -> Polytope:
     """Wrapper function for `Polytope._init_vrepr` to create a polytope from vertices, and optionally rays"""
     return Polytope(verts=verts, rays=rays)
 
 
 @wraps(Polytope._init_hrepr)  # pylint: disable=protected-access
-def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq: Optional[NDArray] = None) -> Polytope:
+def poly_from_ineq(A: ArrayLike, b: ArrayLike, A_eq: Optional[ArrayLike] = None, b_eq: Optional[ArrayLike] = None) -> Polytope:
     """Wrapper function for `Polytope._init_hrepr` to create a polytope from inequalities, and optionally equalities"""
     return Polytope(A=A, b=b, A_eq=A_eq, b_eq=b_eq)
 
@@ -1039,12 +1308,147 @@ def poly_from_ineq(A: NDArray, b: NDArray, A_eq: Optional[NDArray] = None, b_eq:
 @wraps(Polytope._init_ambient)  # pylint: disable=protected-access
 def poly_ambient(n: int) -> Polytope:
     """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
-    poly = Polytope()
-    poly._init_ambient(n)  # pylint: disable=protected-access
-    return poly
+    polytope = Polytope()
+    polytope._init_ambient(n)  # pylint: disable=protected-access
+    return polytope
 
 
 @wraps(Polytope.from_bounds)
 def poly_from_bounds(lb: ArrayLike, ub: ArrayLike) -> Polytope:
     """Wrapper function for `Polytope.from_bounds` to create a polytope from lower and upper bounds"""
     return Polytope.from_bounds(lb, ub)
+
+
+@wraps(Polytope.from_point)
+def poly_from_point(point: ArrayLike) -> Polytope:
+    """Wrapper function for `Polytope.from_point` to create a singleton polytope given a point/vector"""
+    return Polytope.from_point(point)
+
+
+# pylint: disable=protected-access
+def poly_from_name(name: Literal['triangle',
+                                 'square',
+                                 'pentagon',
+                                 'hexagon',
+                                 'heptagon',
+                                 'octagon',
+                                 'tetrahedron',
+                                 'simplex',
+                                 'cube',
+                                 'octahedron',
+                                 'dodecahedron',
+                                 'icosahedron',
+                                 'house',
+                                 'pyramid'],
+                   ) -> Polytope:
+    """Create a polytope from a libary based on a provided name.
+    
+    Parameters
+    ----------
+    name: str
+        Name of the polytope in the libary to be created. Options are:
+        - 'house' (2D)
+        - 'pyramid' (3D)
+    
+    Returns
+    -------
+    poly : Polytope
+        The resulting polytope in both V-representaion and H-representation
+        
+    Raises
+    ------
+    ValueError 
+        If the provided `name` is not recognized
+    """
+    match name:
+        case 'triangle':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'square':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'pentagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'hexagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'heptagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'octagon':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'tetrahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'simplex':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'cube':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'octahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'dodecahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'icosahedron':
+            raise NotImplementedError("This shape is not yet implemented")
+        case 'house':
+            n = 2
+            verts = np.array([[  0,   0],
+                              [  0,   1],
+                              [  1,   0],
+                              [  1,   1],
+                              [0.5, 1.5]])
+            A = np.array([[              0.0,             -1.0],  # Bottom: y >= 0
+                          [             -1.0,              0.0],  # Left:   x >= 0
+                          [-1.0 / np.sqrt(2), 1.0 / np.sqrt(2)],  # Top-Left roof slant
+                          [              1.0,              0.0],  # Right:  x <= 1
+                          [ 1.0 / np.sqrt(2), 1.0 / np.sqrt(2)]])  # Top-Right roof slant
+            b = np.array([0, 0, 1 / np.sqrt(2), 1, np.sqrt(2)])
+            is_empty = False
+            is_degen = False
+            is_bounded = True
+            is_full_dim = True
+            is_pointed = True
+            is_singleton = False
+            dim = 2
+            vol = 1.25
+            diam = float(np.linalg.norm(verts[0] - verts[4], ord=2))
+            width = 1
+            chebcr = (np.array([0.5, 0.5]), 0.5)
+        case 'pyramid':
+            n = 3
+            verts = np.array([[  0,   0,  0],
+                              [  0,   1,  0],
+                              [  1,   0,  0],
+                              [  1,   1,  0],
+                              [0.5, 0.5,  1]])
+            A = np.array([[ 0,  0, -1],  # Base: z >= 0
+                          [-2,  0,  1],  # Left slant: -2x + z <= 0
+                          [ 0, -2,  1],  # Front slant: -2y + z <= 0
+                          [ 2,  0,  1],  # Right slant: 2x + z <= 2
+                          [ 0,  2,  1]   # Back slant: 2y + z <= 2
+            ])
+            b = np.array([0, 0, 0, 2, 2])
+            is_empty = False
+            is_degen = False
+            is_bounded = True
+            is_full_dim = True
+            is_pointed = True
+            is_singleton = False
+            dim = 3
+            vol = 1 / 3
+            diam = float(np.linalg.norm(verts[0] - verts[3], ord=2))
+            width = 1
+            chebcr = (np.array([0.5, 0.5, 0.25]), 0.75)
+        case _:
+            raise ValueError(f"Unrecognized name '{name}'")
+
+    polytope = poly(verts)
+    polytope._hrepr = (np.column_stack((A, b)), np.empty((0, n + 1)))
+    polytope._is_empty = is_empty
+    polytope._is_degen = is_degen
+    polytope._is_bounded = is_bounded
+    polytope._is_full_dim = is_full_dim
+    polytope._is_pointed = is_pointed
+    polytope._is_singleton = is_singleton
+    polytope._dim = dim
+    polytope._vol = vol
+    polytope._diam = diam
+    polytope._width = width
+    polytope._chebcr = chebcr
+
+    return polytope

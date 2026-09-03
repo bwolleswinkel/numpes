@@ -17,7 +17,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-    'sphinx_immaterial'
+    'sphinx_immaterial',
 ]
 
 intersphinx_mapping = {
@@ -58,7 +58,7 @@ html_theme_options = {
     ],
     "color": {
         "primary": "#FFA900"
-    }
+    },
 }
 
 # -- Options for EPUB output

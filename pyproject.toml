@@ -163,7 +163,8 @@ markers = [
   # Module-based markers
   "utils: tests for the utils subpackage",
   # Test type-based markers
-  "unit: unit tests"
+  "unit: unit tests",
+  "coupled: coupled test with two or more functions that are being tested together",
 ]
 
 [tool.coverage.run]
@@ -194,4 +195,10 @@ disable = [
 ]
 
 [tool.pylint.basic]
-good-names = ["A", "A_eq", "Ab", "Ab_eq", "V"]
+good-names = ["A", "A_eq", "Ab", "Ab_eq", "V", "M"]
+
+[tool.isort]
+line_length = 9999
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # Ignore unused imports (F401) and wildcard imports (F403) only in __init__.py files

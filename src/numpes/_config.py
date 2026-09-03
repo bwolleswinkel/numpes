@@ -27,16 +27,17 @@ class ConfigSchema:
     atol: float = 1E-8
 
     on_poly_convert: Literal['pass', 'warning', 'error'] = 'pass'
-    on_property_assign: Literal['pass', 'minimal'] = 'pass'  # FIXME: Placeholder, should be 'minimal' once implemented
+    on_property_assign: Literal['pass', 'minimal'] = 'minimal'  # FIXME: Placeholder, should be 'minimal' once implemented
     on_hash_degen: Literal['error', 'unsafe'] = 'error'
 
     lp_backend: Literal['auto', 'scipy', 'cvxpy', 'pulp'] = 'auto'  # NOTE: 'auto' will try CVXPY is installed, otherwise will fall back to SciPy
     sdp_backend: Literal['cvxpy'] = 'cvxpy'
     scipy_method: Literal['highs', 'highs-ds', 'highs-ipm'] | str = 'highs'
-    cvxpy_solver: Any | None = cvx.CLARABEL if CVXPY_INSTALLED else None
+    cvxpy_solver: Any | None = cvx.HIGHS if CVXPY_INSTALLED else None
     optimize_success: Literal['optimal', 'optimal_inaccurate'] = 'optimal'  # NOTE: 'optimal_inaccurate' treats solutions that are optimal, or optimal but inaccurate, as successful
 
     verbose: int = 0
+    aspect: Literal['auto', 'equal'] = 'auto'
     print_num_verts: int = 4
     print_format_poly: str = '...'
     print_format_ellps: str = '...'

@@ -32,6 +32,133 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
+def is_square(A: NDArray) -> bool:
+    """Check whether a matrix `A` is square"""
+    if not A.ndim == 2:
+        return False
+    if not A.shape[0] == A.shape[1]:
+        return False
+    return True
+
+
+def is_sing(A: NDArray) -> bool:
+    """Check whether the matrix is singular (i.e., non-invertible)"""
+    if not is_square(A):
+        return True
+    if np.linalg.matrix_rank(A, rtol=CFG.rtol) < A.shape[0]:
+        return True
+    return False
+
+
+# FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
+def minimize_vrepr(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
+    """Minimize the V-representation by removing redundant rays and vertices"""
+
+    def spans_ambient_space(rays: NDArray) -> bool:
+        """Check whether the rays span the ambient space"""
+        k_rays, n = rays.shape
+        if k_rays < n + 1:
+            return False
+        for basis_vec in np.vstack((np.eye(n), -np.eye(n))):
+            res = solve_lp(np.zeros(k_rays), A_eq=rays.T, b_eq=basis_vec, bounds=[(0, None)] * k_rays)
+            if not res.success:
+                return False
+        return True
+
+    if not isinstance(verts, np.ndarray) or (rays is not None and not isinstance(rays, np.ndarray)):
+        raise TypeError(f"Expected verts and rays to be NumPy arrays, but got verts of type {type(verts)} and rays of type {type(rays)}")
+    if verts.ndim != 2:
+        raise ValueError(f"Expected verts to be a 2D array, but got an array with shape {verts.shape}")
+    if rays is not None and rays.ndim != 2:
+        raise ValueError(f"Expected rays to be a 2D array, but got an array with shape {rays.shape}")
+    if rays is not None and verts.shape[1] != rays.shape[1]:
+        raise ValueError(f"Expected verts and rays to have the same number of columns, but got verts with shape {verts.shape} and rays with shape {rays.shape}")
+    n = verts.shape[1]
+
+    if rays is None:
+        rays = np.empty((0, n))
+    # 0: Check for the special zero rays case, which should be mapped to a zero vertex
+    if verts.size == 0 and np.allclose(rays, 0, rtol=CFG.rtol, atol=CFG.atol):
+        return np.zeros((1, n)), np.empty((0, n))
+    # 1: Find redundant rays
+    rays = reduce_rays(rays)
+    # 1-A: Check of the rays span the entire space
+    if spans_ambient_space(rays):
+        return np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n)))
+    # 1-B: Check if the vertices are empty and rays are not (non-pointed; add the zero vertex)
+    if verts.size == 0 and rays.size > 0:
+        return np.zeros((1, n)), rays
+    # 2: Find redundant vertices
+    verts = reduce_verts(verts, rays)
+
+    return verts, rays
+
+
+# FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
+# FIXME: Should these also/only return the indices? That's more performant, right?
+def reduce_rays(rays: NDArray) -> NDArray:
+    """Minimize a collection of rays by removing directions already captured by other rays"""
+    if (k_rays := rays.shape[0]) <= 1:
+        return rays
+    redundant = np.zeros(k_rays, dtype=bool)
+    for idx in range(k_rays):
+        other = ~redundant.copy()
+        other[idx] = False
+        A = rays[other, :].T
+        b = rays[idx]
+        num_other_rays = np.count_nonzero(other)
+        if num_other_rays == 0:
+            continue
+        c = np.zeros(num_other_rays)
+        bounds = [(0, None) for _ in range(num_other_rays)]
+        res = solve_lp(c, A_eq=A, b_eq=b, bounds=bounds)
+        if res.success:
+            redundant[idx] = True
+    return rays[~redundant]
+
+
+# FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
+# FIXME: Should these also/only return the indices? That's more performant, right?
+# pylint: disable=invalid-name
+def reduce_verts(verts: NDArray, rays: NDArray) -> NDArray:
+    """Minimize a collection of vertices by removing directions already implied by other vertices and rays"""
+    if (k := verts.shape[0]) <= 1:
+        return verts
+    redundant = np.zeros(k, dtype=bool)
+    for idx in range(k):
+        # Gather all other non-redundant vertices
+        # Construct equality constraints for:
+        # Sum(lambda_i * v_i) + Sum(mu_j * r_j) == v_k
+        # Sum(lambda_i) == 1
+        # Top part of matrix: coordinates matching v_k
+        other = ~redundant.copy()
+        other[idx] = False
+        A_top_v = verts[other].T
+        A_top_r = rays.T
+        A_top = np.column_stack((A_top_v, A_top_r))
+        # Bottom part of matrix: sum of lambdas must equal 1 (mus are ignored here)
+        A_bot_v = np.ones((1, np.count_nonzero(other)))
+        A_bot_r = np.zeros((1, (k_rays := rays.shape[0])))
+        A_bot = np.column_stack((A_bot_v, A_bot_r))
+
+        A_eq = np.vstack((A_top, A_bot))
+        b_eq = np.append(verts[idx], 1.0)
+
+        # LP formulation:
+        # Minimize 0
+        # Subject to: A_eq * [lambda, mu] == b_eq, lambda >= 0, mu >= 0
+        num_vars = np.count_nonzero(other) + k_rays
+        c = np.zeros(num_vars)
+        bounds = [(0, None) for _ in range(num_vars)]
+
+        res = solve_lp(c=c, A_eq=A_eq, b_eq=b_eq, bounds=bounds)
+
+        if res.success:
+            redundant[idx] = True
+
+    return verts[~redundant]
+
+
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/19[untested/unverified]
 def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Minimize an H-representation by removing redundant inequalities

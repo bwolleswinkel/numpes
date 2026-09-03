@@ -185,6 +185,10 @@ class TestSolveLP(SolveLPMixin):
 
     solve_fn = staticmethod(pes.utils.solve_lp)
 
+    # FIXME: This method is super important and already caused some bugs!
+    def test_solve_zero_decision_variables(self):
+        """Test how all backends handle a linear program with zero decision variables"""
+
     def test_solve_feasible_unbounded(self):
         ...
 

@@ -323,7 +323,7 @@ SLIM_BEAM_2D = PolytopeData(
 )
 
 TRIANGLE_2D = PolytopeData(
-    name="triangle_2d",
+    name="triangle_2d",  # FIXME: Rename to 'simplex', triangle is ambiguous
     n=2,
     verts=np.array([[0, 0],
                     [1, 0],
