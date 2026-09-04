@@ -27,6 +27,7 @@ aff_subs
 """
 
 from __future__ import annotations
+from copy import copy
 
 from typing import TYPE_CHECKING
 
@@ -47,7 +48,7 @@ from numpes.utils.linalg import span
 from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
 
 if TYPE_CHECKING:
-    from typing import Any, Literal, Optional
+    from typing import Self, Literal, Optional, Any
 
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
@@ -340,15 +341,51 @@ class Subspace:
         return iter(self.basis)
 
     # [untested/unverified]
+    # pylint: disable=protected-access
+    def copy(self,
+             deepcopy: bool = True,
+             memo: Optional[dict[int, Any]] = None,
+             ) -> Subspace:
+        """Return a (deep)copy of the subspace. 
+
+        Parameters
+        ----------
+        deepcopy : bool, default=True
+            If True, a deep copy of the subspace is returned (totally isolated from the original polytope). If False, a shallow copy is returned.
+        memo : dict[int, Any], optional
+            A dictionary of objects already copied during the current copying pass, used by `copy.deepcopy` to avoid infinite recursion when copying objects with circular references. If None, a new empty dictionary is created.
+
+        Returns
+        -------
+        Subspace
+            A (deep)copy of the subspace
+
+        Warnings
+        --------
+        If `deepcopy` is set to False, the returned subspace will share references to the same underlying data as the original subspace. Modifications to the NumPy array `basis` in either subspace will affect both subspace.
+        """
+        if not deepcopy:
+            return copy(self)
+
+        memo = {} if memo is None else memo
+        if id(self) in memo:
+            return memo[id(self)]
+
+        obj = copy(self)
+        memo[id(self)] = obj
+
+        obj._basis = self._basis.copy()
+
+        return obj
+
+    # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
-                ) -> Subspace:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
+                ) -> Subspace | Self:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
         """Compute a minimal representation of the subspace by removing linearly dependent basis vectors"""
-        basis = span(self._basis.T).T
-        if in_place:
-            self._basis = basis
-            return self
-        return Subspace(basis)
+        obj = self if in_place else self.copy()
+        obj._basis = span(self._basis.T).T
+        return obj
 
     # [untested/unverified]
     def plot(self,
