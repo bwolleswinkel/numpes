@@ -19,6 +19,7 @@ span
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 import scipy as sp
@@ -27,7 +28,7 @@ from numpes._config import CFG
 from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, Literal
 
     from numpy.typing import NDArray
 
@@ -41,6 +42,15 @@ def is_square(A: NDArray) -> bool:
     return True
 
 
+def is_sym(A: NDArray) -> bool:
+    """Check if a matrix `A` is symmetric"""
+    if not is_square(A):
+        return False
+    if not np.allclose(A, A.T, rtol=CFG.rtol, atol=CFG.atol):
+        return False
+    return True
+
+
 def is_sing(A: NDArray) -> bool:
     """Check whether the matrix is singular (i.e., non-invertible)"""
     if not is_square(A):
@@ -48,6 +58,287 @@ def is_sing(A: NDArray) -> bool:
     if np.linalg.matrix_rank(A, rtol=CFG.rtol) < A.shape[0]:
         return True
     return False
+
+
+def is_posdef(A: NDArray, semi_def: bool = False) -> bool:
+    """Check if a matrix `A` is positive definite or positive semi-definite"""
+    if semi_def:
+        if not is_sym(A):
+            return False
+        if not np.all(np.linalg.eigvalsh(A) >= -CFG.atol):
+            return False
+        return True
+    try:
+        _ = np.linalg.cholesky(A)
+    except np.linalg.LinAlgError as _:
+        return False
+    return True
+
+
+def is_rot_mat(R: NDArray) -> bool:
+    """Check if a matrix `R` is a valid rotation matrix"""
+    if not is_square(R) or R.size <= 1:  # NOTE: This is not a valid rotation matrix due to the geometric definition (no rotation in 1D)
+        return False
+    if not np.allclose(R @ R.T, np.eye(R.shape[0]), rtol=CFG.rtol, atol=CFG.atol):
+        return False
+    if not np.isclose(np.linalg.det(R), 1.0, rtol=CFG.rtol, atol=CFG.atol):
+        return False
+    return True
+
+
+# [untested/unverified]
+def rot_mat(angles: list[float]) -> NDArray:
+    """Construct a rotation matrix from a sequence of Givens angles.
+    
+    Parameters
+    ----------
+    angles : list[float]
+        A list of Givens angles in radians in QR-like adjacent-plane sweep order
+        
+    Returns
+    -------
+    R : NDArray
+        An n x n rotation matrix corresponding to the given Givens angles
+
+    Raises
+    ------
+    ValueError
+        If the length of `angles` is not compatible with a valid rotation matrix size
+    """
+    # Check if the length of angles is compatible with a valid rotation matrix size (1 = 2d, 3 = 3d, 6 = 4d, 10 = 5d, etc.)
+    m = len(angles)
+    if m <= 0:
+        raise ValueError(f"The length={m} of `angles` is not compatible with a valid rotation matrix size (see notes). Nearest valid length is 1 (2d).")
+    if not (n := ((1 + np.sqrt(1 + 8 * m)) / 2)).is_integer():
+        raise ValueError(f"The length={m} of 'angles' is not compatible with a valid rotation matrix size (see notes). Nearest valid lengths are {int(n) * (int(n) - 1) // 2} ({int(n)}d) or {(int(n) + 1) * int(n) // 2} ({int(n) + 1}d).")
+    n = int(n)
+    R = np.eye(n)
+    for k, angle in enumerate(angles):
+        i, j = _idx_plane_ij(k, n)
+        G = givens_mat(i, j, angle, n)
+        R = R @ G
+    return R
+
+
+# [untested/unverified]
+def rot_mat_2d(angle: float) -> NDArray:
+    """Create a 2D rotation matrix from a single angle in radians.
+    
+    Parameters
+    ----------
+    angle : float
+        The rotation angle in radians
+        
+    Returns
+    -------
+    R : NDArray
+        A 2 x 2 rotation matrix corresponding to the given angle
+    """
+    R = np.array([[np.cos(angle), -np.sin(angle)],
+                  [np.sin(angle),  np.cos(angle)]])
+    return R
+
+
+# [untested/unverified]
+def rot_mat_3d(angles: list[float],
+               convention: str | Literal['givens', 'yaw_pitch_roll'] = 'givens',
+               ) -> NDArray:
+    # FIXME: Instead of using 'proper_euler' and 'tait_bryan', I should use the much more clear 'xyz', 'XYZ', etc., for intrinsic and ectrinsit rotation, and just keep 'givens' and 'yaw_pitch_roll' as special cases. 
+    """Create a 3D rotation matrix from a sequence of angles based on the specified convention.
+    
+    Parameters
+    ----------
+    angles : list[float]
+        A list of length 3 of angles in radians
+    convention : str | 'yaw_pitch_roll' | 'givens', default='givens'
+        The axis-order convention to use for constructing the rotation matrix (see also notes). Must be 3 characters belonging to the set {'X', 'Y', 'Z'} (for intrinsic rotations) or {'x', 'y', 'z'} (for extrinsic rotations). Extrinsic and intrinsic rotations cannot be mixed teh character sequence. Two special cases are provided for convenience:
+        - 'yaw_pitch_roll': Yaw-Pitch-Roll angles (ZYX intrinsic). Identical to 'ZYX'.
+        - 'givens': QR-like adjacent-plane Givens sweep (xzx extrinsic). Identical to 'xzx'.
+
+    Returns
+    -------
+    R : NDArray 
+        A 3 x 3 rotation matrix corresponding to the given angles and convention
+
+    Examples
+    --------
+    >>> angles = np.deg2rad([0, -45, 90])
+    >>> print(pes.utils.rot_mat_3d(angles, convention='yaw_pitch_roll').round(2))
+    [[ 0.    1.    0.  ]
+     [-0.71  0.   -0.71]
+     [-0.71  0.    0.71]]
+    >>> print(pes.utils.rot_mat_3d(angles, convention='xzx').round(2))
+    [[ 0.71  0.   -0.71]
+     [ 0.71  0.    0.71]
+     [ 0.   -1.    0.  ]]
+
+    Use `pes.utils.angles_3d_convert` to convert between different conventions of 3D rotation angles.
+
+    >>> angles = np.deg2rad([-30, 60, 45])  # Proper Euler angles in YZY convention
+    >>> angles_converted = pes.utils.angles_3d_convert(angles, from_convention='yzy', to_convention='givens')
+    >>> print(pes.utils.rot_mat_3d(angles_converted))
+    [[ 0.66 -0.75  0.05]
+     [ 0.61  0.5  -0.61]
+     [ 0.44  0.43  0.79]]
+
+    Notes
+    -----
+    Note that extrinsic rotations are equivalent to intrinsic rotations in the reverse order. For example, a zyx extrinsic rotation is equivalent to an XYZ intrinsic rotation.
+    """
+    angles = angles_3d_convert(angles, from_convention=convention, to_convention='givens')
+    return rot_mat(angles)
+
+
+def givens_mat(i: int, j: int, angle: float, n: int) -> NDArray:
+    """Construct a Givens rotation matrix for the plane spanned by axes i and j"""
+    if i < 0 or j < 0 or i >= n or j >= n or i >= j:
+        raise ValueError(f"Invalid indices i={i}, j={j} for Givens rotation matrix of size {n} (must satisfy 0 <= i < j < n)")
+    G = np.eye(n)
+    c, s = np.cos(angle), np.sin(angle)
+    G[[i, i], [i, j]] = c, -s
+    G[[j, j], [i, j]] = s, c
+    return G
+
+
+# FROM: Gemini 1.5 Flash | 26/09/01[untested/unverified]
+def angles_givens(R: NDArray) -> list[float]:
+    """Convert an n-dimensional rotation matrix `R` into n * (n - 1) / 2 Givens angles
+
+    Parameters
+    ----------
+    R : NDArray
+        An n x n rotation matrix
+
+    Returns
+    -------
+    angles : list[float]
+        A list of Givens angles in radians, with length n * (n - 1) / 2
+
+    Raises
+    ------
+    ValueError
+        If `R` is not valid rotation matrix
+    
+    Notes
+    -----
+    The returned order is the QR-like adjacent plane sweep used by `rot_mat`: for each
+    column `col = 0 .. n-2`, rows are traversed bottom-to-top (`row = n-1 .. col+1`) and
+    plane `(row-1, row)` is used. This function is the inverse of that construction order. The plane sequence index `k` can be converted to the adjacent plane indices `(i, j)` using `_idx_plane_i_j(k, n)`.
+    """
+    if not is_square(R):
+        raise ValueError(f"Input matrix R must be square, received matrix with shape {R.shape}")
+    if not is_rot_mat(R):
+        raise ValueError(f"Input matrix R must be a valid rotation matrix (orthogonal with determinant 1), received R @ R.T = {R @ R.T} and det(R) = {np.linalg.det(R)}")
+
+    n = R.shape[0]
+    R_copy = np.array(R, dtype=float, copy=True)
+    angles = []
+
+    for col in range(n - 1):
+        for row in range(n - 1, col, -1):
+            y, x = R_copy[row, col], R_copy[row - 1, col]
+
+            theta = np.arctan2(y, x).item()
+            angles.append(theta)
+
+            c, s = np.cos(-theta), np.sin(-theta)  # Perform the inverse rotation
+            G = np.array([[c, -s],
+                          [s,  c]])
+
+            R_copy[[row - 1, row], :] = G @ R_copy[[row - 1, row], :]
+
+    return angles
+
+
+def angle_2d(R: NDArray) -> float:
+    """Compute the rotation angle from a 2D rotation matrix `R`.
+
+    Parameters
+    ----------
+    R : NDArray
+        A 2 x 2 rotation matrix
+
+    Returns
+    -------
+    angle : float
+        The rotation angle in radians
+
+    Raises
+    ------
+    ValueError
+        If `R` is not a valid 2D rotation matrix
+    """
+    if R.shape != (2, 2):
+        raise ValueError(f"Input matrix R must be a 2 x 2 rotation matrix, received shape={R.shape}")
+    if not is_rot_mat(R):
+        raise ValueError(f"Input matrix R must be a valid rotation matrix (orthogonal with determinant 1), received R @ R.T = {R @ R.T} and det(R) = {np.linalg.det(R)}")
+    angle = np.arctan2(R[1, 0], R[0, 0])
+    return angle
+
+
+def angles_3d(R: NDArray,
+              convention: str | Literal['yaw_pitch_roll', 'givens'] = 'givens',
+              ) -> list[float]:
+    if R.shape != (3, 3):
+        raise ValueError(f"Input matrix R must be a 3 x 3 rotation matrix, received shape={R.shape}")
+    if not is_rot_mat(R):
+        raise ValueError(f"Input matrix R must be a valid rotation matrix (orthogonal with determinant 1), received R @ R.T = {R @ R.T} and det(R) = {np.linalg.det(R)}")
+    angles = angles_givens(R)
+    angles_converted = angles_3d_convert(angles, from_convention='givens', to_convention=convention)
+    return angles_converted
+
+
+# [untested/unverified]
+def angles_3d_convert(angles: list[float],
+                      from_convention: str | Literal['yaw_pitch_roll', 'givens'] = 'givens',
+                      to_convention: str | Literal['yaw_pitch_roll', 'givens'] = 'givens',
+                      ) -> list[float]:
+    """Convert a sequence of 3D rotation angles from one convention to another.
+        
+    Parameters
+    ----------
+    angles : list[float]
+        A list of length 3 of angles in radians
+    from_convention : str | 'yaw_pitch_roll' | 'givens', default='givens'
+        The axis-order convention of the input angles. Must be 3 characters belonging to the set {'X', 'Y', 'Z'} (for intrinsic rotations) or {'x', 'y', 'z'} (for extrinsic rotations). Extrinsic and intrinsic rotations cannot be mixed in the character sequence. Two special cases are provided for convenience:
+        - 'yaw_pitch_roll': Yaw-Pitch-Roll angles (ZYX intrinsic). Identical to 'ZYX'.
+        - 'givens': QR-like adjacent-plane Givens sweep (xzx extrinsic). Identical to 'xzx'.
+    to_convention : str | 'yaw_pitch_roll' | 'givens', default='givens'
+        The axis-order convention to convert the angles to. Must be 3 characters belonging to the set {'X', 'Y', 'Z'} (for intrinsic rotations) or {'x', 'y', 'z'} (for extrinsic rotations). Extrinsic and intrinsic rotations cannot be mixed in the character sequence. Two special cases are provided for convenience:
+        - 'yaw_pitch_roll': Yaw-Pitch-Roll angles (ZYX intrinsic). Identical to 'ZYX'.
+        - 'givens': QR-like adjacent-plane Givens sweep (xzx extrinsic). Identical to 'xzx'.
+
+    Returns
+    -------
+    angles_converted : list[float]
+        A list of length 3 of angles in radians corresponding to the converted convention
+    """
+
+    def _validate_convention(convention: str | Literal['yaw_pitch_roll', 'givens']) -> None:
+        if convention in {'yaw_pitch_roll', 'givens'}:
+            return
+        if len(convention) != 3:
+            raise ValueError(f"Invalid convention '{convention}' (must be a string of length 3 or one of the special cases 'yaw_pitch_roll' or 'givens')")
+        if set(convention) - {'X', 'Y', 'Z', 'x', 'y', 'z'}:
+            raise ValueError(f"Invalid convention '{convention}' (must only contain characters from {{'X', 'Y', 'Z'}} or {{'x', 'y', 'z'}})")
+        if any(c.isupper() for c in convention) and any(c.islower() for c in convention):
+            raise ValueError(f"Invalid convention '{convention}'. Cannot mix intrinsic (uppercase) and extrinsic (lowercase) rotations.")
+        if convention[0] == convention[1] or convention[1] == convention[2]:
+            raise ValueError(f"Invalid convention '{convention}' (consecutive axes must be different)")
+
+    _validate_convention(from_convention)
+    _validate_convention(to_convention)
+
+    convention_map = {
+        'yaw_pitch_roll': 'zyx',
+        'givens': 'XZX',
+    }
+    src_seq = convention_map.get(from_convention, from_convention)
+    tgt_seq = convention_map.get(to_convention, to_convention)
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=UserWarning)
+        angles_converted = sp.spatial.transform.Rotation.from_euler(src_seq, angles).as_euler(tgt_seq)
+    return angles_converted
 
 
 # FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
@@ -291,3 +582,46 @@ def span(A: NDArray) -> NDArray:
     _, R, P = sp.linalg.qr(A, pivoting=True)
     rank = np.sum(np.abs(np.diag(R)) > CFG.atol)
     return A[:, sorted(P[:rank])]
+
+
+# FROM: Gemini 1.5 Flash | 26/09/02[untested/unverified]
+def _idx_plane_ij(k: int, n: int) -> tuple[int, int]:
+    """Convert plane-sequence index k to adjacent plane indices (i, j) for QR-like sweep order
+
+    Parameters
+    ----------
+    k : int
+        The plane sequence index, where 0 <= k < n * (n - 1) / 2
+    n : int
+        The dimension of the rotation matrix
+
+    Returns
+    -------
+    i : int
+        The first index of the adjacent pair
+    j : int
+        The second index of the adjacent pair
+
+    Raises
+    ------
+    ValueError
+        If `k` is out of bounds for the given `n`
+    """
+    m = n * (n - 1) // 2
+    if k < 0 or k >= m:
+        raise ValueError(f"Index k={k} is out of bounds for n={n} (must satisfy 0 <= k < {m})")
+
+    # FIXME: Actually, I think there is a very natural ordering with tranches (add to notes):
+    # 2d: (0, 1) -> [[I]]
+    # 3d: (0, 1), (1, 2), (0, 2) -> [[1, 2], [1]]
+    # 3d: (2, 3), (1, 2), (0, 1), (2, 3), (1, 2), (2, 3) -> [[1, 2, 3], [1, 2], [1]]
+    # See the pattern? The first tranche is some length, then it repeats on shorter, then two shorter, etc.: now, how to get the ordering of the first tranche? I do not know, so I need to still figure this out
+
+    count = 0
+    for col in range(n - 1):
+        for row in range(n - 1, col, -1):
+            if count == k:
+                return row - 1, row
+            count += 1
+
+    raise ValueError(f"Could not map k={k} to a plane for n={n}")
