@@ -186,13 +186,11 @@ show_missing = true
 [tool.pylint.format]
 max-line-length = 120
 
-[tool.pylint.messages_control]
-disable = [
-  "too-many-locals",  # R0914
-  "too-many-arguments",  # R0913
-  "too-many-positional-arguments",  # R0917
-  "too-many-instance-attributes",  #R0902
-]
-
 [tool.pylint.basic]
-good-names = ["A", "A_eq", "Ab", "Ab_eq", "V"]
+good-names = ["A", "A_eq", "Ab", "Ab_eq", "V", "M"]
+
+[tool.isort]
+line_length = 9999
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # Ignore unused imports (F401) and wildcard imports (F403) only in __init__.py files

@@ -23,7 +23,7 @@ except ImportError as _:
     PULP_INSTALLED = False
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, Sequence
 
     from numpy.typing import NDArray
 
@@ -53,14 +53,14 @@ def _solve_lp_scipy(
     b: Optional[NDArray] = None,
     A_eq: Optional[NDArray] = None,
     b_eq: Optional[NDArray] = None,
-    bounds: Optional[list[tuple[float | None, float | None]]] = None,
+    bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
     """Solve a linear program using SciPy's linprog function"""
     if bounds is None:
         # NOTE: Passing `None` so SciPy applies its default non-negativity constraints.
         # In our implementation, `None` represents no bounds
-        bounds_sp: tuple[None, None] | list[tuple[float | None, float | None]] = (None, None)
+        bounds_sp: tuple[None, None] | Sequence[tuple[float | None, float | None]] = (None, None)
     else:
         bounds_sp = bounds
     res_sp = sp.optimize.linprog(
@@ -95,7 +95,7 @@ def _solve_lp_cvxpy(
     b: Optional[NDArray] = None,
     A_eq: Optional[NDArray] = None,
     b_eq: Optional[NDArray] = None,
-    bounds: Optional[list[tuple[float | None, float | None]]] = None,
+    bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
     """Solve a linear program using CVXPY"""
@@ -146,7 +146,7 @@ def _solve_lp_pulp(
     b: Optional[NDArray] = None,
     A_eq: Optional[NDArray] = None,
     b_eq: Optional[NDArray] = None,
-    bounds: Optional[list[tuple[float | None, float | None]]] = None,
+    bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
     """Solve a linear program using PULP"""
@@ -159,7 +159,7 @@ def _solve_lp_pulp(
     if bounds is None:
         bounds_pulp: list[tuple[float | None, float | None]] = [(None, None)] * n
     else:
-        bounds_pulp = bounds
+        bounds_pulp = list(bounds)
     x = []
     for i in range(n):
         lower = bounds_pulp[i][0]
@@ -211,7 +211,7 @@ def solve_lp(
         b: Optional[NDArray] = None,
         A_eq: Optional[NDArray] = None,
         b_eq: Optional[NDArray] = None,
-        bounds: Optional[list[tuple[float | None, float | None]]] = None,
+        bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
         x_0: Optional[NDArray] = None,
     ) -> OptimizationProgramResult:
     """Solve a linear program in the form `min c.T @ x` subject to `A @ x <= b`, `A_eq @ x = b_eq`, 
@@ -223,7 +223,7 @@ def solve_lp(
         b: Optional[NDArray] = None,
         A_eq: Optional[NDArray] = None,
         b_eq: Optional[NDArray] = None,
-        bounds: Optional[list[tuple[float | None, float | None]]] = None,
+        bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
         x_0: Optional[NDArray] = None,
     ) -> None:
         """Validate the inputs to the linear program solver
@@ -261,6 +261,18 @@ def solve_lp(
             raise ValueError("Length of x_0 must match length of c")
 
     _validate_inputs(c, A, b, A_eq, b_eq, bounds, x_0)
+
+    # FIXME: I don't know if this implementation makes mathematical sense
+    if c.size == 0:
+        feasible = ((b is None or (b > 0 or np.allclose(b, 0, rtol=CFG.rtol, atol=CFG.atol)))
+                    and (b_eq is None or np.allclose(b_eq, 0, rtol=CFG.rtol, atol=CFG.atol)))
+        return OptimizationProgramResult(
+            success=feasible,
+            status=Status.OPTIMAL if feasible else Status.INFEASIBLE,
+            value=0.0 if feasible else None,
+            x_star=np.empty(0) if feasible else None,
+        )
+
     if CFG.lp_backend == 'auto':
         backend = 'cvxpy' if CVXPY_INSTALLED else 'scipy'
     else:
@@ -269,7 +281,15 @@ def solve_lp(
         case 'scipy':
             res = _solve_lp_scipy(c, A, b, A_eq, b_eq, bounds, x_0)
         case 'cvxpy':
-            res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
+            try:
+                res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
+            except cvx.SolverError as _:
+                # FIXME: Maybe I should propagate this error in a different manner, by raising an actual RunTimeError; this is a somewhat dangerous workaround
+                res = OptimizationProgramResult(success=False,
+                                                status=Status.NUMERICAL_ISSUES_ENCOUNTERED,
+                                                value=None,
+                                                x_star=None,
+                                                )
         case 'pulp':
             res = _solve_lp_pulp(c, A, b, A_eq, b_eq, bounds, x_0)
         case _:

@@ -46,8 +46,11 @@ class TestLsort:
         assert np.array_equal(lsort(arr), expected), \
             f"Expected lsort to lexicographically sort the rows of {arr}, got {lsort(arr)} instead"
 
+    def test_invalid_type(self):
+        """Test that lsort raises a TypeError whenever anything other than a NumPy array is passed as input"""
+
     def test_invalid_ndims_value_error(self):
-        ...
+        """Tests whether lsort raises a ValueError whenever an array with more than 2 dimensions is passed as input"""
 
 
 class TestRadiansDegreesConversion:

@@ -52,9 +52,11 @@ from importlib.metadata import PackageNotFoundError
 
 from numpes import control, utils
 from numpes._config import algo_options, get_config, reset_config, set_algo_options
+
+from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError, NumpesException
+from numpes.polytope import Polytope, poly, poly_ambient, poly_empty, poly_from_bounds, poly_from_ineq, poly_from_name, poly_from_point, poly_from_verts
 from numpes.ellipsoid import Ellipsoid, ellps, ellps_empty, ellps_from_radii
-from numpes.exceptions import ConversionError, InvalidCombinationOfArguments, InvalidRepresentation, NumpesException
-from numpes.polytope import Polytope, poly, poly_empty, poly_from_verts, poly_from_ineq, poly_ambient, poly_from_bounds
+from numpes.subspace import Subspace, subs
 
 try:
     from importlib.metadata import version

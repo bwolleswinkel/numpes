@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Any, Optional
 
 
 # [untested/unverified]
@@ -84,17 +84,17 @@ def sym_replace(arr: str, char: str = '*') -> str:
         while idx_start + num_length < str_arr[i, :].size:
             if ''.join(str_arr[i, idx_start:(idx_start + 3)].tolist()) == '...':
                 idx_start += 4
-            else: 
+            else:
                 if j > i + (0 if (idx_trunc is None or i < idx_trunc) else 1):
                     str_arr[i, idx_start:(idx_start + num_length)] = list(f"{char:^{num_length}}")
                 idx_start += num_length + 1
             j += 1
 
-    A_list = [''.join(elem).strip('█') for (i, elem) in enumerate(str_arr.tolist())]
+    arr_list = [''.join(elem).strip('█') for (i, elem) in enumerate(str_arr.tolist())]
     if idx_trunc is not None:
-        A_list.insert(idx_trunc, ' ...')
+        arr_list.insert(idx_trunc, ' ...')
 
-    return '\n'.join(A_list)
+    return '\n'.join(arr_list)
 
 
 # [untested/unverified]
@@ -223,3 +223,23 @@ def pad(text: str, length: int, char: str = " ") -> str:
     return (text
             if len(text) >= length
             else text + ''.join([' '] * (length - len(text))))
+
+
+def repr_items(obj: object,
+               compact_ndarray: bool = False,
+               ) -> list[tuple[str, str]]:
+    """Return (attribute, formatted-value) pairs used by repr formatting. Flattens NumPy arrays by removing any `'\\n'` characters in its representation."""
+
+    def fmt_repr_value(value: Any, pretty_ndarray: bool) -> str:
+        if isinstance(value, np.ndarray):
+            if not pretty_ndarray:
+                return " ".join([elem.strip() for elem in repr(value).splitlines()])
+            return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
+        if isinstance(value, tuple):
+            inner = ", ".join(fmt_repr_value(item, pretty_ndarray) for item in value)
+            if len(value) == 1:
+                inner += ","
+            return f"({inner})"
+        return repr(value)
+
+    return [(key, fmt_repr_value(value, compact_ndarray)) for key, value in obj.__dict__.items()]
