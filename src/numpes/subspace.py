@@ -41,7 +41,7 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import wraps
-from numpes._internal.printing import format_as_set
+from numpes._internal.printing import format_as_set, repr_items
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
@@ -119,7 +119,7 @@ class Subspace:
         | [0] |
         \ [0]]/
         """
-        self._basis: NDArray
+        self._basis: NDArray = np.empty((0, 0))
         self._is_minimal: bool | None = None  # FIXME: Should this be 'minimal'? 'reduced'? '(non)-redundant'?  'echelon'? 'canonical'?
         self._is_trivial: bool | None = None
         self._is_bounded: bool | None = None
@@ -237,7 +237,10 @@ class Subspace:
             case _:
                 raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         if basis.size != 0:
-            basis_lines = format_as_set([str(np.atleast_2d(base).T) for base in basis], edgeitems).splitlines()
+            if basis.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                basis_lines = format_as_set([str(np.atleast_2d(base).T + np.zeros((self.n, 1))) for base in basis], edgeitems).splitlines()
+            else:
+                basis_lines = format_as_set([str(np.atleast_2d(base).T) for base in basis], edgeitems).splitlines()
             nlines = len(basis_lines)
             idx_text = nlines // 2
             span_lines = ["     " if idx != idx_text else "span " for idx in range(nlines)]
@@ -249,27 +252,8 @@ class Subspace:
 
     def __repr__(self) -> str:
         """Return a representation of the subspace attributes"""
-        attrs = ", ".join(f"{key}={value}" for key, value in self._repr_items())
+        attrs = ", ".join(f"{key}={value}" for key, value in repr_items(self))
         return f"{self.__class__.__name__}({attrs})"
-
-    def _repr_items(self,
-                    pretty_ndarray: bool = False,
-                    ) -> list[tuple[str, str]]:
-        """Return (attribute, formatted-value) pairs used by repr formatting"""
-
-        def fmt_repr_value(value: Any, pretty_ndarray: bool) -> str:
-            if isinstance(value, np.ndarray):
-                if not pretty_ndarray:
-                    return " ".join([elem.strip() for elem in repr(value).splitlines()])
-                return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
-            if isinstance(value, tuple):
-                inner = ", ".join(fmt_repr_value(item, pretty_ndarray) for item in value)
-                if len(value) == 1:
-                    inner += ","
-                return f"({inner})"
-            return repr(value)
-
-        return [(key, fmt_repr_value(value, pretty_ndarray)) for key, value in self.__dict__.items()]
 
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the subspace based on a format specifier"""
@@ -278,24 +262,27 @@ class Subspace:
 
         if token == '':
             return str(self)
-        if token == '?':
+        if token == 'r':
             return repr(self)
         if token == '#':
-            attrs = ",\n    ".join(f"{key}={value}" for key, value in self._repr_items(pretty_ndarray=True))
+            attrs = ",\n    ".join(f"{key}={value}" for key, value in repr_items(self, compact_ndarray=True))
             return f"{self.__class__.__name__}(\n    {attrs},\n)"
-        if '?' in token or '#' in token:
-            raise ValueError(f"Format specifiers '?' and '#' do not except any additional symbols, recieved '{format_spec}'")
-        if token.startswith('!'):
+        if 'r' in token or '#' in token:
+            raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
+        if token.startswith('i'):
             comb += self._str_header()
             token = token[1:]
         if len(token) == 0:
             return comb
-        if token and token[0] in {' ', '+', '-'}:
+        if token[0] in {' ', '+', '-'}:
             kwargs['sign'] = token[0]
             token = token[1:]
-        if token[0] in {'f', 'e', 'E'}:
-            char = token[0]  # FIXME: Why do I need this workaround? Because simply putting 'token[0]' leads to a index-out-of-bounds'error?
-            kwargs['formatter'] = {'float': lambda x: f'{x:{kwargs.get('sign', '')}{('f' if char == 'f' else 'e')}}'}  # FIXME: Does NOT seem to work
+        if token and token[0] in {'f', 'e', 'E'}:
+            sign = kwargs.setdefault('sign', ' ')
+            float_format = 'f' if token[0] == 'f' else 'e'
+            kwargs['formatter'] = {
+                'float': lambda value, sign=sign, float_format=float_format: f'{value:{sign}{float_format}}',
+            }
             kwargs['to_dtype'] = 'float'
             token = token[1:]
         if token.startswith('.'):
@@ -304,11 +291,19 @@ class Subspace:
                 digits += token[idx]
                 idx += 1
             if not digits:
-                raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, recieved '{token}'")
+                raise ValueError(f"Invalid format '{format_spec}': '.' character must be preceded by at least one digit, received '{token}'")
             token = token[idx:]
             if token and token[0] in {'f', 'e', 'E'}:
                 char = token[0]
-                kwargs['formatter'] = {'float': lambda x: f'{x:{kwargs.get('sign', '')}.{int(digits)}{('f' if char == 'f' else 'e')}}'}  # FIXME: Does NOT seem to work, seems to be completely ignored?
+                kwargs.setdefault('sign', ' ')
+                if char == 'f' and digits == '0':
+                    kwargs['formatter'] = {
+                        'float': lambda value: f"{value:{kwargs.get('sign', '')}.0f}.",
+                    }
+                else:
+                    kwargs['formatter'] = {
+                        'float': lambda value: f"{value:{kwargs.get('sign', '')}.{int(digits)}{char}}",
+                    }
                 kwargs['to_dtype'] = 'float'
                 token = token[1:]
             elif token and token[0] == 'd':
@@ -316,14 +311,14 @@ class Subspace:
             elif not token:
                 raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', but was not followed by any character")
             else:
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', recieved '{token[0]}'")
+                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
         elif token.startswith('d'):
             kwargs['to_dtype'] = 'int'
             token = token[1:]
         if token.startswith('~'):
             digits = token[1:]
             if not digits.isdigit():
-                raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, recieved '{token}'")
+                raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
             kwargs['edgeitems'] = int(digits)
             token = ''
         if token != '':
@@ -331,6 +326,7 @@ class Subspace:
 
         to_dtype = kwargs.get('to_dtype', None)
         kwargs.pop('to_dtype', None)
+        kwargs = {key: value for key, value in kwargs.items() if value is not None}
         with np.printoptions(**kwargs):
             str_basis = self._str_basis(to_dtype=to_dtype)
             if 'E' in format_spec:
