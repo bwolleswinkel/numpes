@@ -1064,7 +1064,7 @@ class Polytope:
     # pylint: disable=protected-access
     def mat_mul(self,
                 M: NDArray,
-                recalc_chebcr: bool = False,
+                calc_chebcr: bool = False,
                 in_place: bool = True,
                 ) -> Polytope | Self:
         """Matrix multiplication with a matrix `M`.
@@ -1073,7 +1073,7 @@ class Polytope:
         ----------
         M : NDArray
             A matrix to multiply the polytope by
-        recalc_chebcr : bool, default=False
+        calc_chebcr : bool, default=False
             Whether to recalculate the Chebyshev center and radius after the multiplication by solving an LP
         in_place : bool, default=True
             If True, the polytope is modified in place

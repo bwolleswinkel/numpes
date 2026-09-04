@@ -18,8 +18,8 @@ span
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import warnings
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy as sp
@@ -28,55 +28,55 @@ from numpes._config import CFG
 from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
-    from typing import Optional, Literal
+    from typing import Literal, Optional
 
     from numpy.typing import NDArray
 
 
-def is_square(A: NDArray) -> bool:
-    """Check whether a matrix `A` is square"""
-    if not A.ndim == 2:
+def is_square(M: NDArray) -> bool:
+    """Check if the matrix `M` is square"""
+    if not M.ndim == 2:
         return False
-    if not A.shape[0] == A.shape[1]:
-        return False
-    return True
-
-
-def is_sym(A: NDArray) -> bool:
-    """Check if a matrix `A` is symmetric"""
-    if not is_square(A):
-        return False
-    if not np.allclose(A, A.T, rtol=CFG.rtol, atol=CFG.atol):
+    if not M.shape[0] == M.shape[1]:
         return False
     return True
 
 
-def is_sing(A: NDArray) -> bool:
-    """Check whether the matrix is singular (i.e., non-invertible)"""
-    if not is_square(A):
+def is_sym(M: NDArray) -> bool:
+    """Check if the matrix `M` is symmetric"""
+    if not is_square(M):
+        return False
+    if not np.allclose(M, M.T, rtol=CFG.rtol, atol=CFG.atol):
+        return False
+    return True
+
+
+def is_sing(M: NDArray) -> bool:
+    """Check if the matrix `M` is singular (i.e., non-invertible)"""
+    if not is_square(M):
         return True
-    if np.linalg.matrix_rank(A, rtol=CFG.rtol) < A.shape[0]:
+    if np.linalg.matrix_rank(M, rtol=CFG.rtol) < M.shape[0]:
         return True
     return False
 
 
-def is_posdef(A: NDArray, semi_def: bool = False) -> bool:
-    """Check if a matrix `A` is positive definite or positive semi-definite"""
+def is_posdef(M: NDArray, semi_def: bool = False) -> bool:
+    """Check if the matrix `M` is positive definite or positive semi-definite"""
     if semi_def:
-        if not is_sym(A):
+        if not is_sym(M):
             return False
-        if not np.all(np.linalg.eigvalsh(A) >= -CFG.atol):
+        if not np.all(np.linalg.eigvalsh(M) >= -CFG.atol):
             return False
         return True
     try:
-        _ = np.linalg.cholesky(A)
+        _ = np.linalg.cholesky(M)
     except np.linalg.LinAlgError as _:
         return False
     return True
 
 
 def is_rot_mat(R: NDArray) -> bool:
-    """Check if a matrix `R` is a valid rotation matrix"""
+    """Check if the matrix `R` is a valid rotation matrix"""
     if not is_square(R) or R.size <= 1:  # NOTE: This is not a valid rotation matrix due to the geometric definition (no rotation in 1D)
         return False
     if not np.allclose(R @ R.T, np.eye(R.shape[0]), rtol=CFG.rtol, atol=CFG.atol):
@@ -143,7 +143,7 @@ def rot_mat_2d(angle: float) -> NDArray:
 def rot_mat_3d(angles: list[float],
                convention: str | Literal['givens', 'yaw_pitch_roll'] = 'givens',
                ) -> NDArray:
-    # FIXME: Instead of using 'proper_euler' and 'tait_bryan', I should use the much more clear 'xyz', 'XYZ', etc., for intrinsic and ectrinsit rotation, and just keep 'givens' and 'yaw_pitch_roll' as special cases. 
+    # FIXME: Instead of using 'proper_euler' and 'tait_bryan', I should use the much more clear 'xyz', 'XYZ', etc., for intrinsic and ectrinsit rotation, and just keep 'givens' and 'yaw_pitch_roll' as special cases.
     """Create a 3D rotation matrix from a sequence of angles based on the specified convention.
     
     Parameters
@@ -231,7 +231,7 @@ def angles_givens(R: NDArray) -> list[float]:
         raise ValueError(f"Input matrix R must be a valid rotation matrix (orthogonal with determinant 1), received R @ R.T = {R @ R.T} and det(R) = {np.linalg.det(R)}")
 
     n = R.shape[0]
-    R_copy = np.array(R, dtype=float, copy=True)
+    R_copy = np.array(R, dtype=float, copy=True)  # pylint: disable=invalid-name
     angles = []
 
     for col in range(n - 1):
@@ -337,7 +337,7 @@ def angles_3d_convert(angles: list[float],
     tgt_seq = convention_map.get(to_convention, to_convention)
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=UserWarning)
-        angles_converted = sp.spatial.transform.Rotation.from_euler(src_seq, angles).as_euler(tgt_seq)
+        angles_converted = sp.spatial.transform.Rotation.from_euler(src_seq, angles).as_euler(tgt_seq)  # type: ignore[call-overload]
     return angles_converted
 
 
@@ -578,7 +578,7 @@ def span(A: NDArray) -> NDArray:
     # FIXME: For some reason, left-to-right ordering is NOT preserved; the returned columns are always in order,
     # but if columns i and i + delta are lin dependent, sometimes the i + delta column is returned instead of
     # the 'first' encountered i column, which is a bit arbitrary. Off course this is not a huge problem, but might
-    # be nice to look into if we can actually preseve this ordering.
+    # be nice to look into if we can actually preserve this ordering.
     _, R, P = sp.linalg.qr(A, pivoting=True)
     rank = np.sum(np.abs(np.diag(R)) > CFG.atol)
     return A[:, sorted(P[:rank])]

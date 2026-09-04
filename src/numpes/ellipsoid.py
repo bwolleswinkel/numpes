@@ -10,14 +10,15 @@ try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
 from numpes._config import CFG
+from numpes._internal.printing import pad, sym_replace
 from numpes._internal.wraps import wraps
-from numpes._internal.printing import sym_replace, pad
-from numpes.utils.linalg import is_posdef, angles_givens
+from numpes.utils.linalg import angles_givens, is_posdef
 
 if TYPE_CHECKING:
     from typing import Literal, Optional
@@ -114,7 +115,7 @@ class Ellipsoid:
         self._is_bounded: bool | None = np.isfinite(radii).all()
         self._is_full_dim: bool | None = not np.isclose(radii, 0, atol=CFG.atol).any()
         self._is_singleton: bool | None = np.isclose(radii, 0, atol=CFG.atol).all()
-        self._angles: NDArray | None = None
+        self._angles: list[float] | None = None
         self._dim: int | None = None
         self._vol: float | None = None
 
@@ -183,8 +184,9 @@ class Ellipsoid:
         if not cov.ndim == 2:
             raise ValueError(f"Covariance matrix 'cov' must be a two-dimensional array, received {cov.shape}")
         raise NotImplementedError(...)
-    
+
     # [untested/unverified]
+    # pylint: disable=invalid-name
     def __str__(self) -> str:
         """Descriptive representation of the ellipsoid"""
         header = self._str_header()
@@ -203,16 +205,16 @@ class Ellipsoid:
                             else 2)
 
         c_text = ['   ' if idx != idx_text else 'c: ' for idx in range(nlines)]
-        c_vals = [pad(line, max([len(line) for line in c_lines])) for line in c_lines]
+        c_vals = [pad(line, max(len(line) for line in c_lines)) for line in c_lines]
         Q_text = ['     ' if idx != idx_text else ', Q: ' for idx in range(nlines)]
         Q_vals = sym_replace(Q_as_str).splitlines()
         comb = '\n'.join([''.join(line) for line in zip(c_text, c_vals, Q_text, Q_vals)])
         if self.n == 1:
             comb = comb.replace('[[', '[').replace(']]', ']')
 
-        comb = header + "\n" + comb 
+        comb = header + "\n" + comb
         return comb
-    
+
     # [untested/unverified]
     def _str_header(self) -> str:
         # NOTE: These methods are not yet implemented
@@ -237,13 +239,13 @@ class Ellipsoid:
              plot_radii: bool = False,
              label: Optional[str] = None,
              show: bool = True,
-             ax: Optional[Axes] = None,
-             ) -> Axes:
-        """Plot a polytope"""
+             ax: Optional[Axes | Axes3D] = None,
+             ) -> Axes | Axes3D:
+        """Plot the ellipsoid"""
 
         if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting." \
-                                " Please install it with 'pip install matplotlib' and try again.")
+            raise ImportError("Matplotlib is required for plotting. " \
+                              "Please install it with 'pip install matplotlib' and try again.")
 
         if ax is None:
             if self.n == 1:
@@ -268,7 +270,7 @@ class Ellipsoid:
                 if ax.name == '3d':
                     raise ValueError("The dimension of the ellipsoid" \
                                      " does not match the dimension of the provided axes 'ax'")
-                ax.add_patch(Ellipse(xy=self.c,
+                ax.add_patch(Ellipse(xy=(self.c[0], self.c[1]),
                                      width=2 * self.radii[0],
                                      height=2 * self.radii[1],
                                      angle=np.rad2deg(self.angles).item(),
@@ -281,9 +283,9 @@ class Ellipsoid:
                 ax.autoscale_view()
             case 3:
                 if ax.name != '3d':
-                    raise ValueError("The dimension of the ellipsoid" \
-                                     " does not match the dimension of the provided axes 'ax'")
-                u, v = (np.linspace(0, 2 * np.pi, num_points), 
+                    raise ValueError(f"The dimension of the ellipsoid n={self.n} " \
+                                      "does not match the dimension of the provided axes 'ax'")
+                u, v = (np.linspace(0, 2 * np.pi, num_points),
                         np.linspace(0,     np.pi, num_points))
                 sphere = np.array([self.radii[0] * np.outer(np.cos(u), np.sin(v)),
                                    self.radii[1] * np.outer(np.sin(u), np.sin(v)),
@@ -316,8 +318,8 @@ class Ellipsoid:
                    label: Optional[str] = None,
                    annotate: bool | list[str] = True,
                    show: bool = True,
-                   ax: Optional[Axes] = None,
-                   ) -> Axes:
+                   ax: Optional[Axes | Axes3D] = None,
+                   ) -> Axes | Axes3D:
         """Plot the radii of the ellipse"""
         if not MATPLOTLIB_INSTALLED:
             raise ImportError("Matplotlib is required for plotting." \
@@ -353,16 +355,17 @@ class Ellipsoid:
 
 @wraps(Ellipsoid.from_quad)
 def ellps(Q: ArrayLike, c: Optional[ArrayLike] = None,) -> Ellipsoid:
-    ellps = Ellipsoid.from_quad(Q, c)
-    return ellps
+    """Wrapper function for `Ellipsoid.from_quad` to create an ellipsoid from a quadratic matrix"""
+    ellpsoid = Ellipsoid.from_quad(Q, c)
+    return ellpsoid
 
 
 def ellps_empty(n: int) -> Ellipsoid:
     """Construct an empty ellipsoid in R^n"""
     R = np.empty((n, n))
     radii = np.empty(n)
-    ellps = Ellipsoid(R, radii)
-    return ellps
+    ellpsoid = Ellipsoid(R, radii)
+    return ellpsoid
 
 
 @wraps(Ellipsoid.__init__)
@@ -370,6 +373,6 @@ def ellps_from_radii(radii: ArrayLike, R: Optional[ArrayLike] = None, c: Optiona
     """Construct an ellipsoid from a rotation matrix `R` and a set of radii `radii`"""
     if R is None:
         # FIXME: This is not correct! This should create an R matrix based on the sorted radii (I think), such that the major axis is always the largest. Oh no this is correct, this 'magic' should be done by the property assignment inside ellps
-        R = np.eye(len(radii))
-    ellps = Ellipsoid(R, radii, c=c)
-    return ellps
+        R = np.eye(np.atleast_1d(radii).size)
+    ellpsoid = Ellipsoid(R, radii, c=c)
+    return ellpsoid
