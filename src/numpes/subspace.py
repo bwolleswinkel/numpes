@@ -381,7 +381,7 @@ class Subspace:
     # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
-                ) -> Subspace | Self:  # FIXME: Should this not always return a instance of Subspace? Either self, or a new instance?
+                ) -> Subspace | Self:
         """Compute a minimal representation of the subspace by removing linearly dependent basis vectors"""
         obj = self if in_place else self.copy()
         obj._basis = span(self._basis.T).T
