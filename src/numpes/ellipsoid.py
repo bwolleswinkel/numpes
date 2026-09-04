@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -18,10 +18,11 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal.printing import pad, sym_replace
 from numpes._internal.wraps import wraps
+from numpes._internal.printing import repr_items
 from numpes.utils.linalg import angles_givens, is_posdef
 
 if TYPE_CHECKING:
-    from typing import Literal, Optional
+    from typing import Literal, Optional, Callable, Any
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from numpy.typing import ArrayLike, NDArray
@@ -76,8 +77,8 @@ class Ellipsoid:
             raise ValueError(f"Number of 'radii' must equal shape of 'R', received radii of size {radii.size} and rotation matrix of shape {R.shape}")
         if (radii < 0).any():
             raise ValueError(f"Radii must be strictly non-negative, received non-negative radius of {radii[np.argwhere(radii < 0).min()]} at index {np.argwhere(radii < 0).min()}")
-        if np.isnan(radii).any():
-            raise ValueError(f"Radii cannot be NaN value, received {radii}")
+        # if np.isnan(radii).any():
+        #     raise ValueError(f"Radii cannot be NaN value, received {radii}")
         self.radii: NDArray = radii
         self.R: NDArray = R  # FIXME: Here, upon assignment, I should do the reordering of R based on the order or radii
         # FIXME: I should implement this instead | Or should I do both representations? Tough decision...
@@ -186,12 +187,43 @@ class Ellipsoid:
         raise NotImplementedError(...)
 
     # [untested/unverified]
-    # pylint: disable=invalid-name
     def __str__(self) -> str:
-        """Descriptive representation of the ellipsoid"""
+        """Description of the ellipsoid"""
         header = self._str_header()
-        with np.printoptions(threshold=0):
-            c_as_str, Q_as_str = str(np.atleast_2d(self.c).T), str(self.Q)
+        return header + "\n" + self._str_quad()
+
+    # [untested/unverified]
+    def _str_header(self) -> str:
+        # NOTE: These methods are not yet implemented
+        # if self.is_empty:
+        #     return f"Empty ellipsoid in R^{self.n}"
+        # if self.is_singleton:
+        #     return f"Singleton ellipsoid in R^{self.n}"
+        # if self.is_lower_dim:
+        #     return f"Lower dimensional ellipsoid in R^{self.n}"
+        # if not self.is_bounded:
+        #     return f"Unbounded ellipsoid in R^{self.n}"
+        # if self.is_full_space:
+        #     return f"Full space ellipsoid in R^{self.n}"
+        return f"Ellipsoid in R^{self.n}"
+
+    # [untested/unverified]
+    # pylint: disable=invalid-name
+    def _str_quad(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
+        """Quadratic description of the ellipsoid"""
+        match to_dtype:
+            case None:
+                c, Q = self.c, self.Q
+            case 'float':
+                c, Q = self.c.astype(float), self.Q.astype(float)
+            case 'int':
+                c, Q = self.c.astype(int), self.Q.astype(int)
+            case _:
+                raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+        if c.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+            c_as_str, Q_as_str = str(np.atleast_2d(c + np.zeros_like(c)).T), str(Q + np.zeros_like(Q))
+        else:
+            c_as_str, Q_as_str = str(np.atleast_2d(c).T), str(Q)
         c_lines, Q_lines = c_as_str.splitlines(), Q_as_str.splitlines()
         nlines = len(Q_lines)
         try:
@@ -212,23 +244,105 @@ class Ellipsoid:
         if self.n == 1:
             comb = comb.replace('[[', '[').replace(']]', ']')
 
-        comb = header + "\n" + comb
         return comb
 
-    # [untested/unverified]
-    def _str_header(self) -> str:
-        # NOTE: These methods are not yet implemented
-        # if self.is_empty:
-        #     return f"Empty ellipsoid in R^{self.n}"
-        # if self.is_singleton:
-        #     return f"Singleton ellipsoid in R^{self.n}"
-        # if self.is_lower_dim:
-        #     return f"Lower dimensional ellipsoid in R^{self.n}"
-        # if not self.is_bounded:
-        #     return f"Unbounded ellipsoid in R^{self.n}"
-        # if self.is_full_space:
-        #     return f"Full space ellipsoid in R^{self.n}"
-        return f"Ellipsoid in R^{self.n}"
+    def __repr__(self) -> str:
+        """Return a representation of the ellipsoid attributes"""
+        attrs = ", ".join(f"{key}={value}" for key, value in repr_items(self))
+        return f"{self.__class__.__name__}({attrs})"
+
+    def __format__(self, format_spec: str) -> str:
+        """Format the printed description of the ellipsoid based on a format specifier"""
+        # FIXME: Unify this method and move it to `printing`
+        token = format_spec
+        comb = ""
+        threshold: int | None = 0
+        sign: Literal['-', '+', ' '] | None = None
+        formatter: dict[str, Callable[[Any], str]] | None = None
+        to_dtype: Literal['float', 'int'] | None = None
+        edgeitems: int | None = None
+
+        if token == '':
+            return str(self)
+        if token == 'r':
+            return repr(self)
+        if token == '#':
+            attrs = ",\n    ".join(f"{key}={value}" for key, value in repr_items(self, compact_ndarray=True))
+            return f"{self.__class__.__name__}(\n    {attrs},\n)"
+        if 'r' in token or '#' in token:
+            raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
+        if token.startswith('i'):
+            comb += self._str_header()
+            token = token[1:]
+        if len(token) == 0:
+            return comb
+        if token[0] in {' ', '+', '-'}:
+            sign = cast('Literal["-", "+", " "]', token[0])
+            token = token[1:]
+        if token and token[0] in {'f', 'e', 'E'}:
+            sign = sign if sign is not None else ' '
+            float_format = 'f' if token[0] == 'f' else 'e'
+            formatter = {
+                'float': lambda value: f'{value:{sign}{float_format}}',
+            }
+            to_dtype = 'float'
+            token = token[1:]
+        if token.startswith('.'):
+            digits, idx = '', 1
+            while idx < len(token) and token[idx].isdigit():
+                digits += token[idx]
+                idx += 1
+            if not digits:
+                raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, received '{token}'")
+            token = token[idx:]
+            if token and token[0] in {'f', 'e', 'E'}:
+                char = token[0]
+                sign = sign if sign is not None else ' '
+                if char == 'f' and digits == '0':
+                    formatter = {
+                        'float': lambda value: f"{value:{sign}.0f}.",
+                    }
+                else:
+                    formatter = {
+                        'float': lambda value: f"{value:{sign}.{int(digits)}{char}}",
+                    }
+                to_dtype = 'float'
+                token = token[1:]
+            elif token and token[0] == 'd':
+                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' cannot be followed by 'd' as integer type does not take precision")
+            elif not token:
+                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', but was not followed by any character")
+            else:
+                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
+        elif token.startswith('d'):
+            to_dtype = 'int'
+            token = token[1:]
+        if token.startswith('~'):
+            digits = token[1:]
+            if not digits.isdigit():
+                raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
+            edgeitems = int(digits)
+            token = ''
+        if token != '':
+            raise ValueError(f"Invalid format '{format_spec}': trailing junk characters '{token}'")
+
+        # FROM: GitHub Copilot Claude Sonnet 5 | 2026/09/04[untested/unverified]
+        if formatter is not None:
+            # A custom `formatter` bypasses NumPy's column-width alignment, so pad every
+            # formatted value to the same width here to keep rows equal length.
+            base_fmt = formatter['float']
+            values = np.concatenate([np.ravel(self.c), np.ravel(self.Q)]).astype(float)
+            width = max(len(base_fmt(value)) for value in values)
+            formatter = {'float': lambda value, _fmt=base_fmt, _width=width: _fmt(value).rjust(_width)}
+
+        with np.printoptions(threshold=threshold, sign=sign, formatter=cast('Any', formatter), edgeitems=edgeitems):
+            str_quad = self._str_quad(to_dtype=to_dtype)
+            if 'E' in format_spec:
+                str_quad = str_quad.replace('e', 'E')
+            comb += ("" if len(comb) == 0 else "\n") + str_quad
+
+        return comb
+
 
     # untested/unverified
     def plot(self,
@@ -360,11 +474,15 @@ def ellps(Q: ArrayLike, c: Optional[ArrayLike] = None,) -> Ellipsoid:
     return ellpsoid
 
 
+# [untested/unverified]
 def ellps_empty(n: int) -> Ellipsoid:
     """Construct an empty ellipsoid in R^n"""
-    R = np.empty((n, n))
-    radii = np.empty(n)
-    ellpsoid = Ellipsoid(R, radii)
+    # FIXME: I don't know if these values make any sense
+    R = np.full((n, n), np.nan)
+    radii = np.full(n, np.nan)
+    Q = np.diag([np.inf for _ in range(n)])
+    c = np.full(n, np.nan)
+    ellpsoid = Ellipsoid(R, radii, Q=Q, c=c)
     return ellpsoid
 
 

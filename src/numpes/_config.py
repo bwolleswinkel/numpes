@@ -38,6 +38,7 @@ class ConfigSchema:
 
     verbose: int = 0
     aspect: Literal['auto', 'equal'] = 'auto'
+    sym_char: str = '*'
     print_num_verts: int = 4
     print_format_poly: str = '...'
     print_format_ellps: str = '...'

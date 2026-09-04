@@ -258,6 +258,7 @@ class Subspace:
 
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the subspace based on a format specifier"""
+        # FIXME: Unify this method and move it to `printing`
         token = format_spec
         comb = ""
         threshold: int | None = 0
@@ -297,7 +298,7 @@ class Subspace:
                 digits += token[idx]
                 idx += 1
             if not digits:
-                raise ValueError(f"Invalid format '{format_spec}': '.' character must be preceded by at least one digit, received '{token}'")
+                raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, received '{token}'")
             token = token[idx:]
             if token and token[0] in {'f', 'e', 'E'}:
                 char = token[0]

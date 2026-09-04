@@ -4,12 +4,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from numpes._config import CFG
+
 if TYPE_CHECKING:
     from typing import Any, Optional
 
 
 # [untested/unverified]
-def sym_replace(arr: str, char: str = '*') -> str:
+def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
     """Replace the (assumed to be symmetric) numbers located in the upper-triangular part of an 
     2d square NumPy array with `char`. This is to be used for arrays which are symmetric, and
     where the upper-triangular values can be inferred from the lower part. The function does
@@ -86,7 +88,7 @@ def sym_replace(arr: str, char: str = '*') -> str:
                 idx_start += 4
             else:
                 if j > i + (0 if (idx_trunc is None or i < idx_trunc) else 1):
-                    str_arr[i, idx_start:(idx_start + num_length)] = list(f"{char:^{num_length}}")
+                    str_arr[i, idx_start:(idx_start + num_length)] = list(f" {char}" if (num_length == 2 and not '.' in arr) else f"{char:^{num_length}}")
                 idx_start += num_length + 1
             j += 1
 
