@@ -27,9 +27,9 @@ aff_subs
 """
 
 from __future__ import annotations
-from copy import copy
 
-from typing import TYPE_CHECKING
+from copy import copy
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import scipy as sp
@@ -48,7 +48,7 @@ from numpes.utils.linalg import span
 from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
 
 if TYPE_CHECKING:
-    from typing import Self, Literal, Optional, Any
+    from typing import Any, Callable, Iterator, Literal, Optional, Self
 
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray
@@ -259,7 +259,12 @@ class Subspace:
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the subspace based on a format specifier"""
         token = format_spec
-        kwargs, comb = {'threshold': 0}, ""
+        comb = ""
+        threshold: int | None = 0
+        sign: Literal['-', '+', ' '] | None = None
+        formatter: dict[str, Callable[[Any], str]] | None = None
+        to_dtype: Literal['float', 'int'] | None = None
+        edgeitems: int | None = None
 
         if token == '':
             return str(self)
@@ -276,15 +281,15 @@ class Subspace:
         if len(token) == 0:
             return comb
         if token[0] in {' ', '+', '-'}:
-            kwargs['sign'] = token[0]
+            sign = cast('Literal["-", "+", " "]', token[0])
             token = token[1:]
         if token and token[0] in {'f', 'e', 'E'}:
-            sign = kwargs.setdefault('sign', ' ')
+            sign = sign if sign is not None else ' '
             float_format = 'f' if token[0] == 'f' else 'e'
-            kwargs['formatter'] = {
-                'float': lambda value, sign=sign, float_format=float_format: f'{value:{sign}{float_format}}',
+            formatter = {
+                'float': lambda value: f'{value:{sign}{float_format}}',
             }
-            kwargs['to_dtype'] = 'float'
+            to_dtype = 'float'
             token = token[1:]
         if token.startswith('.'):
             digits, idx = '', 1
@@ -296,16 +301,16 @@ class Subspace:
             token = token[idx:]
             if token and token[0] in {'f', 'e', 'E'}:
                 char = token[0]
-                kwargs.setdefault('sign', ' ')
+                sign = sign if sign is not None else ' '
                 if char == 'f' and digits == '0':
-                    kwargs['formatter'] = {
-                        'float': lambda value: f"{value:{kwargs.get('sign', '')}.0f}.",
+                    formatter = {
+                        'float': lambda value: f"{value:{sign}.0f}.",
                     }
                 else:
-                    kwargs['formatter'] = {
-                        'float': lambda value: f"{value:{kwargs.get('sign', '')}.{int(digits)}{char}}",
+                    formatter = {
+                        'float': lambda value: f"{value:{sign}.{int(digits)}{char}}",
                     }
-                kwargs['to_dtype'] = 'float'
+                to_dtype = 'float'
                 token = token[1:]
             elif token and token[0] == 'd':
                 raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' cannot be followed by 'd' as integer type does not take precision")
@@ -314,21 +319,18 @@ class Subspace:
             else:
                 raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
         elif token.startswith('d'):
-            kwargs['to_dtype'] = 'int'
+            to_dtype = 'int'
             token = token[1:]
         if token.startswith('~'):
             digits = token[1:]
             if not digits.isdigit():
                 raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
-            kwargs['edgeitems'] = int(digits)
+            edgeitems = int(digits)
             token = ''
         if token != '':
             raise ValueError(f"Invalid format '{format_spec}': trailing junk characters '{token}'")
 
-        to_dtype = kwargs.get('to_dtype', None)
-        kwargs.pop('to_dtype', None)
-        kwargs = {key: value for key, value in kwargs.items() if value is not None}
-        with np.printoptions(**kwargs):
+        with np.printoptions(threshold=threshold, sign=sign, formatter=cast('Any', formatter), edgeitems=edgeitems):
             str_basis = self._str_basis(to_dtype=to_dtype)
             if 'E' in format_spec:
                 str_basis = str_basis.replace('e', 'E')
@@ -337,7 +339,7 @@ class Subspace:
         return comb
 
     # [untested/unverified]
-    def __iter__(self) -> NDArray:
+    def __iter__(self) -> Iterator[NDArray]:
         return iter(self.basis)
 
     # [untested/unverified]
@@ -505,8 +507,4 @@ def subs(basis: Optional[ArrayLike] = None,
          n: Optional[int] = None,
          ) -> Subspace:
     """Wrapper function for `Subspace.__init__` to create a subspace"""
-    kwargs = {key: value for key, value in {
-        'n': n,
-        'basis': basis,
-    }.items() if value is not None}
-    return Subspace(**kwargs)
+    return Subspace(basis=basis, n=n)

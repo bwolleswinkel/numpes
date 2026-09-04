@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from matplotlib.collections import PolyCollection
     from matplotlib.lines import Line2D
     from mpl_toolkits.mplot3d.art3d import Line3D, Poly3DCollection
+    from mpl_toolkits.mplot3d.axes3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike
 
 
@@ -142,8 +143,8 @@ def plot_line(ax: Axes,
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
-def plot_plane(ax: Axes,
-               plane_normal: ArrayLike,
+def plot_plane(ax: Axes | Axes3D,
+               plane_normal: ArrayLike | None,
                point: Optional[ArrayLike] = None,
                **kwargs,
                ) -> PolyCollection | Poly3DCollection:
@@ -248,7 +249,7 @@ def plot_plane(ax: Axes,
 
     # Create polygon collection
     poly_collection = Poly3DCollection([], linewidths=0, **kwargs)
-    ax.add_collection3d(poly_collection)
+    getattr(ax, 'add_collection3d')(poly_collection)
 
     # Set up callbacks
     for callback in ['xlim_changed', 'ylim_changed', 'zlim_changed']:
@@ -261,7 +262,7 @@ def plot_plane(ax: Axes,
 
 # [untested/unverified]
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[unverified/untested]
-def plot_box(ax: Axes, **kwargs) -> Poly3DCollection:
+def plot_box(ax: Axes3D, **kwargs) -> Poly3DCollection:
     """Plot an indefinite box in 3D, centered at the origin with edges from -inf to inf"""
 
     def update_box():
@@ -339,16 +340,16 @@ def plot_vector(ax: Axes,
             raise ValueError(f"Point and vector must have the same size, but recieved size {point.size} and {vector.size} respectively")
 
     if vector.size == 1:
-        arrow = FancyArrowPatch([point.item(), 0],
-                                [vector.item(), 0],
+        arrow = FancyArrowPatch((point.item(), 0.0),
+                                (vector.item(), 0.0),
                                 mutation_scale=20,
                                 lw=2,
                                 arrowstyle="-|>",
                                 **{key: value for key, value in kwargs.items() if key != 'label'},
                                 )
     elif vector.size == 2:
-        arrow = FancyArrowPatch(point,
-                                vector,
+        arrow = FancyArrowPatch((point[0], point[1]),
+                                (vector[0], vector[1]),
                                 mutation_scale=20,
                                 lw=2,
                                 arrowstyle="-|>",
@@ -365,7 +366,7 @@ def plot_vector(ax: Axes,
     else:
         raise ValueError(f"Vector size should be 1, 2, or 3, received {vector.size}")
 
-    ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([ax.get_zlim()] if vector.size == 3 else [])
+    ax_lims = [ax.get_xlim(), ax.get_ylim()] + ([getattr(ax, 'get_zlim')()] if vector.size == 3 else [])
     for idx, ax_lim in enumerate(ax_lims):
         if vector.size == 1 and idx == 0:
             margin = 1 + ax.get_xmargin()

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from typing import Optional, Any
+    from typing import Any, Optional
 
 
 # [untested/unverified]
@@ -229,7 +229,7 @@ def repr_items(obj: object,
                compact_ndarray: bool = False,
                ) -> list[tuple[str, str]]:
     """Return (attribute, formatted-value) pairs used by repr formatting. Flattens NumPy arrays by removing any `'\\n'` characters in its representation."""
-    
+
     def fmt_repr_value(value: Any, pretty_ndarray: bool) -> str:
         if isinstance(value, np.ndarray):
             if not pretty_ndarray:

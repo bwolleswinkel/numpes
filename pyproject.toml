@@ -186,14 +186,6 @@ show_missing = true
 [tool.pylint.format]
 max-line-length = 120
 
-[tool.pylint.messages_control]
-disable = [
-  "too-many-locals",  # R0914
-  "too-many-arguments",  # R0913
-  "too-many-positional-arguments",  # R0917
-  "too-many-instance-attributes",  #R0902
-]
-
 [tool.pylint.basic]
 good-names = ["A", "A_eq", "Ab", "Ab_eq", "V", "M"]
 

@@ -1,8 +1,22 @@
 isort src/numpes
 ruff check src/numpes
-# C0301=lines-to-long, W0511=fixme, R0912=too-many-branches, R0911=too-many-return statements, R0904=too-many-public-methods, R0801=duplicate-code
-pylint --disable=C0301,W0511,R0801 src/numpes
+# C0301=lines-to-long
+# W0511=fixme
+# R0912=too-many-branches
+# R0911=too-many-return statements
+# R0904=too-many-public-methods
+# R0915=too-many-statements
+# C0302=too-many-lines
+# R0914=too-many-locals
+# R0913=too-many-arguments
+# R0917=too-many-positional-arguments
+# R0902=too-many-instance-attributes
+# R0801=duplicate-code
+pylint --disable=C0301,W0511,R0912,R0911,R0904,R0915,C0302,R0801,R0914,R0913,R0917,R0902 src/numpes
 mypy src/numpes
+
+# For targeting a specific warning
+pylint -d all -e <NUMBER> src/numpes
 
 # For building the website
 cd docs
