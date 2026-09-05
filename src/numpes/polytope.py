@@ -37,7 +37,7 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
-from numpes._internal.printing import format_as_set, pad
+from numpes._internal.printing import format_as_set, pad, format_spec_to_opts, repr_items
 from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError, ConversionError
 from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
 
@@ -857,17 +857,25 @@ class Polytope:
         return f"Polytope in R^{self.n}"
 
     # [untested/unverified]
-    def _str_vrepr(self) -> str:
+    def _str_vrepr(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """"Description of the polytope in V-represntation"""
         try:
-            verts, rays = self.vrepr
+            match to_dtype:
+                case None:
+                    verts, rays = self.vrepr
+                case 'float':
+                    verts, rays = self.verts.astype(float), self.rays.astype(float)
+                case 'int':
+                    verts, rays = self.verts.astype(int), self.rays.astype(int)
+                case _:
+                    raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ConversionError as e:
             raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}")
-        verts += np.zeros_like(verts)
-        rays += np.zeros_like(rays)
         edgeitems = np.get_printoptions()['edgeitems']
         if verts.size != 0:
-            with np.printoptions(threshold=0):
+            if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                verts_lines = format_as_set([str(np.atleast_2d(vert).T + np.zeros((self.n, 1))) for vert in verts], edgeitems).splitlines()
+            else:
                 verts_lines = format_as_set([str(np.atleast_2d(vert).T) for vert in verts], edgeitems).splitlines()
             nlines = len(verts_lines)
             idx_text = nlines // 2
@@ -876,7 +884,9 @@ class Polytope:
         else:
             comb_verts = None
         if rays.size != 0:
-            with np.printoptions(threshold=0):
+            if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                rays_lines = format_as_set([str(np.atleast_2d(ray).T) + np.zeros((self.n, 1)) for ray in rays], edgeitems).splitlines()
+            else:
                 rays_lines = format_as_set([str(np.atleast_2d(ray).T) for ray in rays], edgeitems).splitlines()
             if comb_verts is None:
                 nlines = len(rays_lines)
@@ -899,36 +909,48 @@ class Polytope:
 
     # [untested/unverified]
     # pylint: disable=invalid-name
-    def _str_hrepr(self) -> str:
+    def _str_hrepr(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """"Description of the polytope in H-represntation"""
         try:
-            A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+            match to_dtype:
+                case None:
+                    A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+                case 'float':
+                    A, b, A_eq, b_eq = self.A.astype(float), self.b.astype(float), self.A_eq.astype(float), self.b_eq.astype(float)
+                case 'int':
+                    A, b, A_eq, b_eq = self.A.astype(int), self.b.astype(int), self.A_eq.astype(int), self.b_eq.astype(int)
+                case _:
+                    raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ImportError as e:
             raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}")
-        A += np.zeros_like(A)
-        b += np.zeros_like(b)
-        A_eq += np.zeros_like(A_eq)
-        b_eq += np.zeros_like(b_eq)
         if A.size != 0:
-            with np.printoptions(threshold=0):
+            if A.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                A_as_str = str(A + np.zeros_like(A)).splitlines()
+            else:
                 A_as_str = str(A).splitlines()
             nlines = len(A_as_str)
             idx_text = nlines - (1 if nlines <= 2 else 2)
             A_lines = [pad(line, len(A_as_str[-1])) for line in A_as_str]
             x_lines = [" |    " if idx != idx_text else " x <= " for idx in range(nlines)]
-            with np.printoptions(threshold=0):
+            if b.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                b_lines = str(np.atleast_2d(b).T + np.zeros((1, self.n))).splitlines()
+            else:
                 b_lines = str(np.atleast_2d(b).T).splitlines()
             comb_Ab = "\n".join(["".join(line) for line in zip(A_lines, x_lines, b_lines)])
         else:
             comb_Ab = None
         if A_eq.size != 0:
-            with np.printoptions(threshold=0):
+            if A_eq.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                A_eq_as_str = str(A_eq + np.zeros_like(A_eq)).splitlines()
+            else:
                 A_eq_as_str = str(A_eq).splitlines()
             nlines_eq = len(A_eq_as_str)
             idx_text_eq = nlines_eq - (1 if nlines_eq <= 2 else 2)
             A_eq_lines = [pad(line, len(A_eq_as_str[-1])) for line in A_eq_as_str]
             x_eq_lines = [" |    " if idx != idx_text_eq else " x == " for idx in range(nlines_eq)]
-            with np.printoptions(threshold=0):
+            if b_eq.dtype == float:  # Add array of zeros to avoid `-0.` in print output
+                b_eq_lines = str(np.atleast_2d(b_eq).T + np.zeros((1, self.n))).splitlines()
+            else:
                 b_eq_lines = str(np.atleast_2d(b_eq).T).splitlines()
             comb_Ab_eq = "\n".join(["".join(line) for line in zip(A_eq_lines, x_eq_lines, b_eq_lines)])
         else:
@@ -955,69 +977,52 @@ class Polytope:
 
     def __repr__(self) -> str:
         """Return a representation of the polytopes attributes"""
-        attrs = ", ".join(f"{key}={value}" for key, value in self._repr_items())
+        attrs = ", ".join(f"{key}={value}" for key, value in repr_items(self))
         return f"{self.__class__.__name__}({attrs})"
 
-    def _repr_items(self) -> list[tuple[str, str]]:
-        """Return (attribute, formatted-value) pairs used by repr formatting"""
-
-        def _format_repr_value(value: Any) -> str:
-            if isinstance(value, np.ndarray):
-                return f"NDArray[shape={value.shape}, dtype={value.dtype}]"
-            if isinstance(value, tuple):
-                inner = ", ".join(_format_repr_value(item) for item in value)
-                if len(value) == 1:
-                    inner += ","
-                return f"({inner})"
-            return repr(value)
-
-        return [(key, _format_repr_value(value)) for key, value in self.__dict__.items()]
-
     def __format__(self, format_spec: str) -> str:
-        """Format specifier for f-strings (i.e., `f"{poly:format_spec}"`)"""
-        if format_spec.startswith('r'):
-            if len(format_spec) != 1:
-                raise ValueError(f"Debug specifier 'r' must be used in isolation, got '{format_spec}'")
-            attrs = ",\n".join(f"    {key}={value}" for key, value in self._repr_items())
-            return f"{self.__class__.__name__}(\n{attrs}\n)"
+        """Format the printed description of the polytope based on a format specifier"""
+        if format_spec == '':
+            return str(self)
 
-        pattern = r'^(i)?([hv]{1,2})?(\.\d*[feE])?$'
-        match = re.match(pattern, format_spec)
-        if not match:
-            raise ValueError(f"Unknown format code '{format_spec}' for object of type '{self.__class__.__name__}'")
+        which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec, valid_repr={'v', 'h'})
 
-        tag_i, modes, num_part, str_prec, char_type = match.groups()
-        modes = modes or ""
+        if which_debug == 'r':
+            return repr(self)
+        if which_debug == '#':
+            attrs = ",\n    ".join(f"{key}={value}" for key, value in repr_items(self, compact_ndarray=True))
+            return f"{self.__class__.__name__}(\n    {attrs},\n)"
 
-        precision = None
-        suppress = None
-        if num_part:
-            if tag_i and not modes:
-                raise ValueError("Summary 'i' does not take numeric formatting")
-            precision = int(str_prec) if str_prec else np.get_printoptions()['precision']
-            suppress = char_type == 'f'
+        comb = ""
+        if which_debug == 'i':
+            comb += self._str_header()
+        if which_repr is None:
+            return comb
 
-        res = []
-        if tag_i or not format_spec:  # Default to summary if no format spec is provided
-            res.append(f"{self.__class__.__name__} in R^{self.n}")
+        with np.printoptions(threshold=0,
+                             edgeitems=edgeitems,
+                             formatter=formatter,
+                             sign=sign,
+                             ):
+            if which_repr == '':
+                if self._hrepr is not None:
+                    str_repr = self._str_hrepr(to_dtype=to_dtype)
+                elif self._vrepr is not None:
+                    str_repr = self._str_vrepr(to_dtype=to_dtype)
+                else:
+                    raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                                                     "V-representation or H-representation")
+            elif which_repr == 'v':
+                str_repr = self._str_vrepr(to_dtype=to_dtype)
+            elif which_repr == 'h':
+                str_repr = self._str_hrepr(to_dtype=to_dtype)
+            else:
+                raise AssertionError(f"'which_repr' should only be '', 'v', or 'h', received {which_repr}")
+        if 'E' in format_spec:
+            str_repr = str_repr.replace('e', 'E')
+        comb += ("" if len(comb) == 0 else "\n") + str_repr
 
-        for char in modes:
-            match char:
-                case 'h':
-                    if precision is not None:
-                        with np.printoptions(precision=precision, suppress=suppress):
-                            res.append(self._str_hrepr())
-                    else:
-                        res.append(self._str_hrepr())
-                case 'v':
-                    if precision is not None:
-                        with np.printoptions(precision=precision, suppress=suppress):
-                            res.append(self._str_vrepr())
-                    else:
-                        res.append(self._str_vrepr())
-                case _:
-                    raise ValueError(f"Unknown format code '{char}' in format spec '{format_spec}' for object of type '{self.__class__.__name__}'")
-        return "\n".join(res)
+        return comb
 
     # [untested/unverified]
     # pylint: disable=protected-access

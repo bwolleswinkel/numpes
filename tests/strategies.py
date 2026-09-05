@@ -31,7 +31,7 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
             b = draw(arrays(float, (num_facets,), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
             try:  # FIXME: I don't know if this is a very good strategy; this was a fix for a QHull error
                 poly = pes.Polytope(A, b)
-            except RuntimeError as _:  # FIXME: Can we log this error instead?
+            except (RuntimeError, ValueError) as _:  # FIXME: Can we log this error instead?
                 reject()
         case 'both':
             num_verts = draw(st.integers(n + 1, n + 10))

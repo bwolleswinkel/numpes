@@ -37,7 +37,7 @@ class TestPolytopeRepr:
         (pes.poly([[1, 0],
                    [0, 1],
                    [0, 0]]),
-         "Polytope(_vrepr=(NDArray[shape=(3, 2), dtype=int64], NDArray[shape=(0, 2), dtype=float64]), _hrepr=None, _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
+         "Polytope(_vrepr=(array([[1, 0], [0, 1], [0, 0]]), array([], shape=(0, 2), dtype=float64)), _hrepr=None, _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
     ])
     def test_parameterize_str(self, poly: Polytope, expected_str: str) -> None:
         assert repr(poly) == expected_str, \
@@ -47,12 +47,12 @@ class TestPolytopeRepr:
         (pes.poly([[1, 0],
                    [0, 1],
                    [0, 0]]),
-         "Polytope(_vrepr=(NDArray[shape=(3, 2), dtype=int64], NDArray[shape=(0, 2), dtype=float64]), _hrepr=None, _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
+         "Polytope(_vrepr=(array([[1, 0], [0, 1], [0, 0]]), array([], shape=(0, 2), dtype=float64)), _hrepr=None, _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
         (pes.poly([[-1,  0],
                    [ 0, -1],
                    [ 1,  0],
                    [ 0,  1]], [0, 0, 1.0, 1.0]),
-         "Polytope(_vrepr=None, _hrepr=(NDArray[shape=(4, 3), dtype=float64], NDArray[shape=(0, 3), dtype=float64]), _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
+         "Polytope(_vrepr=None, _hrepr=(array([[-1.,  0.,  0.], [ 0., -1.,  0.], [ 1.,  0.,  1.], [ 0.,  1.,  1.]]), array([], shape=(0, 3), dtype=float64)), _is_empty=None, _is_degen=None, _is_bounded=None, _is_full_dim=None, _is_pointed=None, _is_singleton=None, _dim=None, _vol=None, _diam=None, _width=None, _chebcr=None)"),
     ])
     def test_parameterize_print(self, poly: Polytope, expected_str: str, capsys) -> None:
         print(repr(poly))
@@ -63,13 +63,32 @@ class TestPolytopeRepr:
     @pytest.mark.skip(reason="Formatting is not yet implemented")
     def test_parameterize_format(self) -> None:
         ...
-        
+
+
+class TestPolytopeFormatHashtag:
+    """Tests for the `pes.Polytope.__format__` dunder method with `format_spec == '#'`"""
+
     @given(n=integers(min_value=1, max_value=N_MAX))
     def test_random_empty(self, n: int) -> None:
         poly = pes.poly_empty(n)
-        expected_str = f"Polytope(_vrepr=(NDArray[shape=(0, {n}), dtype=float64], NDArray[shape=(0, {n}), dtype=float64]), _hrepr=(NDArray[shape=(1, {n + 1}), dtype=int64], NDArray[shape=(0, {n + 1}), dtype=float64]), _is_empty=True, _is_degen=True, _is_bounded=True, _is_full_dim=False, _is_pointed=True, _is_singleton=False, _dim=0, _vol=0, _diam=nan, _width=0, _chebcr=(NDArray[shape=({n},), dtype=float64], nan))"
-        assert repr(poly) == expected_str, \
-            f"Expected __repr__ to return\n{expected_str}\nbut got \n{repr(poly)}\n instead"
+        expected_str = \
+            f"Polytope(\n" \
+            f"    _vrepr=(NDArray[shape=(0, {n}), dtype=float64], NDArray[shape=(0, {n}), dtype=float64]),\n" \
+            f"    _hrepr=(NDArray[shape=(1, {n + 1}), dtype=int64], NDArray[shape=(0, {n + 1}), dtype=float64]),\n" \
+            f"    _is_empty=True,\n" \
+            f"    _is_degen=True,\n" \
+            f"    _is_bounded=True,\n" \
+            f"    _is_full_dim=False,\n" \
+            f"    _is_pointed=True,\n" \
+            f"    _is_singleton=False,\n" \
+            f"    _dim=0,\n" \
+            f"    _vol=0,\n" \
+            f"    _diam=nan,\n" \
+            f"    _width=0,\n" \
+            f"    _chebcr=(NDArray[shape=({n},), dtype=float64], nan),\n" \
+            f")"
+        assert f"{poly:#}" == expected_str, \
+            f"Expected `f'{{poly:#}}'` to return\n{expected_str}\nbut got \n{f"{poly:#}"}\n instead"
 
 
 @requires(
