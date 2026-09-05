@@ -38,7 +38,7 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, pad
-from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
+from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError, ConversionError
 from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
 
 if TYPE_CHECKING:
@@ -859,9 +859,10 @@ class Polytope:
     # [untested/unverified]
     def _str_vrepr(self) -> str:
         """"Description of the polytope in V-represntation"""
-        if self._vrepr is None:
-            raise ValueError("The polytope must be initialized in V-representation to use this method")
-        verts, rays = self.vrepr
+        try:
+            verts, rays = self.vrepr
+        except ConversionError as e:
+            raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}")
         verts += np.zeros_like(verts)
         rays += np.zeros_like(rays)
         edgeitems = np.get_printoptions()['edgeitems']
@@ -900,9 +901,10 @@ class Polytope:
     # pylint: disable=invalid-name
     def _str_hrepr(self) -> str:
         """"Description of the polytope in H-represntation"""
-        if self._hrepr is None:
-            raise ValueError("The polytope must be initialized in H-representation to use this method")
-        A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+        try:
+            A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+        except ImportError as e:
+            raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}")
         A += np.zeros_like(A)
         b += np.zeros_like(b)
         A_eq += np.zeros_like(A_eq)
