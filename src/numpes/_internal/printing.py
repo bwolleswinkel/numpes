@@ -7,7 +7,7 @@ import numpy as np
 from numpes._config import CFG
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Callable, Literal
 
 
 # [untested/unverified]
@@ -245,3 +245,90 @@ def repr_items(obj: object,
         return repr(value)
 
     return [(key, fmt_repr_value(value, compact_ndarray)) for key, value in obj.__dict__.items()]
+
+
+
+def format_spec_to_opts(format_spec: str,
+                        valid_repr: set[str] = set(),
+                        ) -> tuple[Literal['', 'i', 'r', '#'] | None,
+                                   str | None,
+                                   Literal['float', 'int'] | None,
+                                   int | None,
+                                   dict[str, Callable[[Any], str]] | None,
+                                   Literal['-', '+', ' '] | None,
+                                   ]:
+    if not format_spec:
+        raise AssertionError(f"Expected 'format_spec' to be non-empty, but received ''")
+    if valid_repr.intersection({'i', 'r', '#', 'd', 'f', 'e', 'E'}):
+        raise AssertionError(f"'valid_repr' cannot contain 'i', 'r', '#', 'd', 'f', 'e', or 'E', but received valid_repr={valid_repr}")
+
+    token = format_spec
+    which_debug = None
+    which_repr = ''
+    to_dtype = None
+    edgeitems = None
+    formatter = None
+    sign = None
+
+    if token == 'r' or token == '#':
+        which_debug = token
+        token = token[1:]
+    if 'r' in token or '#' in token:
+        raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
+    if token.startswith('i'):
+        which_debug = 'i'
+        token = token[1:]
+    if len(token) == 0:
+        return which_debug, None, None, None, None, None
+    if token[0] in valid_repr:
+        which_repr = token[0]
+        token = token[1:]
+    if token and token[0] in {' ', '+', '-'}:
+        sign = token[0]
+        token = token[1:]
+    if token and (char := token[0]) in {'f', 'e', 'E'}:
+        sign = sign if sign is not None else ' '
+        formatter = {
+            'float': lambda value: f'{value:{sign}{'f' if char == 'f' else 'e'}}',
+        }
+        to_dtype = 'float'
+        token = token[1:]
+    if token.startswith('.'):
+        digits, idx = '', 1
+        while idx < len(token) and token[idx].isdigit():
+            digits += token[idx]
+            idx += 1
+        if not digits:
+            raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, received '{token}'")
+        token = token[idx:]
+        if token and (char := token[0]) in {'f', 'e', 'E'}:
+            sign = sign if sign is not None else ' '
+            if char == 'f' and digits == '0':
+                formatter = {
+                    'float': lambda value: f"{value:{sign}.0f}.",
+                }
+            else:
+                formatter = {
+                    'float': lambda value: f"{value:{sign}.{int(digits)}{char}}",
+                }
+            to_dtype = 'float'
+            token = token[1:]
+        elif token and token[0] == 'd':
+            raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' cannot be followed by 'd' as integer type does not take precision")
+        elif not token:
+            raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', but was not followed by any character")
+        else:
+            raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
+    elif token.startswith('d'):
+        to_dtype = 'int'
+        token = token[1:]
+    if token.startswith('~'):
+        digits = token[1:]
+        if not digits.isdigit():
+            raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
+        edgeitems = int(digits)
+        token = ''
+    if token != '':
+        raise ValueError(f"Invalid format '{format_spec}': substring not recognized starting with '{token}'")
+
+    return which_debug, which_repr, to_dtype, edgeitems, formatter, sign

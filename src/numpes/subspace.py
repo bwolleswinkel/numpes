@@ -42,7 +42,7 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import wraps
-from numpes._internal.printing import format_as_set, repr_items
+from numpes._internal.printing import format_as_set, repr_items, format_spec_to_opts
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
@@ -211,7 +211,7 @@ class Subspace:
     def __str__(self) -> str:
         """Descriptive representation of the subspace"""
         header = self._str_header()
-        with np.printoptions(threshold=0):
+        with np.printoptions(threshold=0):  # FIXME: Where to do this threshold?
             str_basis = self._str_basis()
         return header + "\n" + str_basis
 
@@ -258,84 +258,32 @@ class Subspace:
 
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the subspace based on a format specifier"""
-        # FIXME: Unify this method and move it to `printing`
-        token = format_spec
-        comb = ""
-        threshold: int | None = 0
-        sign: Literal['-', '+', ' '] | None = None
-        formatter: dict[str, Callable[[Any], str]] | None = None
-        to_dtype: Literal['float', 'int'] | None = None
-        edgeitems: int | None = None
-
-        if token == '':
+        if format_spec == '':
             return str(self)
-        if token == 'r':
+
+        which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec)
+
+        if which_debug == 'r':
             return repr(self)
-        if token == '#':
+        if which_debug == '#':
             attrs = ",\n    ".join(f"{key}={value}" for key, value in repr_items(self, compact_ndarray=True))
             return f"{self.__class__.__name__}(\n    {attrs},\n)"
-        if 'r' in token or '#' in token:
-            raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
-        if token.startswith('i'):
-            comb += self._str_header()
-            token = token[1:]
-        if len(token) == 0:
-            return comb
-        if token[0] in {' ', '+', '-'}:
-            sign = cast('Literal["-", "+", " "]', token[0])
-            token = token[1:]
-        if token and token[0] in {'f', 'e', 'E'}:
-            sign = sign if sign is not None else ' '
-            float_format = 'f' if token[0] == 'f' else 'e'
-            formatter = {
-                'float': lambda value: f'{value:{sign}{float_format}}',
-            }
-            to_dtype = 'float'
-            token = token[1:]
-        if token.startswith('.'):
-            digits, idx = '', 1
-            while idx < len(token) and token[idx].isdigit():
-                digits += token[idx]
-                idx += 1
-            if not digits:
-                raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, received '{token}'")
-            token = token[idx:]
-            if token and token[0] in {'f', 'e', 'E'}:
-                char = token[0]
-                sign = sign if sign is not None else ' '
-                if char == 'f' and digits == '0':
-                    formatter = {
-                        'float': lambda value: f"{value:{sign}.0f}.",
-                    }
-                else:
-                    formatter = {
-                        'float': lambda value: f"{value:{sign}.{int(digits)}{char}}",
-                    }
-                to_dtype = 'float'
-                token = token[1:]
-            elif token and token[0] == 'd':
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' cannot be followed by 'd' as integer type does not take precision")
-            elif not token:
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', but was not followed by any character")
-            else:
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
-        elif token.startswith('d'):
-            to_dtype = 'int'
-            token = token[1:]
-        if token.startswith('~'):
-            digits = token[1:]
-            if not digits.isdigit():
-                raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
-            edgeitems = int(digits)
-            token = ''
-        if token != '':
-            raise ValueError(f"Invalid format '{format_spec}': trailing junk characters '{token}'")
 
-        with np.printoptions(threshold=threshold, sign=sign, formatter=cast('Any', formatter), edgeitems=edgeitems):
+        comb = ""
+        if which_debug == 'i':
+            comb += self._str_header()
+        if which_repr is None:
+            return comb
+
+        with np.printoptions(threshold=0,
+                             edgeitems=edgeitems,
+                             formatter=formatter,
+                             sign=sign,
+                             ):
             str_basis = self._str_basis(to_dtype=to_dtype)
-            if 'E' in format_spec:
-                str_basis = str_basis.replace('e', 'E')
-            comb += ("" if len(comb) == 0 else "\n") + str_basis
+        if 'E' in format_spec:
+            str_basis = str_basis.replace('e', 'E')
+        comb += ("" if len(comb) == 0 else "\n") + str_basis
 
         return comb
 
