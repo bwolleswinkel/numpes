@@ -7,7 +7,7 @@ import numpy as np
 from numpes._config import CFG
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Callable, Literal
+    from typing import Any, Callable, Literal, Optional
 
 
 # [untested/unverified]
@@ -88,7 +88,7 @@ def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
                 idx_start += 4
             else:
                 if j > i + (0 if (idx_trunc is None or i < idx_trunc) else 1):
-                    str_arr[i, idx_start:(idx_start + num_length)] = list(f" {char}" if (num_length == 2 and not '.' in arr) else f"{char:^{num_length}}")
+                    str_arr[i, idx_start:(idx_start + num_length)] = list(f" {char}" if (num_length == 2 and '.' not in arr) else f"{char:^{num_length}}")
                 idx_start += num_length + 1
             j += 1
 
@@ -249,7 +249,7 @@ def repr_items(obj: object,
 
 
 def format_spec_to_opts(format_spec: str,
-                        valid_repr: set[str] = set(),
+                        valid_repr: set[str] = {''},
                         ) -> tuple[Literal['', 'i', 'r', '#'] | None,
                                    str | None,
                                    Literal['float', 'int'] | None,
@@ -258,7 +258,7 @@ def format_spec_to_opts(format_spec: str,
                                    Literal['-', '+', ' '] | None,
                                    ]:
     if not format_spec:
-        raise AssertionError(f"Expected 'format_spec' to be non-empty, but received ''")
+        raise AssertionError("Expected 'format_spec' to be non-empty, but received ''")
     if valid_repr.intersection({'i', 'r', '#', 'd', 'f', 'e', 'E'}):
         raise AssertionError(f"'valid_repr' cannot contain 'i', 'r', '#', 'd', 'f', 'e', or 'E', but received valid_repr={valid_repr}")
 

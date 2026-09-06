@@ -29,7 +29,7 @@ aff_subs
 from __future__ import annotations
 
 from copy import copy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy as sp
@@ -42,13 +42,13 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import wraps
-from numpes._internal.printing import format_as_set, repr_items, format_spec_to_opts
+from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Literal, Optional, Self
+    from typing import Any, Iterator, Literal, Optional, Self
 
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike, NDArray

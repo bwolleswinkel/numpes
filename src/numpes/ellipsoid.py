@@ -16,13 +16,12 @@ except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
 from numpes._config import CFG
-from numpes._internal.printing import pad, sym_replace
+from numpes._internal.printing import pad, repr_items, sym_replace
 from numpes._internal.wraps import wraps
-from numpes._internal.printing import repr_items
 from numpes.utils.linalg import angles_givens, is_posdef
 
 if TYPE_CHECKING:
-    from typing import Literal, Optional, Callable, Any
+    from typing import Any, Callable, Literal, Optional
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from numpy.typing import ArrayLike, NDArray

@@ -20,7 +20,6 @@ poly_from_bounds
 
 from __future__ import annotations
 
-import re
 from copy import copy
 from itertools import product as iterproduct
 from typing import TYPE_CHECKING, overload
@@ -37,8 +36,8 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
-from numpes._internal.printing import format_as_set, pad, format_spec_to_opts, repr_items
-from numpes.exceptions import DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError, ConversionError
+from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
+from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
 
 if TYPE_CHECKING:
@@ -454,7 +453,7 @@ class Polytope:
     @property
     def vrepr(self) -> tuple[NDArray, NDArray]:
         """V-representation of the polytope as a tuple (verts, rays)"""
-        if self._vrepr is None and CFG.on_poly_convert():
+        if self._vrepr is None and CFG.on_poly_convert_():
             verts, rays = enum_gens(self.Ab, self.Ab_eq)
             self._vrepr = (verts, rays)
         return self._vrepr
@@ -870,7 +869,7 @@ class Polytope:
                 case _:
                     raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ConversionError as e:
-            raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}")
+            raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}") from e
         edgeitems = np.get_printoptions()['edgeitems']
         if verts.size != 0:
             if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
@@ -885,7 +884,7 @@ class Polytope:
             comb_verts = None
         if rays.size != 0:
             if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                rays_lines = format_as_set([str(np.atleast_2d(ray).T) + np.zeros((self.n, 1)) for ray in rays], edgeitems).splitlines()
+                rays_lines = format_as_set([str(np.atleast_2d(ray).T + np.zeros((self.n, 1))) for ray in rays], edgeitems).splitlines()
             else:
                 rays_lines = format_as_set([str(np.atleast_2d(ray).T) for ray in rays], edgeitems).splitlines()
             if comb_verts is None:
@@ -922,7 +921,7 @@ class Polytope:
                 case _:
                     raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ImportError as e:
-            raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}")
+            raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}") from e
         if A.size != 0:
             if A.dtype == float:  # Add array of zeros to avoid `-0.` in print output
                 A_as_str = str(A + np.zeros_like(A)).splitlines()
@@ -1228,7 +1227,7 @@ class Polytope:
                                                             atol=CFG.atol), :]
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
-                if CFG.aspect == 'equal':
+                if CFG.plot_aspect == 'equal':
                     ax.set_aspect('equal', adjustable='box')
             case 3:
                 if ax.name != '3d':
@@ -1243,7 +1242,7 @@ class Polytope:
                     if annotate_facets:
                         label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
                         ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
-                if CFG.aspect == 'equal':
+                if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
