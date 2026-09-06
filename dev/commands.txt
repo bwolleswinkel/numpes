@@ -26,3 +26,11 @@ rm -rf /tmp/numpes-docs
 # For building the documentation
 cd docs
 sphinx-apidoc -f -o api ../src/numpes  # FIXME: Doesn't really give the intended effect
+
+# For installing a test build# NOTE: Sometimes, after creating a new environment, for pycddlib, you might have to run the following. In bash, I ran the first two lines. I think `python=3.14.2` is actually most of the time not necessary, using `conda install pip` (to get the latest Python) should also work
+>>> brew install cddlib gmp
+>>> brew link gmp
+conda create -n venvnumpestest python=3.14.2
+conda activate venvnumpestest
+env "CFLAGS=-I$(brew --prefix)/include -L$(brew --prefix)/lib" python -m pip install pycddlib
+pip install --no-cache-dir -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ numpes[full]
