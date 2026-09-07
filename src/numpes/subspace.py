@@ -36,6 +36,8 @@ import scipy as sp
 
 try:
     import matplotlib.pyplot as plt
+    from matplotlib.typing import ColorType
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
@@ -294,7 +296,7 @@ class Subspace:
     def copy(self,
              deepcopy: bool = True,
              memo: Optional[dict[int, Any]] = None,
-             ) -> Subspace:
+             ) -> Self:
         """Return a (deep)copy of the subspace. 
 
         Parameters
@@ -338,13 +340,13 @@ class Subspace:
 
     # [untested/unverified]
     def plot(self,
-             color: Optional[str] = None,
+             color: Optional[ColorType] = None,
              alpha: float = 0.5,
-             label: Optional[str] = None,
              plot_basis: bool = False,
+             label: Optional[str] = None,
              show: bool = True,
-             ax: Optional[Axes] = None,
-             ) -> Axes:
+             ax: Optional[Axes | Axes3D] = None,
+             ) -> Axes | Axes3D:
         """Plot the subspace"""
         if not MATPLOTLIB_INSTALLED:
             raise ImportError("Matplotlib is required for plotting." \
@@ -374,22 +376,31 @@ class Subspace:
         match self.dim:
             case 0:
                 ax.plot(*[0 for _ in range(self.n)], 'o', color=color, label=label)
+                if label is not None:
+                    ax.legend()
             case 1:
                 line = plot_line(ax, self.basis[0, :], color=color, alpha=alpha)
                 if label is not None:
                     line.set_label(label)
+                    ax.legend()
             case 2:
                 if self.n == 1:
                     raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 plane = plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
                 if label is not None:
                     plane.set_label(label)
+                    ax.legend()
+                if CFG.plot_aspect == 'equal':
+                    ax.set_aspect('equal', adjustable='box')
             case 3:
                 if self.n <= 2:
                     raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 box = plot_box(ax, color=color, alpha=alpha)
                 if label is not None:
                     box.set_label(label)
+                    ax.legend()
+                if CFG.plot_aspect == 'equal':
+                    ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
 
@@ -407,8 +418,9 @@ class Subspace:
 
     # [untested/unverified]
     def plot_basis(self,
-                   color: str | None = None,
-                   label: Optional[list[str]] = None,
+                   color: Optional[ColorType] = None,
+                   annotate: list[str] | bool = False,
+                   label: Optional[str] = None,
                    show: bool = True,
                    ax: Optional[Axes] = None,
                    ) -> Axes:
@@ -440,6 +452,25 @@ class Subspace:
 
         for idx, basis_vector in enumerate(self):
             plot_vector(ax, basis_vector, color=color, label=label if idx == 0 else None)
+
+        if annotate:
+            for idx in range(self.d):
+                annotation = annotate[idx] if isinstance(annotate, list) else fr"{idx}"
+                if self.n == 1:
+                    ax.text(self.basis[idx, 0],
+                            annotation,
+                            color='black')
+                elif self.n == 2:
+                    ax.text(self.basis[idx, 0],
+                            self.basis[idx, 1],
+                            annotation,
+                            color='black')
+                elif self.n == 3:
+                    ax.text(self.basis[idx, 0],
+                            self.basis[idx, 1],
+                            self.basis[idx, 2],
+                            annotation,  # type: ignore[call-arg,arg-type]
+                            color='black')
 
         if show:
             plt.show()

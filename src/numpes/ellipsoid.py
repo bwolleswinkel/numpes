@@ -11,6 +11,7 @@ try:
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
     from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
+    from matplotlib.typing import ColorType
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
@@ -345,9 +346,10 @@ class Ellipsoid:
 
     # untested/unverified
     def plot(self,
-             num_points: int = 100,
-             color: Optional[str] = None,
+             color: Optional[ColorType] = None,
              alpha: float = 0.5,
+             linewidth: Optional[float] = None,
+             linestyle: str = '-',
              plot_edges: bool = True,
              plot_radii: bool = False,
              label: Optional[str] = None,
@@ -391,13 +393,20 @@ class Ellipsoid:
                                      edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                 if plot_edges
                                                 else None),
+                                     linewidth=linewidth,
+                                     linestyle=linestyle,
                                      label=label,
                                      ))
                 ax.autoscale_view()
+                if label is not None:
+                    ax.legend()
+                if CFG.plot_aspect == 'equal':
+                    ax.set_aspect('equal', adjustable='box')
             case 3:
                 if ax.name != '3d':
                     raise ValueError(f"The dimension of the ellipsoid n={self.n} " \
                                       "does not match the dimension of the provided axes 'ax'")
+                num_points = 100  # FIXME: Maybe make this a CFG setting?
                 u, v = (np.linspace(0, 2 * np.pi, num_points),
                         np.linspace(0,     np.pi, num_points))
                 sphere = np.array([self.radii[0] * np.outer(np.cos(u), np.sin(v)),
@@ -415,6 +424,10 @@ class Ellipsoid:
                                 alpha=alpha,
                                 label=label,
                                 )
+                if label is not None:
+                    ax.legend()
+                if CFG.plot_aspect == 'equal':
+                    ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
 
@@ -428,8 +441,8 @@ class Ellipsoid:
     # [untested/unverified]
     def plot_radii(self,
                    color: Optional[str] = None,
+                   annotate: list[str] | bool = True,
                    label: Optional[str] = None,
-                   annotate: bool | list[str] = True,
                    show: bool = True,
                    ax: Optional[Axes | Axes3D] = None,
                    ) -> Axes | Axes3D:

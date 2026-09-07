@@ -30,6 +30,8 @@ try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
+    from matplotlib.typing import ColorType
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
@@ -1040,7 +1042,7 @@ class Polytope:
     def copy(self,
              deepcopy: bool = True,
              memo: Optional[dict[int, Any]] = None,
-             ) -> Polytope:
+             ) -> Self:
         """Return a (deep)copy of the polytope. 
 
         Parameters
@@ -1165,17 +1167,20 @@ class Polytope:
 
     # pylint: disable=too-many-branches,too-many-statements
     def plot(self,
-             color: str | None = None,
+             color: Optional[ColorType] = None,
              alpha: float = 0.5,
+             linewidth: Optional[float] = None,
+             linestyle: str = '-',
              plot_edges: bool = True,
              annotate_verts: list[str] | bool = False,
              annotate_facets: list[str] | bool = False,
+             label: Optional[str] = None,
              show: bool = True,
-             ax: Optional[Axes] = None,
-             ) -> Axes:
+             ax: Optional[Axes | Axes3D] = None,
+             ) -> Axes | Axes3D:
         """Plot a polytope"""
 
-        def _plot_poly_2d(points: NDArray, ax: Axes, color: str, alpha: float, plot_edges: bool) -> None:
+        def _plot_poly_2d(points: NDArray, ax: Axes, color: str, alpha: float, label: str, plot_edges: bool) -> None:
             if points.shape[0] < 3:
                 raise ValueError("At least three points are required to plot a polytope in 2D")
             centroid = np.mean(points, axis=0)
@@ -1184,7 +1189,10 @@ class Polytope:
                                              facecolor=mpl.colors.to_rgba(color, alpha=alpha),
                                              edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                         if plot_edges
-                                                        else None)))
+                                                        else None),
+                                             linewidth=linewidth,
+                                             linestyle=linestyle,
+                                             label=label))
             ax.autoscale_view()
 
         def _plot_facet_3d(points: NDArray, ax: Axes, color: str, alpha: float, plot_edges: bool) -> None:
@@ -1198,7 +1206,9 @@ class Polytope:
                                                  facecolor=mpl.colors.to_rgba(color, alpha=alpha),
                                                  edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                             if plot_edges
-                                                            else None)))
+                                                            else None),
+                                                 linewidth=linewidth,
+                                                 linestyle=linestyle))
 
         if not MATPLOTLIB_INSTALLED:
             raise ImportError("Matplotlib is required for plotting." \
@@ -1230,15 +1240,17 @@ class Polytope:
                 if ax.name == '3d':
                     raise ValueError("The dimension of the polytope" \
                     " does not match the dimension of the provided axes 'ax'")
-                _plot_poly_2d(self.verts, ax, color, alpha, plot_edges=plot_edges)
+                _plot_poly_2d(self.verts, ax, color, alpha, label, plot_edges=plot_edges)
                 if annotate_facets:
                     for idx in range(self.m):
                         verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                             self.b[idx],
                                                             rtol=CFG.rtol,
                                                             atol=CFG.atol), :]
-                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
-                        ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
+                        ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
+                if label is not None:
+                    ax.legend()
                 if CFG.plot_aspect == 'equal':
                     ax.set_aspect('equal', adjustable='box')
             case 3:
@@ -1252,8 +1264,18 @@ class Polytope:
                                                         atol=CFG.atol), :]
                     _plot_facet_3d(verts_facet, ax, color, alpha, plot_edges=plot_edges)
                     if annotate_facets:
-                        label = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
-                        ax.text(*np.mean(verts_facet, axis=0), label, color='black')  # type: ignore[call-arg]
+                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
+                        ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
+                if label is not None:
+                    handles, _ = ax.get_legend_handles_labels()
+                    handles.append(mpl.patches.Patch(facecolor=mpl.colors.to_rgba(color, alpha=alpha),
+                                                     edgecolor=(mpl.colors.to_rgba(color, alpha=1)
+                                                                if plot_edges
+                                                                else "none"),
+                                                     linewidth=linewidth,
+                                                     linestyle=linestyle,
+                                                     label=label))
+                    ax.legend(handles=handles)
                 if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
@@ -1261,17 +1283,17 @@ class Polytope:
 
         if annotate_verts:
             for idx in range(self.k):
-                label = annotate_verts[idx] if isinstance(annotate_verts, list) else fr"${idx}$"
+                annotation = annotate_verts[idx] if isinstance(annotate_verts, list) else fr"{idx}"
                 if self.n == 2:
                     ax.text(self.verts[idx, 0],
                             self.verts[idx, 1],
-                            label,
+                            annotation,
                             color='black')
                 elif self.n == 3:
                     ax.text(self.verts[idx, 0],
                             self.verts[idx, 1],
                             self.verts[idx, 2],
-                            label,  # type: ignore[call-arg,arg-type]
+                            annotation,  # type: ignore[call-arg,arg-type]
                             color='black')
 
         if show:
