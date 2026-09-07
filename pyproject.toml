@@ -89,7 +89,9 @@ commands = [
     "--cov-report=term-missing",
     "--cov-report=",
     "--no-cov-on-fail",
+    "--doctest-modules",
     "-rs",
+    "src/numpes",
     "tests",
   ]
 ]
@@ -108,7 +110,9 @@ commands = [
     "--cov-report=term-missing",
     "--cov-report=",
     "--no-cov-on-fail",
+    "--doctest-modules",
     "-rs",
+    "src/numpes",
     "tests",
   ]
 ]
@@ -127,7 +131,9 @@ commands = [
     "--cov-report=term-missing",
     "--cov-report=",
     "--no-cov-on-fail",
+    "--doctest-modules",
     "-rs",
+    "src/numpes",
     "tests",
   ]
 ]
@@ -146,7 +152,9 @@ commands = [
     "--cov-report=term-missing",
     "--cov-report=",
     "--no-cov-on-fail",
+    "--doctest-modules",
     "-rs",
+    "src/numpes",
     "tests",
   ]
 ]

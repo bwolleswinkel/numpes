@@ -14,7 +14,7 @@ and a `Read the Docs<https://numpes.readthedocs.io/en/latest/>`_ hosted version 
 more elaborate explanations and examples.
 
 The docstring examples assume that `numpes` has been imported as `pes`:
->>> import numpes as pes
+>>> import numpes as pes  # doctest: +SKIP
 
 Code snippets are indicated by three greater-than signs:
 >>> P = pes.poly(n=3)
@@ -22,7 +22,7 @@ Code snippets are indicated by three greater-than signs:
 True
 
 Use the built-in `help` function to view a function's docstring:
->>> help(pes.poly)
+>>> help(pes.poly)  # doctest: +SKIP
 
 Sub-packages
 ------------

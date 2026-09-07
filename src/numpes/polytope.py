@@ -82,7 +82,7 @@ class Polytope:
                  A_eq: Optional[ArrayLike] = None,
                  b_eq: Optional[ArrayLike] = None,
                  ) -> None:
-        """Initialize a Polytope from vertices or half-spaces.
+        r"""Initialize a Polytope from vertices or half-spaces.
 
         Parameters
         ----------
@@ -125,22 +125,34 @@ class Polytope:
         Examples
         --------
         Initialize a polytope from vertices (V-representation):
-        >>> verts = np.array([[0, 0], [1, 0], [0, 1]])
+        >>> verts = [[0, 0],
+        ...          [1, 0],
+        ...          [0, 1]]
         >>> poly = pes.poly(verts)
         >>> print(poly)
-        Polytope with 3 vertices in R^2
+        Polytope in R^2
+             /[[0]  [[1]  [[0] \
+        conv \ [0]], [0]], [1]]/
 
         Initialize a polytope from half-spaces (H-representation):
-        >>> A = np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])
-        >>> b = np.array([1, 1, 0, 0])
+        >>> A = [[1, 0],
+        ...      [0, 1],
+        ...      [-1, 0],
+        ...      [0, -1]]
+        >>> b = [1, 1, 0, 0]
         >>> poly = pes.poly(A, b)
         >>> print(poly)
-        Polytope defined by 4 half-spaces in R^2
+        Polytope in R^2
+        [[ 1  0]  |    [[1]
+         [ 0  1]  |     [1]
+         [-1  0]  x <=  [0]
+         [ 0 -1]] |     [0]]
 
         Initialize an empty polytope in R^2:
         >>> poly = pes.poly(n=2)
         >>> print(poly)
-        Empty polytope in R^2
+        Polytope in R^2
+        [0 0] x <= [-1]
         """
         self._vrepr: tuple[NDArray, NDArray] | None = None
         self._hrepr: tuple[NDArray, NDArray] | None = None
@@ -787,7 +799,7 @@ class Polytope:
         --------
         >>> poly = pes.poly_from_point([1, 2, 3])
         >>> print(poly)
-        Singleton polytope in R^3
+        Polytope in R^3
         [[1. 0. 0.]  |    [[1.]
          [0. 1. 0.]  x ==  [2.]
          [0. 0. 1.]] |     [3.]]
@@ -932,7 +944,7 @@ class Polytope:
             A_lines = [pad(line, len(A_as_str[-1])) for line in A_as_str]
             x_lines = [" |    " if idx != idx_text else " x <= " for idx in range(nlines)]
             if b.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                b_lines = str(np.atleast_2d(b).T + np.zeros((1, self.n))).splitlines()
+                b_lines = str(np.atleast_2d(b).T + np.zeros((b.size, 1))).splitlines()
             else:
                 b_lines = str(np.atleast_2d(b).T).splitlines()
             comb_Ab = "\n".join(["".join(line) for line in zip(A_lines, x_lines, b_lines)])
@@ -948,7 +960,7 @@ class Polytope:
             A_eq_lines = [pad(line, len(A_eq_as_str[-1])) for line in A_eq_as_str]
             x_eq_lines = [" |    " if idx != idx_text_eq else " x == " for idx in range(nlines_eq)]
             if b_eq.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                b_eq_lines = str(np.atleast_2d(b_eq).T + np.zeros((1, self.n))).splitlines()
+                b_eq_lines = str(np.atleast_2d(b_eq).T + np.zeros((b_eq.size, 1))).splitlines()
             else:
                 b_eq_lines = str(np.atleast_2d(b_eq).T).splitlines()
             comb_Ab_eq = "\n".join(["".join(line) for line in zip(A_eq_lines, x_eq_lines, b_eq_lines)])
@@ -1072,7 +1084,7 @@ class Polytope:
                 M: NDArray,
                 calc_chebcr: bool = False,
                 in_place: bool = True,
-                ) -> Polytope | Self:
+                ) -> Self:
         """Matrix multiplication with a matrix `M`.
         
         Parameters
@@ -1139,7 +1151,7 @@ class Polytope:
     def minimal(self,
                 which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
                 in_place: bool = True,
-                ) -> Polytope | Self:
+                ) -> Self:
         """Return a minimal representation of the polytope by removing redundant vertices and facets"""
         obj = self if in_place else self.copy()
         if which_repr in {'vrepr', 'both'}:

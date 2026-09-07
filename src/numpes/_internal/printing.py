@@ -42,17 +42,16 @@ def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
     Examples
     --------
     >>> Q = np.array([[ 1, -1],
-                      [-1,  1])
+    ...               [-1,  1]])
     >>> print(sym_replace(str(Q)))
-    [[ 1, * ],
-     [-1,  1])
+    [[ 1  *]
+     [-1  1]]
 
     Truncation is also supported.
-     
     >>> A = np.arange(10_000).reshape(100, 100) * 1E-2
     >>> Q = A + A.T
     >>> with np.printoptions(precision=2, edgeitems=2):
-    >>>     print(sym_replace(str(Q), char='•'))
+    ...     print(sym_replace(str(Q), char='•'))
     [[  0.     •    ...   •      •   ]
      [  1.01   2.02 ...   •      •   ]
      ...
@@ -121,8 +120,8 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
     Examples
     --------
     >>> verts = np.array([[1, 0],
-                          [0, 1],
-                          [0, 0]])
+    ...                   [0, 1],
+    ...                   [0, 0]])
     >>> print(format_as_set([str(np.atleast_2d(vert).T) for vert in verts]))
     /[[1]  [[0]  [[0] \\
     \\ [0]], [1]], [0]]/
@@ -187,7 +186,7 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
 # [untested/unverified]
 def pad(text: str, length: int, char: str = " ") -> str:
     """Pad a string that is shorter than a certain length by appending copies of `char` (to the end).
-    Leaves the string unchanged if the string is of greater or equal lenght.
+    Leaves the string unchanged if the string is of greater or equal length.
     
     Parameters
     ----------
@@ -206,25 +205,25 @@ def pad(text: str, length: int, char: str = " ") -> str:
     Examples
     --------
     >>> text = "Sample text"
-    print(pad(text, 20, char="_"))
+    >>> print(pad(text, 20, char="_"))
     Sample text_________
 
     By default, a space is used as a padding character.
 
     >>> text_1, text_2 = "First part", "Second part"
-    print(pad(text_1, 30) + text_2)
+    >>> print(pad(text_1, 30) + text_2)
     First part                    Second part
 
     If the input text is longer then `length`, the original string is returned.
     >>> text = "Once upon a time"
-    print(pad(text, 5, char= "?"))
+    >>> print(pad(text, 5, char= "?"))
     Once upon a time
     """
     if len(char) != 1:
-        raise ValueError(f"The length of `char` must be 1, recieved '{char}' of length {len(char)}")
+        raise ValueError(f"The length of `char` must be 1, received '{char}' of length {len(char)}")
     return (text
             if len(text) >= length
-            else text + ''.join([' '] * (length - len(text))))
+            else text + ''.join([char] * (length - len(text))))
 
 
 def repr_items(obj: object,

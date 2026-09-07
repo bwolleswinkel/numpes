@@ -82,20 +82,6 @@ def multipledispatch(func: Callable[[Any], Any]) -> DispatcherFunction:
     -------
     DispatcherFunction
         A wrapper function that handles multiple dispatching based on argument length.
-
-    Examples
-    --------
-    >>> @multipledispatch
-    ... def example_func(*args):
-    ...     return "default"
-    ...
-    ... @example_func.args(len=1)
-    ... def _(arg1):
-    ...     return f"one arg: {arg1}"
-    ...
-    ... @example_func.args(len=2)
-    ... def _(arg1, arg2):
-    ...     return f"two args: {arg1}, {arg2}"
     """
     # Create a dictionary to store dispatchers
     dispatchers: dict[int | tuple[int, tuple[str, ...], tuple[str, ...], tuple[tuple[str, Any], ...]], Callable] = {}

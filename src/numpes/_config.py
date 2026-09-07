@@ -163,7 +163,7 @@ def set_algo_options(*,
     --------
     >>> pes.set_algo_options(atol=0.01)
     ... # The absolute tolerance is set to 0.01 globally
-    ... print(pes.get_config('atol'))
+    >>> print(pes.get_config('atol'))
     0.01
 
     Multiple settings can be updated at once.
@@ -205,14 +205,16 @@ def algo_options(*,
     ...     # Within this context, the absolute tolerance is set to 0.01
     ...     print(pes.get_config('atol'))
     0.01
-    ... # After this context, the absolute tolerance is reset to its original value of 1E-8
+    >>> # After this context, the absolute tolerance is reset to its original value of 1E-8
     ... print(pes.get_config('atol'))
-    1E-08
+    1e-08
 
     Multiple settings can be updated at once.
 
     >>> with pes.algo_options(on_property_assign='minimal', lp_backend='pulp'):
     ...     # Within this context, assignment of properties will call 'self.minimal()' and linear programs will be solved using PuLP
+    ...     print(pes.get_config('on_property_assign'), pes.get_config('lp_backend'))
+    minimal pulp
     """
     values = locals()
     extra_kwargs = values.pop('extra_kwargs')
@@ -264,7 +266,7 @@ def set_display_options(*,
     --------
     >>> pes.set_display_options(sym_char='#')
     ... # The symbolic character is set to '#' globally
-    ... print(pes.get_config('sym_char'))
+    >>> print(pes.get_config('sym_char'))
     #
     """
     values = locals()
@@ -297,7 +299,7 @@ def display_options(*,
     ...     # Within this context, the symbolic character is set to '#'
     ...     print(pes.get_config('sym_char'))
     #
-    ... # After this context, the symbolic character is reset to its original value of '*'
+    >>> # After this context, the symbolic character is reset to its original value of '*'
     ... print(pes.get_config('sym_char'))
     *
     """

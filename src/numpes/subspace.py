@@ -99,18 +99,16 @@ class Subspace:
         Examples
         --------
         Initialize a subspace from basis vectors.
-
         >>> basis = [[1, 0,  0],
         ...          [0, 1, -1]]
         >>> subs = pes.subs(basis)
         >>> print(subs)
-        Subspace with 2 basis vectors in R^3
+        Subspace in R^3
              /[[1]  [[ 0] \
         span < [0] , [ 1] >
              \ [0]]  [-1]]/
 
         Initialize a trivial subspace in R^n.
-
         >>> subs = pes.subs(n=5)
         >>> print(subs)
         Trivial subspace in R^5
@@ -332,7 +330,7 @@ class Subspace:
     # [untested/unverified]
     def minimal(self,
                 in_place: bool = True,
-                ) -> Subspace | Self:
+                ) -> Self:
         """Compute a minimal representation of the subspace by removing linearly dependent basis vectors"""
         obj = self if in_place else self.copy()
         obj._basis = span(self._basis.T).T

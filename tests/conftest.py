@@ -146,3 +146,11 @@ for poly_data in _POLYTOPES_ALL:
 def reset_config() -> None:
     """Reset the global configuration before each test to ensure that tests are independent and do not interfere with each other through global state"""
     pes.reset_config()
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Add the package alias to every collected doctest namespace"""
+    for item in items:
+        doctest = getattr(item, 'dtest', None)
+        if doctest is not None:
+            doctest.globs['pes'] = pes

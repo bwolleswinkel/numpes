@@ -142,6 +142,7 @@ def rot_mat_2d(angle: float) -> NDArray:
 # [untested/unverified]
 def rot_mat_3d(angles: list[float],
                convention: str | Literal['givens', 'yaw_pitch_roll'] = 'givens',
+               units: Literal['rad', 'deg'] = 'rad',
                ) -> NDArray:
     # FIXME: Instead of using 'proper_euler' and 'tait_bryan', I should use the much more clear 'xyz', 'XYZ', etc., for intrinsic and ectrinsit rotation, and just keep 'givens' and 'yaw_pitch_roll' as special cases.
     """Create a 3D rotation matrix from a sequence of angles based on the specified convention.
@@ -154,6 +155,8 @@ def rot_mat_3d(angles: list[float],
         The axis-order convention to use for constructing the rotation matrix (see also notes). Must be 3 characters belonging to the set {'X', 'Y', 'Z'} (for intrinsic rotations) or {'x', 'y', 'z'} (for extrinsic rotations). Extrinsic and intrinsic rotations cannot be mixed teh character sequence. Two special cases are provided for convenience:
         - 'yaw_pitch_roll': Yaw-Pitch-Roll angles (ZYX intrinsic). Identical to 'ZYX'.
         - 'givens': QR-like adjacent-plane Givens sweep (xzx extrinsic). Identical to 'xzx'.
+    units : 'rad' or 'deg', default='rad'
+        The units of the provided angles
 
     Returns
     -------
@@ -162,30 +165,25 @@ def rot_mat_3d(angles: list[float],
 
     Examples
     --------
-    >>> angles = np.deg2rad([0, -45, 90])
-    >>> print(pes.utils.rot_mat_3d(angles, convention='yaw_pitch_roll').round(2))
-    [[ 0.    1.    0.  ]
+    >>> angles = [0, -45, 90]
+    >>> print(pes.utils.rot_mat_3d(angles, convention='yaw_pitch_roll', units='deg').round(2))
+    [[ 0.71 -0.   -0.71]
      [-0.71  0.   -0.71]
-     [-0.71  0.    0.71]]
-    >>> print(pes.utils.rot_mat_3d(angles, convention='xzx').round(2))
-    [[ 0.71  0.   -0.71]
-     [ 0.71  0.    0.71]
-     [ 0.   -1.    0.  ]]
-
-    Use `pes.utils.angles_3d_convert` to convert between different conventions of 3D rotation angles.
-
-    >>> angles = np.deg2rad([-30, 60, 45])  # Proper Euler angles in YZY convention
-    >>> angles_converted = pes.utils.angles_3d_convert(angles, from_convention='yzy', to_convention='givens')
-    >>> print(pes.utils.rot_mat_3d(angles_converted))
-    [[ 0.66 -0.75  0.05]
-     [ 0.61  0.5  -0.61]
-     [ 0.44  0.43  0.79]]
+     [ 0.    1.    0.  ]]
+    >>> print(pes.utils.rot_mat_3d(angles, convention='xzx', units='deg').round(2))
+    [[ 0.71  0.71  0.  ]
+     [ 0.    0.   -1.  ]
+     [-0.71  0.71  0.  ]]
 
     Notes
     -----
     Note that extrinsic rotations are equivalent to intrinsic rotations in the reverse order. For example, a zyx extrinsic rotation is equivalent to an XYZ intrinsic rotation.
     """
-    angles = angles_3d_convert(angles, from_convention=convention, to_convention='givens')
+    if units not in {'rad', 'deg'}:
+        raise ValueError(f"Units must be either 'rad' or 'deg', received unknown option '{units}'")
+    angles = angles_3d_convert(angles if units == 'rad' else np.deg2rad(angles).tolist(),
+                               from_convention=convention,
+                               to_convention='givens')
     return rot_mat(angles)
 
 
