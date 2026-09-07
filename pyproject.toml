@@ -161,7 +161,7 @@ commands = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-addopts = "--import-mode=importlib --strict-markers"
+addopts = "--import-mode=importlib --strict-markers --noconftest -p tests.conftest"  # This is to make sure conftest and the auto-use fixture for global reset are also triggered during doctests
 testpaths = ["tests"]
 markers = [
   # Function-based markers

@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 from hypothesis import settings
 
-import numpes as pes
 from tests.data.archetypes_polytope import _POLYTOPES_ALL, POLYTOPES_ARCHETYPES_REGISTRY, PolytopeData
 from tests.data.generators_polytope import centered_hypercube, cross_polytope, simplex, unit_hypercube
 
@@ -67,6 +66,7 @@ def pytest_generate_tests(metafunc: Metafunc) -> None:
 
 
 def poly_init_safe(poly_data: PolytopeData, repr: Literal['vrepr', 'hrepr', 'both']) -> Polytope:
+    import numpes as pes  # Imported lazily so pytest-cov starts measuring before numpes is first imported
     try:
         match repr:
             case 'vrepr':
@@ -145,11 +145,13 @@ for poly_data in _POLYTOPES_ALL:
 @pytest.fixture(autouse=True)
 def reset_config() -> None:
     """Reset the global configuration before each test to ensure that tests are independent and do not interfere with each other through global state"""
+    import numpes as pes  # Imported lazily so pytest-cov starts measuring before numpes is first imported
     pes.reset_config()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Add the package alias to every collected doctest namespace"""
+    import numpes as pes  # Imported lazily so pytest-cov starts measuring before numpes is first imported
     for item in items:
         doctest = getattr(item, 'dtest', None)
         if doctest is not None:
