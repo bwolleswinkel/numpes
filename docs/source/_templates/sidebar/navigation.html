@@ -1,4 +1,32 @@
 <!-- FROM: GitHub Copilot GPT 5.6 Luna | 2026/10/08 -->
+{% macro render_page(docname, level) %}
+{% set children = toctree_entries(docname) %}
+{% set current = pagename == docname or pagename.startswith(docname + '/') %}
+<li class="toctree-l{{ level }}{% if current %} current{% endif %}">
+  {% if children %}
+  <details class="sidebar-expandable"{% if current %} open{% endif %}>
+    <summary><a class="reference api-package-link" href="{{ pathto(docname) }}" onclick="this.closest('details').open = true;">{{ document_title(docname) }}</a></summary>
+    <ul>
+      {% for section in toctree_sections(docname) %}
+      {% if section.caption %}
+      <li class="toctree-l{{ level + 1 }}">
+        <p class="caption subpackages-caption"><span class="caption-text">{{ section.caption }}</span></p>
+        <ul>
+          {% for child in section.entries %}{{ render_page(child, level + 2) }}{% endfor %}
+        </ul>
+      </li>
+      {% else %}
+      {% for child in section.entries %}{{ render_page(child, level + 1) }}{% endfor %}
+      {% endif %}
+      {% endfor %}
+    </ul>
+  </details>
+  {% else %}
+  <a class="reference api-package-link" href="{{ pathto(docname) }}">{{ document_title(docname) }}</a>
+  {% endif %}
+</li>
+{% endmacro %}
+
 <div class="sidebar-tree">
   <p class="caption"><span class="caption-text">{{ toctree_caption('index', 'getting_started/welcome') }}</span></p>
   <ul>
@@ -25,34 +53,7 @@
               <li class="toctree-l3">
                 <p class="caption subpackages-caption"><span class="caption-text">{{ section.caption }}</span></p>
                 <ul>
-                  {% for child in section.entries %}
-                  {% set child_children = toctree_entries(child) %}
-                  <li class="toctree-l3{% if pagename == child or pagename.startswith(child + '/') %} current{% endif %}">
-                    {% if child_children %}
-                    <details class="sidebar-expandable"{% if pagename == child or pagename.startswith(child + '/') %} open{% endif %}>
-                      <summary><a class="reference api-package-link" href="{{ pathto(child) }}" onclick="this.closest('details').open = true;">{{ document_title(child) }}</a></summary>
-                      <ul>
-                      {% for nested_section in toctree_sections(child) %}
-                      <li class="toctree-l4">
-                          {% if nested_section.caption %}
-                        <p class="caption subpackages-caption"><span class="caption-text">{{ nested_section.caption }}</span></p>
-                          {% endif %}
-                        <ul>
-                          {% for nested_child in nested_section.entries %}
-                          <li class="toctree-l4{% if pagename == nested_child %} current{% endif %}">
-                            <a class="reference api-package-link" href="{{ pathto(nested_child) }}">{{ document_title(nested_child) }}</a>
-                          </li>
-                          {% endfor %}
-                        </ul>
-                      </li>
-                      {% endfor %}
-                      </ul>
-                    </details>
-                    {% else %}
-                    <a class="reference api-package-link" href="{{ pathto(child) }}">{{ document_title(child) }}</a>
-                    {% endif %}
-                  </li>
-                  {% endfor %}
+                  {% for child in section.entries %}{{ render_page(child, 4) }}{% endfor %}
                 </ul>
               </li>
               {% endfor %}
@@ -67,11 +68,7 @@
               <details class="sidebar-expandable"{% if pagename == 'api_documentation/pes_control' or pagename in control_children or pagename.startswith('api_documentation/pes_control/') %} open{% endif %}>
                 <summary><a class="reference api-package-link" href="{{ pathto('api_documentation/pes_control') }}" onclick="this.closest('details').open = true;">{{ document_title('api_documentation/pes_control') }}</a></summary>
                 <ul>
-                  {% for child in control_children %}
-                  <li class="toctree-l4{% if pagename == child %} current{% endif %}">
-                    <a class="reference api-package-link" href="{{ pathto(child) }}">{{ document_title(child) }}</a>
-                  </li>
-                  {% endfor %}
+                  {% for child in control_children %}{{ render_page(child, 4) }}{% endfor %}
                 </ul>
               </details>
             </li>
@@ -80,11 +77,7 @@
               <details class="sidebar-expandable"{% if pagename == 'api_documentation/pes_utils' or pagename in utils_children or pagename.startswith('api_documentation/pes_utils/') %} open{% endif %}>
                 <summary><a class="reference api-package-link" href="{{ pathto('api_documentation/pes_utils') }}" onclick="this.closest('details').open = true;">{{ document_title('api_documentation/pes_utils') }}</a></summary>
                 <ul>
-                  {% for child in utils_children %}
-                  <li class="toctree-l4{% if pagename == child %} current{% endif %}">
-                    <a class="reference api-package-link" href="{{ pathto(child) }}">{{ document_title(child) }}</a>
-                  </li>
-                  {% endfor %}
+                  {% for child in utils_children %}{{ render_page(child, 4) }}{% endfor %}
                 </ul>
               </details>
             </li>
