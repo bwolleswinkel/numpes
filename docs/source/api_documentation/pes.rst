@@ -16,9 +16,14 @@ Under development. ``import numpes as pes``.
    :hidden:
    :caption: Classes
 
-   pes/pes_polytope
+   pes/pes_affinesubset
+   pes/pes_box
+   pes/pes_cone
    pes/pes_ellipsoid
+   pes/pes_polytope
+   pes/pes_sphere
    pes/pes_subspace
+   pes/pes_zonotope
 
 .. toctree::
    :hidden:
