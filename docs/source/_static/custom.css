@@ -1,0 +1,143 @@
+/* FROM: GitHub Copilot GPT 5.6 Luna | 2026/10/08 */
+.sidebar-brand img {
+    display: block;
+    width: 45%;
+    height: auto;
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.sidebar-brand-text::after {
+    content: ' v0.1.0';
+    font-family: monospace;
+    font-size: 0.65em;
+    font-weight: 400;
+}
+
+.sidebar-tree ul {
+    padding-left: 0;
+}
+
+.sidebar-tree li > ul {
+    margin-left: 0;
+}
+
+.sidebar-tree .sidebar-expandable {
+    margin: 0;
+}
+
+.sidebar-tree .sidebar-expandable > summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    list-style: none;
+    margin: 0;
+}
+
+.sidebar-tree .sidebar-expandable > summary::-webkit-details-marker {
+    display: none;
+}
+
+.sidebar-tree .sidebar-expandable > summary::after {
+    border-bottom: 1px solid currentColor;
+    border-right: 1px solid currentColor;
+    box-sizing: border-box;
+    color: var(--color-brand-primary);
+    content: '';
+    display: block;
+    flex: 0 0 auto;
+    height: 0.4rem;
+    margin-left: 0.5rem;
+    margin-right: var(--sidebar-item-spacing-horizontal);
+    padding: 0;
+    transform: rotate(-45deg);
+    width: 0.4rem;
+}
+
+.sidebar-tree .sidebar-expandable[open] > summary::after {
+    transform: rotate(45deg);
+}
+
+.sidebar-tree li.current > .sidebar-expandable > summary::after {
+    border-bottom-width: 2px;
+    border-right-width: 2px;
+}
+
+.sidebar-tree .sidebar-expandable > ul {
+    margin-left: var(--sidebar-item-spacing-horizontal);
+}
+
+.sidebar-tree .reference {
+    color: var(--color-brand-primary);
+    text-decoration: none;
+}
+
+.sidebar-tree .reference:hover {
+    color: var(--color-brand-primary);
+}
+
+.sidebar-tree .api-package-link {
+    font-family: monospace;
+    font-size: 1.05em;
+    font-weight: 400;
+}
+
+.sidebar-tree .current > .reference {
+    font-weight: 700;
+}
+
+.sidebar-tree li.current > .api-package-link,
+.sidebar-tree li.current > .sidebar-expandable > summary > .api-package-link {
+    font-weight: 700;
+}
+
+.sidebar-tree .subpackages-caption .caption-text {
+    color: color-mix(in srgb, var(--color-foreground-primary) 50%, rgba(255, 255, 255, 0.6));
+    font-style: italic;
+    font-weight: 400;
+    text-transform: none;
+}
+
+.sidebar-tree .subpackages-caption {
+    margin-top: 0;
+}
+
+.sidebar-tree .api-import {
+    margin: 0 0 var(--sidebar-item-spacing-vertical) var(--sidebar-item-spacing-horizontal);
+}
+
+.monospace-title h1 {
+    font-family: monospace;
+}
+
+.related-pages,
+.related-pages a,
+.related-pages .context,
+.related-pages .context span,
+.related-pages .title {
+    font-family: var(--font-stack);
+}
+
+.related-pages > a .page-info {
+    box-sizing: border-box;
+    height: 2rem;
+}
+
+.related-pages > a .title {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    height: auto;
+}
+
+.related-pages a[href$="pes.html"] .title,
+.related-pages a[href$="pes_polytope.html"] .title,
+.related-pages a[href$="pes_poly_from_bounds.html"] .title,
+.related-pages a[href$="pes_control.html"] .title,
+.related-pages a[href$="pes_utils.html"] .title {
+    font-family: var(--font-stack--monospace);
+    font-size: 0.9em;
+    line-height: normal;
+}
+
