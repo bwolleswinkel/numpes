@@ -100,3 +100,35 @@
     </li>
   </ul>
 </div>
+
+<script>
+  (() => {
+    const sidebar = document.querySelector('.sidebar-scroll');
+    const storageKey = 'numpes-sidebar-scroll-top';
+
+    if (!sidebar) {
+      return;
+    }
+
+    sidebar.addEventListener('scroll', () => {
+      sessionStorage.setItem(storageKey, String(sidebar.scrollTop));
+    }, { passive: true });
+
+    const restoreSidebarScroll = () => {
+      const scrollTop = Number(sessionStorage.getItem(storageKey));
+
+      if (!Number.isFinite(scrollTop)) {
+        return;
+      }
+
+      sidebar.style.scrollBehavior = 'auto';
+      sidebar.scrollTop = scrollTop;
+      requestAnimationFrame(() => {
+        sidebar.style.removeProperty('scroll-behavior');
+      });
+    };
+
+    window.addEventListener('pageshow', restoreSidebarScroll);
+    restoreSidebarScroll();
+  })();
+</script>
