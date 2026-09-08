@@ -20,23 +20,40 @@
           <details class="sidebar-expandable"{% if pagename == 'api_documentation/pes' or pagename in pes_children or pagename.startswith('api_documentation/pes/') %} open{% endif %}>
             <summary><a class="reference api-package-link" href="{{ pathto('api_documentation/pes') }}" onclick="this.closest('details').open = true;">{{ document_title('api_documentation/pes') }}</a></summary>
             <ul>
-              {% for child in pes_children %}
-              {% set child_children = toctree_entries(child) %}
-              <li class="toctree-l3{% if pagename == child or pagename.startswith(child + '/') %} current{% endif %}">
-                {% if child_children %}
-                <details class="sidebar-expandable"{% if pagename == child or pagename.startswith(child + '/') %} open{% endif %}>
-                  <summary><a class="reference api-package-link" href="{{ pathto(child) }}" onclick="this.closest('details').open = true;">{{ document_title(child) }}</a></summary>
-                  <ul>
-                    {% for nested_child in child_children %}
-                    <li class="toctree-l4{% if pagename == nested_child %} current{% endif %}">
-                      <a class="reference api-package-link" href="{{ pathto(nested_child) }}">{{ document_title(nested_child) }}</a>
-                    </li>
-                    {% endfor %}
-                  </ul>
-                </details>
-                {% else %}
-                <a class="reference api-package-link" href="{{ pathto(child) }}">{{ document_title(child) }}</a>
-                {% endif %}
+              {% set pes_sections = toctree_sections('api_documentation/pes') %}
+              {% for section in pes_sections %}
+              <li class="toctree-l3">
+                <p class="caption subpackages-caption"><span class="caption-text">{{ section.caption }}</span></p>
+                <ul>
+                  {% for child in section.entries %}
+                  {% set child_children = toctree_entries(child) %}
+                  <li class="toctree-l3{% if pagename == child or pagename.startswith(child + '/') %} current{% endif %}">
+                    {% if child_children %}
+                    <details class="sidebar-expandable"{% if pagename == child or pagename.startswith(child + '/') %} open{% endif %}>
+                      <summary><a class="reference api-package-link" href="{{ pathto(child) }}" onclick="this.closest('details').open = true;">{{ document_title(child) }}</a></summary>
+                      <ul>
+                      {% for nested_section in toctree_sections(child) %}
+                      <li class="toctree-l4">
+                          {% if nested_section.caption %}
+                        <p class="caption subpackages-caption"><span class="caption-text">{{ nested_section.caption }}</span></p>
+                          {% endif %}
+                        <ul>
+                          {% for nested_child in nested_section.entries %}
+                          <li class="toctree-l4{% if pagename == nested_child %} current{% endif %}">
+                            <a class="reference api-package-link" href="{{ pathto(nested_child) }}">{{ document_title(nested_child) }}</a>
+                          </li>
+                          {% endfor %}
+                        </ul>
+                      </li>
+                      {% endfor %}
+                      </ul>
+                    </details>
+                    {% else %}
+                    <a class="reference api-package-link" href="{{ pathto(child) }}">{{ document_title(child) }}</a>
+                    {% endif %}
+                  </li>
+                  {% endfor %}
+                </ul>
               </li>
               {% endfor %}
             </ul>

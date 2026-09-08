@@ -91,12 +91,26 @@ def _toctree_entries(app, parent):
     return entries
 
 
+def _toctree_sections(app, parent):
+    """Return each page toctree with its caption and document children."""
+    sections = []
+    for toctree in app.env.get_doctree(parent).findall(addnodes.toctree):
+        sections.append(
+            {
+                'caption': toctree.get('caption', ''),
+                'entries': [entry for _, entry in toctree.get('entries', [])],
+            }
+        )
+    return sections
+
+
 def _add_navigation_context(app, pagename, templatename, context, doctree):
     context['document_title'] = lambda docname: _document_title(app, docname)
     context['toctree_caption'] = lambda parent, child: _toctree_caption(
         app, parent, child
     )
     context['toctree_entries'] = lambda parent: _toctree_entries(app, parent)
+    context['toctree_sections'] = lambda parent: _toctree_sections(app, parent)
 
 
 def setup(app):
