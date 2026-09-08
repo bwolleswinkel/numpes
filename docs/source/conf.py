@@ -83,8 +83,12 @@ def _toctree_caption(app, parent, child):
 
 
 def _toctree_entries(app, parent):
-    """Return the direct document children of a page toctree."""
-    return app.env.toctree_includes.get(parent, [])
+    """Return the direct document children declared by a page toctree."""
+    entries = []
+    for toctree in app.env.get_doctree(parent).findall(addnodes.toctree):
+        for _, entry in toctree.get('entries', []):
+            entries.append(entry)
+    return entries
 
 
 def _add_navigation_context(app, pagename, templatename, context, doctree):

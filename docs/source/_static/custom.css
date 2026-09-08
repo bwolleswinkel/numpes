@@ -1,4 +1,11 @@
 /* FROM: GitHub Copilot GPT 5.6 Luna | 2026/10/08 */
+:root {
+    --docs-sidebar-width: 22.5em;
+    --docs-sidebar-link-spacing-vertical: 0.3rem;
+    --docs-sidebar-caption-spacing-vertical: 0.6rem;
+    --docs-sidebar-tree-spacing-vertical: 0.9rem;
+}
+
 .sidebar-brand img {
     display: block;
     width: 45%;
@@ -12,6 +19,14 @@
     font-family: monospace;
     font-size: 0.65em;
     font-weight: 400;
+}
+
+@media (min-width: 67em) {
+    .sidebar-container,
+    .sidebar-drawer {
+        min-width: var(--docs-sidebar-width);
+        width: var(--docs-sidebar-width);
+    }
 }
 
 .sidebar-tree ul {
@@ -70,6 +85,8 @@
 
 .sidebar-tree .reference {
     color: var(--color-brand-primary);
+    padding-bottom: var(--docs-sidebar-link-spacing-vertical);
+    padding-top: var(--docs-sidebar-link-spacing-vertical);
     text-decoration: none;
 }
 
@@ -103,6 +120,17 @@
     margin-top: 0;
 }
 
+.sidebar-tree .caption .caption-text {
+    margin-top: var(--docs-sidebar-caption-spacing-vertical);
+    padding-bottom: var(--docs-sidebar-link-spacing-vertical);
+    padding-top: var(--docs-sidebar-link-spacing-vertical);
+}
+
+.sidebar-tree {
+    margin-bottom: var(--docs-sidebar-link-spacing-vertical);
+    margin-top: var(--docs-sidebar-tree-spacing-vertical);
+}
+
 .sidebar-tree .api-import {
     margin: 0 0 var(--sidebar-item-spacing-vertical) var(--sidebar-item-spacing-horizontal);
 }
@@ -131,11 +159,7 @@
     height: auto;
 }
 
-.related-pages a[href$="pes.html"] .title,
-.related-pages a[href$="pes_polytope.html"] .title,
-.related-pages a[href$="pes_poly_from_bounds.html"] .title,
-.related-pages a[href$="pes_control.html"] .title,
-.related-pages a[href$="pes_utils.html"] .title {
+.related-pages a[href*="pes"] .title {
     font-family: var(--font-stack--monospace);
     font-size: 0.9em;
     line-height: normal;
