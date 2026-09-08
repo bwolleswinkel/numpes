@@ -164,3 +164,53 @@
     font-size: 0.9em;
     line-height: normal;
 }
+
+.api-columns-row {
+    align-items: start;
+}
+
+.api-icon {
+    color: #666;
+    margin-left: auto;
+    opacity: 1;
+    transform: translateY(0.125em);
+}
+
+li:has(> p > .api-icon) > p {
+    align-items: baseline;
+    display: flex;
+}
+
+.api-card .sd-card-body > p,
+.api-card .sd-card-body > ul {
+    margin-block: 0.125rem;
+}
+
+.api-card .sd-card-body > ul {
+    padding-left: 2rem;
+}
+
+.api-card .sd-card-body > ul > li {
+    margin-block: 0;
+}
+
+.api-card .sd-card-body > ul > li + li {
+    margin-top: -0.125em;
+}
+
+.api-card .sd-card-body > ul a {
+    font-family: var(--font-stack--monospace);
+    font-size: 0.9em;
+}
+
+.api-card .sd-card-body > ul > li::marker {
+    color: #666;
+}
+
+.api-card-title-large .sd-card-title {
+    font-size: 1.25em;
+}
+
+.api-letter-nav {
+    text-align: center;
+}

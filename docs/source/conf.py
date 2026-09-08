@@ -12,6 +12,8 @@ version = release
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
+    'sphinx_design',
 ]
 
 html_theme = 'furo'
