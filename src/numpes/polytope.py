@@ -487,7 +487,7 @@ class Polytope:
     @property
     def hrepr(self) -> tuple[NDArray, NDArray]:
         """H-representation of the polytope as a tuple (A, b)"""
-        if self._hrepr is None:
+        if self._hrepr is None and CFG.on_poly_convert_():
             Ab, Ab_eq = enum_facets(self.verts, self.rays)
             self._hrepr = (Ab, Ab_eq)
         return self._hrepr

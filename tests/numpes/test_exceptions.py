@@ -1,5 +1,7 @@
 """Tests for functionality inside `src/numpes/exceptions.py`"""
 
+import inspect
+
 import numpes as pes
 
 
@@ -38,8 +40,19 @@ class TestInvalidCombinationOfArgumentsError:
 
     def test_docstring(self) -> None:
         """Test the docstring formulation"""
-        expected_docstring = "An invalid combination of arguments is provided to a function, method, or constructor"
-        assert pes.InvalidCombinationOfArgumentsError.__doc__ == expected_docstring, \
+        expected_docstring = \
+            r"""An invalid combination of arguments is provided to a function, method, or constructor.
+
+            Examples
+            --------
+            >>> try:
+            ...     pes.poly([[1,  2],
+            ...               [0, -1]], n=2)
+            ... except pes.InvalidCombinationOfArgumentsError as e:
+            ...     print(f"Caught {type(e).__name__}: {e}")
+            Caught InvalidCombinationOfArgumentsError: Cannot provide 'n' when initializing from vertices
+            """
+        assert inspect.cleandoc(pes.InvalidCombinationOfArgumentsError.__doc__) == inspect.cleandoc(expected_docstring), \
             f"Expected docstring to read '{expected_docstring}', but received '{pes.InvalidCombinationOfArgumentsError.__doc__}'"
 
 
@@ -113,8 +126,21 @@ class TestInvalidRepresentationError:
 
     def test_docstring(self) -> None:
         """Test the docstring formulation"""
-        expected_docstring = "The object has an invalid or unresolvable representation"
-        assert pes.InvalidRepresentationError.__doc__ == expected_docstring, \
+        expected_docstring = \
+            r"""The object has an invalid or unresolvable representation.
+
+            Examples
+            --------
+            >>> try:
+            ...     poly = pes.poly([[1,  2],
+            ...                      [0, -1]])
+            ...     poly._vrepr = None
+            ...     print(poly)
+            ... except pes.InvalidRepresentationError as e:
+            ...     print(f"Caught {type(e).__name__}: {e}")
+            Caught InvalidRepresentationError: Polytope is not properly initialized with either V-representation or H-representation
+            """
+        assert inspect.cleandoc(pes.InvalidRepresentationError.__doc__) == inspect.cleandoc(expected_docstring), \
             f"Expected docstring to read '{expected_docstring}', but received '{pes.InvalidRepresentationError.__doc__}'"
 
 
@@ -138,6 +164,19 @@ class TestConversionError:
 
     def test_docstring(self) -> None:
         """Test the docstring formulation"""
-        expected_docstring = "Object converts from one representation to another, but the conversion is not implemented or not allowed according to the global configuration"
-        assert pes.ConversionError.__doc__ == expected_docstring, \
+        expected_docstring = \
+            r"""Object converts from one representation to another, but the conversion is not implemented or not allowed according to the global configuration.
+
+            Examples
+            --------
+            >>> with pes.algo_options(on_poly_convert='error'):
+            ...     try: 
+            ...         poly = pes.poly([[1,  2],
+            ...                          [0, -1]])
+            ...         print(f"{poly:h}")
+            ...     except pes.ConversionError as e:
+            ...         print(f"Caught {type(e).__name__}: {e}")
+            Caught ConversionError: The value of 'CFG.on_poly_convert' is set to 'error', so conversion between polytope representations is not allowed
+            """
+        assert inspect.cleandoc(pes.ConversionError.__doc__) == inspect.cleandoc(expected_docstring), \
             f"Expected docstring to read '{expected_docstring}', but received '{pes.ConversionError.__doc__}'"
