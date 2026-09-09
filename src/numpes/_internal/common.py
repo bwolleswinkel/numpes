@@ -12,7 +12,7 @@ except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
 from numpes.utils.axes import Axes1D
-from numpes.utils import add_1d_subplot
+from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes

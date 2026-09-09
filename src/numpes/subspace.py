@@ -40,9 +40,9 @@ except ImportError as _:
     pass
 
 from numpes._config import CFG
-from numpes._internal import wraps
 from numpes._internal.common import get_axes_color
 from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
+from numpes._internal.wraps import wraps
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import plot_box, plot_line, plot_plane, plot_vector

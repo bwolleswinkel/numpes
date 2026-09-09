@@ -35,11 +35,13 @@ except ImportError as _:
     pass
 
 from numpes._config import CFG
-from numpes._internal import multipledispatch, wraps
 from numpes._internal.common import get_axes_color
+from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
+from numpes._internal.wraps import wraps
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
-from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
+from numpes.utils.linalg import is_sing, is_square, minimize_hrepr, minimize_vrepr
+from numpes.utils.spatial import conv, enum_facets, enum_gens, signed_angle
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self

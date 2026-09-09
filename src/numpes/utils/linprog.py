@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
-import warnings
 
 import numpy as np
 import scipy as sp
