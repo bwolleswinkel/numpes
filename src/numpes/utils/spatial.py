@@ -300,7 +300,7 @@ def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> 
         raise ValueError("Look vector must be 3-dimensional if provided")
     if look is not None and np.allclose(look, 0):
         raise ValueError("Look vector must be non-zero")
-    if np.allclose(v_1, 0) or np.allclose(v_2, 0):
+    if np.linalg.norm(v_1) <= CFG.atol or np.linalg.norm(v_2) <= CFG.atol:
         return np.nan  # Undefined angle if either vector is zero
 
     v_1_norm, v_2_norm = v_1 / np.linalg.norm(v_1), v_2 / np.linalg.norm(v_2)
