@@ -10,6 +10,3 @@ wraps
     This module defines a decorator for wrapping functions, used in for instance factory patterns.
 
 """
-
-from numpes._internal.multipledispatch import *
-from numpes._internal.wraps import *

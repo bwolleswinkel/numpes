@@ -14,7 +14,7 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from numpes.utils.axes import Axes1D
+from numpes._internal.axes import Axes1D
 
 if TYPE_CHECKING:
     from typing import Optional

@@ -11,7 +11,7 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from numpes.utils.axes import Axes1D
+from numpes._internal.axes import Axes1D
 from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:

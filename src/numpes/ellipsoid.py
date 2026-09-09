@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike, NDArray
 
-    from numpes.utils.axes import Axes1D
+    from numpes._internal.axes import Axes1D
 
 
 # TODO: Inherit from a common base class ConvexRegion
