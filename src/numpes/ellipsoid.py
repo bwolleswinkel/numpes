@@ -7,26 +7,24 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 
 try:
-    import matplotlib as mpl
     import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
     from matplotlib.patches import Ellipse
-    from matplotlib.typing import ColorType
-    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
-    MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
-    MATPLOTLIB_INSTALLED = False
+    pass
 
 from numpes._config import CFG
+from numpes._internal.common import get_axes_color
 from numpes._internal.printing import pad, repr_items, sym_replace
 from numpes._internal.wraps import wraps
-from numpes._internal.common import get_axes_color
 from numpes.utils.linalg import angles_givens, is_posdef
-from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Literal, Optional
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
+    from matplotlib.typing import ColorType
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -335,7 +333,7 @@ class Ellipsoid:
             base_fmt = formatter['float']
             values = np.concatenate([np.ravel(self.c), np.ravel(self.Q)]).astype(float)
             width = max(len(base_fmt(value)) for value in values)
-            formatter = {'float': lambda value, _fmt=base_fmt, _width=width: _fmt(value).rjust(_width)}
+            formatter = {'float': lambda value: base_fmt(value).rjust(width)}
 
         with np.printoptions(threshold=threshold, sign=sign, formatter=cast('Any', formatter), edgeitems=edgeitems):
             str_quad = self._str_quad(to_dtype=to_dtype)
@@ -345,6 +343,7 @@ class Ellipsoid:
 
         return comb
 
+    # untested
     def plot(self,
              color: Optional[ColorType] = None,
              alpha: float = 0.5,
@@ -358,10 +357,10 @@ class Ellipsoid:
              ) -> Axes | Axes3D:
         """Plot the ellipsoid"""
 
-        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
-
+        display_name = f"{self.__class__.__name__.lower()}"
         match self.n:
             case 1:
+                ax, color = get_axes_color(ax, color, 1, display_name=display_name)
                 ax.plot(edges := self.c + self.radii[0] * np.array([-1, 1]),
                         color=color,
                         alpha=alpha,
@@ -373,15 +372,13 @@ class Ellipsoid:
                 if label is not None:
                     ax.legend()
             case 2:
-                if ax.name == '3d':
-                    raise ValueError("The dimension of the ellipsoid " \
-                                     "does not match the dimension of the provided axes 'ax'")
+                ax, color = get_axes_color(ax, color, 2, display_name=display_name)
                 ax.add_patch(Ellipse(xy=(self.c[0], self.c[1]),
                                      width=2 * self.radii[0],
                                      height=2 * self.radii[1],
                                      angle=np.rad2deg(self.angles).item(),
-                                     facecolor=mpl.colors.to_rgba(color, alpha=alpha),
-                                     edgecolor=(mpl.colors.to_rgba(color, alpha=1)
+                                     facecolor=to_rgba(color, alpha=alpha),
+                                     edgecolor=(to_rgba(color, alpha=1)
                                                 if plot_edges
                                                 else None),
                                      linewidth=linewidth,
@@ -394,9 +391,7 @@ class Ellipsoid:
                 if CFG.plot_aspect == 'equal':
                     ax.set_aspect('equal', adjustable='box')
             case 3:
-                if ax.name != '3d':
-                    raise ValueError(f"The dimension of the ellipsoid n={self.n} " \
-                                      "does not match the dimension of the provided axes 'ax'")
+                ax, color = get_axes_color(ax, color, 3, display_name=display_name)
                 num_points = 100  # FIXME: Maybe make this a CFG setting?
                 u, v = (np.linspace(0, 2 * np.pi, num_points),
                         np.linspace(0,     np.pi, num_points))
@@ -405,7 +400,7 @@ class Ellipsoid:
                                    self.radii[2] * np.outer(np.ones_like(u), np.cos(v))])
                 xx, yy, zz = [(self.R @ sphere.reshape(3, -1)).reshape(3, *sphere.shape[1:])[i] + \
                                self.c[i] for i in range(3)]
-                ax.plot_surface(xx, yy, zz,
+                ax.plot_surface(xx, yy, zz,  # type: ignore[union-attr]
                                 rstride=4, cstride=4,
                                 color=color,
                                 edgecolor=None if not plot_edges else color,
@@ -427,7 +422,7 @@ class Ellipsoid:
         return ax
 
     def plot_radii(self,
-                   color: Optional[str] = None,
+                   color: Optional[ColorType] = None,
                    annotate: list[str] | bool = True,
                    label: Optional[str] = None,
                    show: bool = True,
@@ -435,7 +430,7 @@ class Ellipsoid:
                    ) -> Axes | Axes3D:
         """Plot the radii of the ellipse"""
 
-        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
+        ax, color = get_axes_color(ax, color, self.n, display_name=f"{self.__class__.__name__.lower()}")
 
         for idx, (vec, radius) in enumerate(zip(self.R.T, self.radii)):
             ax.plot(*(elem for elem in zip(self.c, self.c + (vec * radius))),

@@ -29,18 +29,15 @@ aff_subs
 from __future__ import annotations
 
 from copy import copy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import scipy as sp
 
 try:
     import matplotlib.pyplot as plt
-    from matplotlib.typing import ColorType
-    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
-    MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
-    MATPLOTLIB_INSTALLED = False
+    pass
 
 from numpes._config import CFG
 from numpes._internal import wraps
@@ -48,12 +45,14 @@ from numpes._internal.common import get_axes_color
 from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
-from numpes.utils.plot import add_1d_subplot, plot_box, plot_line, plot_plane, plot_vector
+from numpes.utils.plot import plot_box, plot_line, plot_plane, plot_vector
 
 if TYPE_CHECKING:
     from typing import Any, Iterator, Literal, Optional, Self
 
     from matplotlib.axes import Axes
+    from matplotlib.typing import ColorType
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -278,7 +277,7 @@ class Subspace:
 
         with np.printoptions(threshold=0,
                              edgeitems=edgeitems,
-                             formatter=formatter,
+                             formatter=cast('Any', formatter),
                              sign=sign,
                              ):
             str_basis = self._str_basis(to_dtype=to_dtype)
@@ -349,7 +348,7 @@ class Subspace:
              ) -> Axes | Axes3D:
         """Plot the subspace"""
 
-        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
+        ax, color = get_axes_color(ax, color, self.n, display_name=f"{self.__class__.__name__.lower()}")
 
         match self.dim:
             case 0:
@@ -404,7 +403,7 @@ class Subspace:
                    ) -> Axes:
         """Plot the basis of the subspace"""
 
-        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
+        ax, color = get_axes_color(ax, color, self.n, display_name=f"{self.__class__.__name__.lower()}")
 
         for idx, basis_vector in enumerate(self):
             plot_vector(ax, basis_vector, color=color, label=label if idx == 0 else None)

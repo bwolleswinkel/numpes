@@ -1,28 +1,19 @@
 """Module for 1-dimensional plotting functionality"""
 
-from typing import NoReturn
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-try:
-    from matplotlib.axes import Axes
-except ImportError as _:
-    Axes = None
-
-
-# FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
-if Axes is None:
-    class Axes1D:
-        """A stub class that defers the import error until instantiation"""
-
-        def __init__(self, *_args, **_kwargs) -> NoReturn:
-            raise ImportError(
-                "Matplotlib is required for all plotting functionality. "
-                "Please install it with 'pip install matplotlib' and try again."
-            )
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes as _AxesBase
 else:
-    # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
-    class Axes1D(Axes):
+    try:
+        from matplotlib.axes import Axes as _AxesBase
+    except ImportError:
+        _AxesBase = object
+
+
+class Axes1D(_AxesBase):
         """A custom 1D axis class"""
 
         def __init__(self, fig, *args, **kwargs):
@@ -37,6 +28,11 @@ else:
             **kwargs : dict
                 Additional arguments passed to parent Axes class
             """
+            if _AxesBase is object:
+                raise ImportError(
+                    "Matplotlib is required for all plotting functionality. "
+                    "Please install it with 'pip install matplotlib' and try again."
+                )
             super().__init__(fig, *args, **kwargs)
             self.fixed_ylim = (-1, 1)
             self._updating_ylim = False  # Flag to prevent recursion

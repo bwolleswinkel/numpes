@@ -248,7 +248,7 @@ def repr_items(obj: object,
 
 
 def format_spec_to_opts(format_spec: str,
-                        valid_repr: set[str] = {''},
+                        valid_repr: Optional[set[str]] = None,
                         ) -> tuple[Literal['', 'i', 'r', '#'] | None,
                                    str | None,
                                    Literal['float', 'int'] | None,
@@ -258,19 +258,24 @@ def format_spec_to_opts(format_spec: str,
                                    ]:
     if not format_spec:
         raise AssertionError("Expected 'format_spec' to be non-empty, but received ''")
+    if valid_repr is None:
+        valid_repr = {''}
     if valid_repr.intersection({'i', 'r', '#', 'd', 'f', 'e', 'E'}):
         raise AssertionError(f"'valid_repr' cannot contain 'i', 'r', '#', 'd', 'f', 'e', or 'E', but received valid_repr={valid_repr}")
 
     token = format_spec
-    which_debug = None
-    which_repr = ''
-    to_dtype = None
+    which_debug: Literal['', 'i', 'r', '#'] | None = None
+    which_repr: str | None = ''
+    to_dtype: Literal['float', 'int'] | None = None
     edgeitems = None
     formatter = None
-    sign = None
+    sign: Literal['-', '+', ' '] | None = None
 
-    if token == 'r' or token == '#':
-        which_debug = token
+    if token == 'r':
+        which_debug = 'r'
+        token = token[1:]
+    elif token == '#':
+        which_debug = '#'
         token = token[1:]
     if 'r' in token or '#' in token:
         raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
@@ -282,8 +287,14 @@ def format_spec_to_opts(format_spec: str,
     if token[0] in valid_repr:
         which_repr = token[0]
         token = token[1:]
-    if token and token[0] in {' ', '+', '-'}:
-        sign = token[0]
+    if token and token[0] == ' ':
+        sign = ' '
+        token = token[1:]
+    elif token and token[0] == '+':
+        sign = '+'
+        token = token[1:]
+    elif token and token[0] == '-':
+        sign = '-'
         token = token[1:]
     if token and (char := token[0]) in {'f', 'e', 'E'}:
         sign = sign if sign is not None else ' '
