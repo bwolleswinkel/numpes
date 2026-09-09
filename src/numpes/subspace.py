@@ -7,7 +7,7 @@ Subspace
 AffineSubset
     Class representing a affine subset, which is a linear translation of a subspace by some offset vector
 QuotientSpace
-    Class representing a quotient space, which is a vector space of affine subsets forming a equivelance relation between similar bases
+    Class representing a quotient space, which is a vector space of affine subsets forming a equivalence relation between similar bases
     
     
 Functions

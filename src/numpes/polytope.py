@@ -29,9 +29,9 @@ import numpy as np
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
-    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from matplotlib.typing import ColorType
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False

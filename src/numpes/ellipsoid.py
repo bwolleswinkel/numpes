@@ -10,8 +10,8 @@ try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
-    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from matplotlib.typing import ColorType
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
