@@ -61,5 +61,5 @@ from numpes.subspace import Subspace, subs
 try:
     from importlib.metadata import version
     __version__: str = version('numpes')
-except (ImportError, PackageNotFoundError) as _:
+except (ImportError, PackageNotFoundError):
     __version__ = "unknown"
