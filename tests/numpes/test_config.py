@@ -5,7 +5,7 @@ from typing import Any
 
 from dataclasses import fields
 import numpes as pes
-from numpes._config import CFG, ConfigSchema, GlobalConfig
+from numpes._config import CFG, _ConfigSchema, _GlobalConfig
 import pytest
 
 try:
@@ -43,13 +43,13 @@ class TestConfigSchema:
 
     def test_attr_no_unexpected(self) -> None:
         """Test that the ConfigSchema does not contain any attributes beyond the ones listed"""
-        found_attr = {field.name for field in fields(ConfigSchema)}
+        found_attr = {field.name for field in fields(_ConfigSchema)}
         assert found_attr - expected_attr == set(), \
             f"Unexpected attributes found in ConfigSchema: {found_attr - expected_attr}"
 
     def test_attr_no_missing(self) -> None:
         """Test that the ConfigSchema contains all of the attributes listed"""
-        found_attr = {field.name for field in fields(ConfigSchema)}
+        found_attr = {field.name for field in fields(_ConfigSchema)}
         assert expected_attr - found_attr == set(), \
             f"Expected attributes missing from ConfigSchema: {expected_attr - found_attr}"
 
@@ -74,7 +74,7 @@ class TestConfigSchema:
 
     def test_attr_default_values(self) -> None:
         """Test that all attributes have the expected default values"""
-        config_schema = ConfigSchema()
+        config_schema = _ConfigSchema()
         for key, value in self.expected_default_values.items():
             assert getattr(config_schema, key) == value, \
                 f"Expected default value of '{value}' for attribute '{key}', but received {getattr(config_schema, key)}"
@@ -85,7 +85,7 @@ class TestGlobalConfig:
 
     def test_init(self) -> None:
         """Test that initializing raises no error"""
-        _ = GlobalConfig()
+        _ = _GlobalConfig()
 
     @pytest.mark.parametrize("arg", [
         0,
@@ -95,18 +95,18 @@ class TestGlobalConfig:
     def test_parameterize_init_invalid(self, arg: Any) -> None:
         """Test that providing any argument raises a TypeError"""
         with pytest.raises(TypeError):
-            _ = GlobalConfig(arg)
+            _ = _GlobalConfig(arg)
 
     @pytest.mark.parametrize("name", list(expected_attr))
     def test_getattr(self, name: str) -> None:
         """Test that the __getattr__ works for getting attributes"""
-        global_config = GlobalConfig()
+        global_config = _GlobalConfig()
         _ = getattr(global_config, name)
 
     @pytest.mark.parametrize("name", list(expected_attr))
     def test_setattr_raises_attribute_error(self, name: str) -> None:
         """Test that setting any of the attributes raises a """
-        global_config = GlobalConfig()
+        global_config = _GlobalConfig()
         with pytest.raises(AttributeError, match=re.escape(
                 "Use set_algo_options() or set_display_options() to modify global settings"
             )):
@@ -114,7 +114,7 @@ class TestGlobalConfig:
 
     def test_set_locked_attribute_error(self) -> None:
         """Test that setting `_locked` raises another AttributeError"""
-        global_config = GlobalConfig()
+        global_config = _GlobalConfig()
         with pytest.raises(AttributeError, match=re.escape(
                 "This attribute should not be changed externally"
             )):

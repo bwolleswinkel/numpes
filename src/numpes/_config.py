@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ConfigSchema:
+class _ConfigSchema:
     """Schema for all attributes of the config file"""
     rtol: float = 1E-5
     atol: float = 1E-8
@@ -45,11 +45,11 @@ class ConfigSchema:
 
 
 @final
-class GlobalConfig:
+class _GlobalConfig:
     """Class representing the global configuration for the package, containing global constants and settings"""
 
     def __init__(self) -> None:
-        self.__dict__['_data'] = ConfigSchema()
+        self.__dict__['_data'] = _ConfigSchema()
         self.__dict__['_locked'] = True
 
     def __getattr__(self, name: str) -> Any:
@@ -76,7 +76,7 @@ class GlobalConfig:
 
     def _reset(self) -> None:
         """Reset all settings to their default values"""
-        self._update(**ConfigSchema().__dict__)
+        self._update(**_ConfigSchema().__dict__)
 
     def on_poly_convert_(self) -> Literal[True]:
         """Method that is called when a polytope is converted from one representation to another.
@@ -110,7 +110,7 @@ class GlobalConfig:
 
 
 # NOTE: This is a global instance that needs to be initialized once here
-CFG: Final[GlobalConfig] = GlobalConfig()
+CFG: Final[_GlobalConfig] = _GlobalConfig()
 
 
 # pylint: disable=unused-argument
@@ -356,7 +356,7 @@ def get_config(key: Literal['atol',
     return getattr(CFG._data, key)  # pylint: disable=protected-access
 
 
-@wraps(GlobalConfig._reset)  # pylint: disable=protected-access
+@wraps(_GlobalConfig._reset)  # pylint: disable=protected-access
 def reset_config() -> None:
     """Reset the global config to its default values"""
     CFG._reset()  # pylint: disable=protected-access
