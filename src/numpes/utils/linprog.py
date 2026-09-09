@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 import scipy as sp
@@ -166,7 +167,7 @@ def _solve_lp_pulp(
         upper = bounds_pulp[i][1]
         lb = lower if lower is not None and np.isfinite(lower) else None
         ub = upper if upper is not None and np.isfinite(upper) else None
-        x_i = pulp.LpVariable(f"x_{i}", lowBound=lb, upBound=ub)
+        x_i = prob.add_variable(name=f"x_{i}", lowBound=lb, upBound=ub)
         x.append(x_i)
     objective = pulp.lpSum([c[i] * x[i] for i in range(n)])
     prob += objective
@@ -187,7 +188,10 @@ def _solve_lp_pulp(
         for i, x_i in enumerate(x):
             x_i.setInitialValue(float(x_0[i]))
 
-    solver = pulp.PULP_CBC_CMD(msg=0, warmStart=x_0 is not None)
+    # BUG: A depreciation warning is shown, but it persists when following the advised `pulp[cbc]` solutions
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning, module="pulp")
+        solver = pulp.PULP_CBC_CMD(msg=0, warmStart=x_0 is not None)
     prob.solve(solver)
     success = prob.status in {pulp.LpStatusOptimal, pulp.LpStatusUnbounded}
     status = {

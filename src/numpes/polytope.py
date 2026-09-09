@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike, NDArray
 
+    from numpes.utils.axes import Axes1D
+
 
 # TODO: Inherit from a common base class ConvexRegion
 class Polytope:
@@ -1177,9 +1179,60 @@ class Polytope:
              annotate_facets: list[str] | bool = False,
              label: Optional[str] = None,
              show: bool = True,
-             ax: Optional[Axes | Axes3D] = None,
-             ) -> Axes | Axes3D:
-        """Plot a polytope"""
+             ax: Optional[Axes1D | Axes | Axes3D] = None,
+             ) -> Axes1D | Axes | Axes3D:
+        """Plot the polytope. Only available when `self.n` ∈ {1, 2, 3}. Matplolib must be installed.
+        
+        Parameters
+        ----------
+        color : ColorType, optional
+            Color of the polytope. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        alpha : float, default=0.5
+            Transparency of the polytope
+        linewidth : float, optional
+            Linewidth of the edge when `plot_edges=True`. If `None`, the default linewidth will be used.
+        linestyle : str, default='-'
+            Linestyle of the edge when `plot_edges=True`. The default linestyle '-' is a solid line.
+        plot_edges : bool, default=True
+            Whether to plot the edges (equal to the boundary in 2d) of the polytope
+        annotate_verts : list[str] or bool, default=False
+            Whether to annotate the vertices. If `True`, an incremental annotation 0, 1, ... will be used. A custom list of annotations can be provided.
+        annotate_facets : list[str] or bool, default=False
+            Whether to annotate the facets. If `True`, an incremental annotation 0, 1, ... will be used. A custom list of annotations can be provided.
+        label : str, optional
+            Label shown in the legend. If provided, a legend is automatically added to `ax`.
+        show : bool, default=True
+            Whether to show the polytope using `plt.show()`
+        ax : Axes1D, Axes, or Axes3D, optional
+            An pre-defined axes object on which to plot (for plotting multiple convex regions)
+        
+        Returns
+        -------
+        ax : Axes1D, Axes, or Axes3D
+            Axes object on which the polytope is plotted
+
+        Raises
+        ------
+        ImportError
+            When Matplotlib is not installed, or when pycddlib is not installed and the polytope is not initialized in both representations
+        ValueError
+            When `self.n` ∉ {1, 2, 3} or when the provided `ax` object does not match `self.n`
+
+        Warnings
+        --------
+        To plot a polytope, both its V-representation and H-representation need to either be initialized, or need to be computed using pycddlib; as such, this can be a soft requirement in practice for plotting most user-defined polytopes.
+
+        Examples
+        --------
+        >>> A = [[ 0,  1], 
+        ...      [-2,  0],
+        ...      [ 1,  1],
+        ...      [ 0, -1]]
+        >>> b = [1, 1, 1, 0]
+        >>> poly = pes.poly(A, b)
+        >>> poly.plot()  # doctest: +SKIP
+        .. image:: # FIXME
+        """
 
         def _plot_poly_2d(points: NDArray,
                           ax: Axes,
@@ -1275,9 +1328,6 @@ class Polytope:
                     ax.set_aspect('equal', adjustable='box')
             case 3:
                 ax, color = get_axes_color(ax, color, 3, display_name=display_name)
-                if ax.name != '3d':
-                    raise ValueError("The dimension of the polytope " \
-                                     "does not match the dimension of the provided axes 'ax'")
                 for idx in range(self.m):
                     verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                         self.b[idx],
@@ -1306,7 +1356,7 @@ class Polytope:
                 if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
-                raise RuntimeError(f"Received n = {self.n} which is invalid, and should have been caught by previous code. Please report this bug.")
+                raise ValueError(f"Plotting is only supported for an n-d polytope with n <= 3, received n = {self.n}")
 
         if annotate_verts:
             for idx in range(self.k):

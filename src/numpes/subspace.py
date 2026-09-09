@@ -55,6 +55,8 @@ if TYPE_CHECKING:
     from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike, NDArray
 
+    from numpes.utils.axes import Axes1D
+
 
 # TODO: Inherit from a common base class ConvexRegion
 class Subspace:
@@ -344,10 +346,49 @@ class Subspace:
              plot_basis: bool = False,
              label: Optional[str] = None,
              show: bool = True,
-             ax: Optional[Axes | Axes3D] = None,
-             ) -> Axes | Axes3D:
-        """Plot the subspace"""
+             ax: Optional[Axes1D | Axes | Axes3D] = None,
+             ) -> Axes1D | Axes | Axes3D:
+        """Plot the subspace. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
+                
+        Parameters
+        ----------
+        color : ColorType, optional
+            Color of the subspace. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        alpha : float, default=0.5
+            Transparency of the subspace
+        plot_basis : bool, default=False
+            Whether to plot the basis of the subspace
+        label : str, optional
+            Label shown in the legend. If provided, a legend is automatically added to `ax`.
+        show : bool, default=True
+            Whether to show the ellipsoid using `plt.show()`
+        ax : Axes1D, Axes, or Axes3D, optional
+            An pre-defined axes object on which to plot (for plotting multiple convex regions)
+        
+        Returns
+        -------
+        ax : Axes1D, Axes, or Axes3D
+            Axes object on which the subspace is plotted
 
+        Raises
+        ------
+        ImportError
+            When Matplotlib is not installed
+        ValueError
+            When `self.n` ∉ {1, 2, 3} or when the provided `ax` object does not match `self.n`
+
+        See also
+        --------
+        plot_basis : Plot the basis of the subspace.
+
+        Examples
+        --------
+        >>> basis = [[1,  2,  0],
+        ...          [0, -3, -1]]
+        >>> subs = pes.subs(basis)
+        >>> subs.plot()  # doctest: +SKIP
+        .. image:: # FIXME
+        """
         ax, color = get_axes_color(ax, color, self.n, display_name=f"{self.__class__.__name__.lower()}")
 
         match self.dim:
@@ -399,10 +440,47 @@ class Subspace:
                    annotate: list[str] | bool = False,
                    label: Optional[str] = None,
                    show: bool = True,
-                   ax: Optional[Axes] = None,
-                   ) -> Axes:
-        """Plot the basis of the subspace"""
+                   ax: Optional[Axes1D | Axes | Axes3D] = None,
+                   ) -> Axes1D | Axes | Axes3D:
+        """Plot the basis vectors of the subspace. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
+                
+        Parameters
+        ----------
+        color : ColorType, optional
+            Color of the basis vectors. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        annotate : list[str] or bool, default=False
+            Whether to annotate the basis vectors. If `True`, an incremental annotation 0, 1, ... will be used. A custom list of annotations can be provided.
+        label : str, optional
+            Label shown in the legend. If provided, a legend is automatically added to `ax`.
+        show : bool, default=True
+            Whether to show the basis vectors using `plt.show()`
+        ax : Axes1D, Axes, or Axes3D, optional
+            An pre-defined axes object on which to plot (for plotting multiple convex regions)
+        
+        Returns
+        -------
+        ax : Axes1D, Axes, or Axes3D
+            Axes object on which the basis vectors are plotted
 
+        Raises
+        ------
+        ImportError
+            When Matplotlib is not installed
+        ValueError
+            When `self.n` ∉ {1, 2, 3} or when the provided `ax` object does not match `self.n`
+
+        See also
+        --------
+        plot : Plot the subspace.
+
+        Examples
+        --------
+        >>> basis = [[1,  2,  0],
+        ...          [0, -3, -1]]
+        >>> subs = pes.subs(basis)
+        >>> subs.plot_basis()  # doctest: +SKIP
+        .. image:: # FIXME
+        """
         ax, color = get_axes_color(ax, color, self.n, display_name=f"{self.__class__.__name__.lower()}")
 
         for idx, basis_vector in enumerate(self):

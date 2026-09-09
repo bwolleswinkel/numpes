@@ -11,7 +11,7 @@ try:
 except ImportError as _:
     MATPLOTLIB_INSTALLED = False
 
-from numpes._internal.axes import Axes1D
+from numpes.utils.axes import Axes1D
 from numpes.utils import add_1d_subplot
 
 if TYPE_CHECKING:
@@ -81,7 +81,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
     ImportError
         When Matplotlib is not installed
     ValueError
-        When `n` ∉ {1, 2, 3}
+        When `n` ∉ {1, 2, 3} or when the provided `ax` object does not match `n`
     """
 
     if not MATPLOTLIB_INSTALLED:
