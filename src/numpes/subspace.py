@@ -44,6 +44,7 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal import wraps
+from numpes._internal.common import get_axes_color
 from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
@@ -338,7 +339,6 @@ class Subspace:
         obj._basis = span(self._basis.T).T
         return obj
 
-    # [untested/unverified]
     def plot(self,
              color: Optional[ColorType] = None,
              alpha: float = 0.5,
@@ -348,31 +348,8 @@ class Subspace:
              ax: Optional[Axes | Axes3D] = None,
              ) -> Axes | Axes3D:
         """Plot the subspace"""
-        if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting." \
-            " Please install it with 'pip install matplotlib' and try again.")
 
-        if ax is None:
-            match self.n:
-                case 1:
-                    fig = plt.figure()
-                    ax = add_1d_subplot(fig)
-                case 2:
-                    fig, ax = plt.subplots()
-                case 3:
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111, projection='3d')
-                case _:
-                    raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n = {self.n}")
-        else:
-            fig = None
-
-        if color is None:
-            # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
-
-        if self.n > 3:
-            raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n={self.n}")
+        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
 
         match self.dim:
             case 0:
@@ -386,8 +363,11 @@ class Subspace:
                     ax.legend()
             case 2:
                 if self.n == 1:
-                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
-                plane = plot_plane(ax, self.perp.basis.squeeze() if self.n == 3 else None, color=color, alpha=alpha)
+                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but received n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                plane = plot_plane(ax,
+                                   self.perp.basis.squeeze() if self.n == 3 else None,
+                                   color=color,
+                                   alpha=alpha)
                 if label is not None:
                     plane.set_label(label)
                     ax.legend()
@@ -395,7 +375,7 @@ class Subspace:
                     ax.set_aspect('equal', adjustable='box')
             case 3:
                 if self.n <= 2:
-                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                    raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but received n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
                 box = plot_box(ax, color=color, alpha=alpha)
                 if label is not None:
                     box.set_label(label)
@@ -403,21 +383,18 @@ class Subspace:
                 if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
-                raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but recieved n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
+                raise InvalidRepresentationError(f"Expected dimension 'n' to be smaller or equal to 'dim', but received n={self.n}, dim={self.dim}, indicating the attributes of this subspace are in an invalid state")
 
         for idx in range(self.n):
             lims = getattr(ax, f'get_{['x', 'y', 'z'][idx]}lim')()
             getattr(ax, f'set_{['x', 'y', 'z'][idx]}lim')(min(lims[0], -1), max(lims[1], 1))
-
         if plot_basis:
             self.plot_basis(color=color, show=False, ax=ax)
-
         if show:
             plt.show()
 
         return ax
 
-    # [untested/unverified]
     def plot_basis(self,
                    color: Optional[ColorType] = None,
                    annotate: list[str] | bool = False,
@@ -426,53 +403,17 @@ class Subspace:
                    ax: Optional[Axes] = None,
                    ) -> Axes:
         """Plot the basis of the subspace"""
-        if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting." \
-            " Please install it with 'pip install matplotlib' and try again.")
 
-        if ax is None:
-            if self.n == 1:
-                fig = plt.figure()
-                ax = add_1d_subplot(fig)
-            elif self.n == 2:
-                fig, ax = plt.subplots()
-            elif self.n == 3:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-            else:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
-        else:
-            fig = None
-
-        if color is None:
-            # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
-
-        if self.n > 3:
-            raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n={self.n}")
+        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
 
         for idx, basis_vector in enumerate(self):
             plot_vector(ax, basis_vector, color=color, label=label if idx == 0 else None)
-
         if annotate:
             for idx in range(self.d):
-                annotation = annotate[idx] if isinstance(annotate, list) else f"{idx}"
-                if self.n == 1:
-                    ax.text(self.basis[idx, 0],
-                            annotation,
-                            color='black')
-                elif self.n == 2:
-                    ax.text(self.basis[idx, 0],
-                            self.basis[idx, 1],
-                            annotation,
-                            color='black')
-                elif self.n == 3:
-                    ax.text(self.basis[idx, 0],
-                            self.basis[idx, 1],
-                            self.basis[idx, 2],
-                            annotation,  # type: ignore[call-arg,arg-type]
-                            color='black')
-
+                annotation = (annotate[idx]
+                              if isinstance(annotate, list)
+                              else f"{idx}")
+                ax.text(*self.basis[idx, :], annotation, color='black')
         if show:
             plt.show()
 

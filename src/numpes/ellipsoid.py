@@ -19,6 +19,7 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal.printing import pad, repr_items, sym_replace
 from numpes._internal.wraps import wraps
+from numpes._internal.common import get_axes_color
 from numpes.utils.linalg import angles_givens, is_posdef
 from numpes.utils.plot import add_1d_subplot
 
@@ -344,7 +345,6 @@ class Ellipsoid:
 
         return comb
 
-    # untested/unverified
     def plot(self,
              color: Optional[ColorType] = None,
              alpha: float = 0.5,
@@ -358,40 +358,24 @@ class Ellipsoid:
              ) -> Axes | Axes3D:
         """Plot the ellipsoid"""
 
-        if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting. " \
-                              "Please install it with 'pip install matplotlib' and try again.")
-
-        if ax is None:
-            match self.n:
-                case 1:
-                    fig = plt.figure()
-                    ax = add_1d_subplot(fig)
-                case 2:
-                    fig, ax = plt.subplots()
-                case 3:
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111, projection='3d')
-                case _:
-                    raise ValueError(f"Plotting is only supported for n-d ellipsoids with n <= 3, received n = {self.n}")
-        else:
-            fig = None
-
-        if color is None:
-            # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
 
         match self.n:
             case 1:
-                ax.plot(edges := self.c + self.radii[0] * np.array([-1, 1]), color=color, alpha=alpha, linewidth=linewidth, linestyle=linestyle, label=label)
+                ax.plot(edges := self.c + self.radii[0] * np.array([-1, 1]),
+                        color=color,
+                        alpha=alpha,
+                        linewidth=linewidth,
+                        linestyle=linestyle,
+                        label=label)
                 if plot_edges:
                     ax.scatter(edges, color=color)
                 if label is not None:
                     ax.legend()
             case 2:
                 if ax.name == '3d':
-                    raise ValueError("The dimension of the ellipsoid" \
-                                     " does not match the dimension of the provided axes 'ax'")
+                    raise ValueError("The dimension of the ellipsoid " \
+                                     "does not match the dimension of the provided axes 'ax'")
                 ax.add_patch(Ellipse(xy=(self.c[0], self.c[1]),
                                      width=2 * self.radii[0],
                                      height=2 * self.radii[1],
@@ -421,11 +405,8 @@ class Ellipsoid:
                                    self.radii[2] * np.outer(np.ones_like(u), np.cos(v))])
                 xx, yy, zz = [(self.R @ sphere.reshape(3, -1)).reshape(3, *sphere.shape[1:])[i] + \
                                self.c[i] for i in range(3)]
-                ax.plot_surface(xx,
-                                yy,
-                                zz,
-                                rstride=4,
-                                cstride=4,
+                ax.plot_surface(xx, yy, zz,
+                                rstride=4, cstride=4,
                                 color=color,
                                 edgecolor=None if not plot_edges else color,
                                 alpha=alpha,
@@ -436,16 +417,15 @@ class Ellipsoid:
                 if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
-                raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
+                raise RuntimeError(f"Received n = {self.n} which is invalid, and should have been caught by previous code. Please report this bug.")
 
         if plot_radii:
             self.plot_radii(color=color, show=False, ax=ax)
-
         if show:
             plt.show()
+
         return ax
 
-    # [untested/unverified]
     def plot_radii(self,
                    color: Optional[str] = None,
                    annotate: list[str] | bool = True,
@@ -454,34 +434,13 @@ class Ellipsoid:
                    ax: Optional[Axes | Axes3D] = None,
                    ) -> Axes | Axes3D:
         """Plot the radii of the ellipse"""
-        if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting." \
-                                " Please install it with 'pip install matplotlib' and try again.")
 
-        # FIXME: This really should be a method elsewhere
-        if ax is None:
-            match self.n:
-                case 1:
-                    fig = plt.figure()
-                    ax = add_1d_subplot(fig)
-                case 2:
-                    fig, ax = plt.subplots()
-                case 3:
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111, projection='3d')
-                case _:
-                    raise ValueError(f"Plotting is only supported for n-d ellipsoids with n <= 3, received n = {self.n}")
-        else:
-            fig = None
+        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
 
-        if color is None:
-            # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
-
-        if self.n > 3:
-            raise ValueError(f"Plotting is only supported for n-d ellipsoid with n <= 3, received n = {self.n}")
         for idx, (vec, radius) in enumerate(zip(self.R.T, self.radii)):
-            ax.plot(*(elem for elem in zip(self.c, self.c + (vec * radius))), color=color, label=label)
+            ax.plot(*(elem for elem in zip(self.c, self.c + (vec * radius))),
+                    color=color,
+                    label=label)
             if annotate:
                 ax.text(*(self.c + vec * (radius / 2)), str(idx) if isinstance(annotate, bool) else annotate[idx])
 
@@ -489,6 +448,7 @@ class Ellipsoid:
             ax.legend()
         if show:
             plt.show()
+
         return ax
 
 

@@ -29,24 +29,23 @@ import numpy as np
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
-    from matplotlib.typing import ColorType
-    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
-    MATPLOTLIB_INSTALLED: bool = True
 except ImportError as _:
-    MATPLOTLIB_INSTALLED = False
+    pass
 
 from numpes._config import CFG
 from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
+from numpes._internal.common import get_axes_color
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
-from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
+    from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
+    from matplotlib.typing import ColorType
     from numpy.typing import ArrayLike, NDArray
 
 
@@ -1181,86 +1180,88 @@ class Polytope:
              ) -> Axes | Axes3D:
         """Plot a polytope"""
 
-        def _plot_poly_2d(points: NDArray, ax: Axes, color: str, alpha: float, label: str, plot_edges: bool) -> None:
+        def _plot_poly_2d(points: NDArray,
+                          ax: Axes,
+                          color: str,
+                          alpha: float,
+                          label: str,
+                          plot_edges: bool,
+                          ) -> None:
             if points.shape[0] < 3:
-                raise ValueError("At least three points are required to plot a polytope in 2D")
+                raise RuntimeError("At least three points are required to plot a polytope in 2D")
             centroid = np.mean(points, axis=0)
-            points_sorted = sorted(points, key=lambda p: signed_angle(points[0] - centroid, p - centroid))
+            points_sorted = sorted(points,
+                                   key=lambda p: signed_angle(points[0] - centroid,
+                                                              p - centroid))
             ax.add_collection(PolyCollection([points_sorted],
                                              facecolor=mpl.colors.to_rgba(color, alpha=alpha),
                                              edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                         if plot_edges
-                                                        else None),
+                                                        else 'none'),
                                              linewidth=linewidth,
                                              linestyle=linestyle,
                                              label=label))
-            ax.autoscale_view()
 
-        def _plot_facet_3d(points: NDArray, ax: Axes, color: str, alpha: float, plot_edges: bool) -> None:
+        def _plot_facet_3d(points: NDArray,
+                           ax: Axes,
+                           color: str,
+                           alpha: float,
+                           plot_edges: bool,
+                           ) -> None:
             # NOTE: Assumes all points are coplanar
             if points.shape[0] < 3:
-                raise ValueError("At least three points are required to define a facet in 3D")
+                raise RuntimeError("At least three points are required to define a facet in 3D")
             centroid = np.mean(points, axis=0)
             look = np.cross(points[1] - points[0], points[2] - points[0])
-            points_sorted = sorted(points, key=lambda p: signed_angle(points[0] - centroid, p - centroid, look=look))
+            points_sorted = sorted(points,
+                                   key=lambda p: signed_angle(points[0] - centroid,
+                                                              p - centroid,
+                                                              look=look))
             ax.add_collection3d(Poly3DCollection([np.array(points_sorted)],  # type: ignore[attr-defined]
                                                  facecolor=mpl.colors.to_rgba(color, alpha=alpha),
                                                  edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                             if plot_edges
-                                                            else None),
+                                                            else 'none'),
                                                  linewidth=linewidth,
                                                  linestyle=linestyle))
 
-        if not MATPLOTLIB_INSTALLED:
-            raise ImportError("Matplotlib is required for plotting." \
-            " Please install it with 'pip install matplotlib' and try again.")
-
-        if ax is None:
-            match self.n:
-                case 1:
-                    fig = plt.figure()
-                    ax = add_1d_subplot(fig)
-                case 2:
-                    fig, ax = plt.subplots()
-                case 3:
-                    fig = plt.figure()
-                    ax = fig.add_subplot(111, projection='3d')
-                case _:
-                    raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
-        else:
-            fig = None
-
-        if color is None:
-            # pylint: disable=protected-access
-            color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
+        ax, color = get_axes_color(ax, color, self.n, text_err=f"{self.__class__.__name__.lower()}")
 
         # TODO: Also implement the logic when `self` is lower-dimensional, so when it is a single plane, or a line.
         # TODO: Also add a degeneracy check for plotting
         match self.n:
             case 1:
-                ax.plot(edges := [np.min(self.verts), np.max(self.verts)], color=color, alpha=alpha, linewidth=linewidth, linestyle=linestyle, label=label)
+                ax.plot(edges := [np.min(self.verts), np.max(self.verts)],
+                        color=color,
+                        alpha=alpha,
+                        linewidth=linewidth,
+                        linestyle=linestyle,
+                        label=label)
                 if annotate_facets:
                     # FIXME: Should I throw an error when len(annotate_facets) != 1?
                     annotation = (annotate_facets[0]
                                   if isinstance(annotate_facets, list)
                                   else "0")
-                    ax.text(np.mean(self.verts), annotation, color='black')  # type: ignore[call-arg]
+                    ax.text(np.mean(edges), annotation, color='black')  # type: ignore[call-arg]
                 if plot_edges:
                     ax.scatter(edges, color=color)
                 if label is not None:
                     ax.legend()
             case 2:
                 if ax.name == '3d':
-                    raise ValueError("The dimension of the polytope" \
-                    " does not match the dimension of the provided axes 'ax'")
+                    raise ValueError("The dimension of the polytope " \
+                                     "does not match the dimension of the provided axes 'ax'")
                 _plot_poly_2d(self.verts, ax, color, alpha, label, plot_edges=plot_edges)
+                ax.autoscale_view()
                 if annotate_facets:
                     for idx in range(self.m):
                         verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                             self.b[idx],
                                                             rtol=CFG.rtol,
                                                             atol=CFG.atol), :]
-                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else f"{idx}"
+                        annotation = (annotate_facets[idx]
+                                      if isinstance(annotate_facets, list)
+                                      else f"{idx}")
                         ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
                 if label is not None:
                     ax.legend()
@@ -1268,8 +1269,8 @@ class Polytope:
                     ax.set_aspect('equal', adjustable='box')
             case 3:
                 if ax.name != '3d':
-                    raise ValueError("The dimension of the polytope" \
-                    " does not match the dimension of the provided axes 'ax'")
+                    raise ValueError("The dimension of the polytope " \
+                                     "does not match the dimension of the provided axes 'ax'")
                 for idx in range(self.m):
                     verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                         self.b[idx],
@@ -1277,14 +1278,16 @@ class Polytope:
                                                         atol=CFG.atol), :]
                     _plot_facet_3d(verts_facet, ax, color, alpha, plot_edges=plot_edges)
                     if annotate_facets:
-                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else f"{idx}"
+                        annotation = (annotate_facets[idx]
+                                      if isinstance(annotate_facets, list)
+                                      else f"{idx}")
                         ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
                 if label is not None:
                     handles, _ = ax.get_legend_handles_labels()
                     handles.append(mpl.patches.Patch(facecolor=mpl.colors.to_rgba(color, alpha=alpha),
                                                      edgecolor=(mpl.colors.to_rgba(color, alpha=1)
                                                                 if plot_edges
-                                                                else "none"),
+                                                                else 'none'),
                                                      linewidth=linewidth,
                                                      linestyle=linestyle,
                                                      label=label))
@@ -1292,15 +1295,14 @@ class Polytope:
                 if CFG.plot_aspect == 'equal':
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+                raise RuntimeError(f"Received n = {self.n} which is invalid, and should have been caught by previous code. Please report this bug.")
 
         if annotate_verts:
             for idx in range(self.k):
                 annotation = (annotate_verts[idx]
                               if isinstance(annotate_verts, list)
                               else fr"{idx}")
-                ax.text(*self.verts[idx, :self.n], annotation, color='black')
-
+                ax.text(*self.verts[idx, :], annotation, color='black')
         if show:
             plt.show()
 
