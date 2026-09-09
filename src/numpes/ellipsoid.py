@@ -20,6 +20,7 @@ from numpes._config import CFG
 from numpes._internal.printing import pad, repr_items, sym_replace
 from numpes._internal.wraps import wraps
 from numpes.utils.linalg import angles_givens, is_posdef
+from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Literal, Optional
@@ -343,7 +344,6 @@ class Ellipsoid:
 
         return comb
 
-
     # untested/unverified
     def plot(self,
              color: Optional[ColorType] = None,
@@ -363,24 +363,31 @@ class Ellipsoid:
                               "Please install it with 'pip install matplotlib' and try again.")
 
         if ax is None:
-            if self.n == 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
-            if self.n == 2:
-                fig, ax = plt.subplots()
-            elif self.n == 3:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-            else:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+            match self.n:
+                case 1:
+                    fig = plt.figure()
+                    ax = add_1d_subplot(fig)
+                case 2:
+                    fig, ax = plt.subplots()
+                case 3:
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111, projection='3d')
+                case _:
+                    raise ValueError(f"Plotting is only supported for n-d ellipsoids with n <= 3, received n = {self.n}")
         else:
             fig = None
+
         if color is None:
             # pylint: disable=protected-access
             color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
 
         match self.n:
             case 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
+                ax.plot(edges := self.c + self.radii[0] * np.array([-1, 1]), color=color, alpha=alpha, linewidth=linewidth, linestyle=linestyle, label=label)
+                if plot_edges:
+                    ax.scatter(edges, color=color)
+                if label is not None:
+                    ax.legend()
             case 2:
                 if ax.name == '3d':
                     raise ValueError("The dimension of the ellipsoid" \
@@ -451,18 +458,22 @@ class Ellipsoid:
             raise ImportError("Matplotlib is required for plotting." \
                                 " Please install it with 'pip install matplotlib' and try again.")
 
+        # FIXME: This really should be a method elsewhere
         if ax is None:
-            if self.n == 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D ellipsoids")
-            if self.n == 2:
-                fig, ax = plt.subplots()
-            elif self.n == 3:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-            else:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+            match self.n:
+                case 1:
+                    fig = plt.figure()
+                    ax = add_1d_subplot(fig)
+                case 2:
+                    fig, ax = plt.subplots()
+                case 3:
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111, projection='3d')
+                case _:
+                    raise ValueError(f"Plotting is only supported for n-d ellipsoids with n <= 3, received n = {self.n}")
         else:
             fig = None
+
         if color is None:
             # pylint: disable=protected-access
             color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
@@ -474,6 +485,8 @@ class Ellipsoid:
             if annotate:
                 ax.text(*(self.c + vec * (radius / 2)), str(idx) if isinstance(annotate, bool) else annotate[idx])
 
+        if label is not None:
+            ax.legend()
         if show:
             plt.show()
         return ax

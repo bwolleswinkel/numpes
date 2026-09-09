@@ -41,6 +41,7 @@ from numpes._internal import multipledispatch, wraps
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils import conv, enum_facets, enum_gens, is_sing, is_square, minimize_hrepr, minimize_vrepr, signed_angle
+from numpes.utils.plot import add_1d_subplot
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -1215,15 +1216,17 @@ class Polytope:
             " Please install it with 'pip install matplotlib' and try again.")
 
         if ax is None:
-            if self.n == 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
-            if self.n == 2:
-                fig, ax = plt.subplots()
-            elif self.n == 3:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-            else:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
+            match self.n:
+                case 1:
+                    fig = plt.figure()
+                    ax = add_1d_subplot(fig)
+                case 2:
+                    fig, ax = plt.subplots()
+                case 3:
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111, projection='3d')
+                case _:
+                    raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n = {self.n}")
         else:
             fig = None
 
@@ -1235,7 +1238,17 @@ class Polytope:
         # TODO: Also add a degeneracy check for plotting
         match self.n:
             case 1:
-                raise NotImplementedError("Plotting is not yet implemented for 1D polytopes")
+                ax.plot(edges := [np.min(self.verts), np.max(self.verts)], color=color, alpha=alpha, linewidth=linewidth, linestyle=linestyle, label=label)
+                if annotate_facets:
+                    # FIXME: Should I throw an error when len(annotate_facets) != 1?
+                    annotation = (annotate_facets[0]
+                                  if isinstance(annotate_facets, list)
+                                  else "0")
+                    ax.text(np.mean(self.verts), annotation, color='black')  # type: ignore[call-arg]
+                if plot_edges:
+                    ax.scatter(edges, color=color)
+                if label is not None:
+                    ax.legend()
             case 2:
                 if ax.name == '3d':
                     raise ValueError("The dimension of the polytope" \
@@ -1247,7 +1260,7 @@ class Polytope:
                                                             self.b[idx],
                                                             rtol=CFG.rtol,
                                                             atol=CFG.atol), :]
-                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
+                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else f"{idx}"
                         ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
                 if label is not None:
                     ax.legend()
@@ -1264,7 +1277,7 @@ class Polytope:
                                                         atol=CFG.atol), :]
                     _plot_facet_3d(verts_facet, ax, color, alpha, plot_edges=plot_edges)
                     if annotate_facets:
-                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else fr"${idx}$"
+                        annotation = annotate_facets[idx] if isinstance(annotate_facets, list) else f"{idx}"
                         ax.text(*np.mean(verts_facet, axis=0), annotation, color='black')  # type: ignore[call-arg]
                 if label is not None:
                     handles, _ = ax.get_legend_handles_labels()
@@ -1283,18 +1296,10 @@ class Polytope:
 
         if annotate_verts:
             for idx in range(self.k):
-                annotation = annotate_verts[idx] if isinstance(annotate_verts, list) else fr"{idx}"
-                if self.n == 2:
-                    ax.text(self.verts[idx, 0],
-                            self.verts[idx, 1],
-                            annotation,
-                            color='black')
-                elif self.n == 3:
-                    ax.text(self.verts[idx, 0],
-                            self.verts[idx, 1],
-                            self.verts[idx, 2],
-                            annotation,  # type: ignore[call-arg,arg-type]
-                            color='black')
+                annotation = (annotate_verts[idx]
+                              if isinstance(annotate_verts, list)
+                              else fr"{idx}")
+                ax.text(*self.verts[idx, :self.n], annotation, color='black')
 
         if show:
             plt.show()

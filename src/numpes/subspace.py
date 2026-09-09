@@ -353,16 +353,17 @@ class Subspace:
             " Please install it with 'pip install matplotlib' and try again.")
 
         if ax is None:
-            if self.n == 1:
-                fig = plt.figure()
-                ax = add_1d_subplot(fig)
-            elif self.n == 2:
-                fig, ax = plt.subplots()
-            elif self.n == 3:
-                fig = plt.figure()
-                ax = fig.add_subplot(111, projection='3d')
-            else:
-                raise ValueError(f"Plotting is only supported for n-d polytopes with n <= 3, received n={self.n}")
+            match self.n:
+                case 1:
+                    fig = plt.figure()
+                    ax = add_1d_subplot(fig)
+                case 2:
+                    fig, ax = plt.subplots()
+                case 3:
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111, projection='3d')
+                case _:
+                    raise ValueError(f"Plotting is only supported for n-d subspaces with n <= 3, received n = {self.n}")
         else:
             fig = None
 
@@ -455,7 +456,7 @@ class Subspace:
 
         if annotate:
             for idx in range(self.d):
-                annotation = annotate[idx] if isinstance(annotate, list) else fr"{idx}"
+                annotation = annotate[idx] if isinstance(annotate, list) else f"{idx}"
                 if self.n == 1:
                     ax.text(self.basis[idx, 0],
                             annotation,

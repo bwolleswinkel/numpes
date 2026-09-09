@@ -80,7 +80,7 @@ else:
             """
             # FIXME: Do I actually want to do this?
             # Check if `linewidth` is provided in kwargs, else set to 2
-            if 'linewidth' not in kwargs and 'lw' not in kwargs:
+            if 'linewidth' not in kwargs and 'lw' not in kwargs or ('linewidth' in kwargs and kwargs['linewidth'] is None) or ('lw' in kwargs and kwargs['lw'] is None):
                 kwargs['linewidth'] = 3
             # Handle case where only x-values are provided
             # FIXME: What about NumPy arrays? Can you do length there?
@@ -114,6 +114,13 @@ else:
                 vmax=vmax, alpha=alpha, linewidths=linewidths, edgecolors=edgecolors,
                 colorizer=colorizer, plotnonfinite=plotnonfinite, **kwargs,
             )
+
+        def text(self, x, s, **kwargs):
+            """Override the text method to dropping the y-argument, and placing it on a fixed height"""
+            # FIXME: Do I actually want to do this?
+            if 'ha' not in kwargs and 'ha' not in kwargs:
+                kwargs['ha'] = 'center'
+            return super().text(x, 0.04, s, **kwargs)
 
         def legend(self, *args, **kwargs):
             """Override legend method to position it at a fixed height above the x-axis"""
