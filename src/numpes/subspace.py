@@ -229,16 +229,13 @@ class Subspace:
     # [untested/unverified]
     def _str_basis(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """"Descriptive representation of the basis of the polytope"""
-        edgeitems = np.get_printoptions()['edgeitems']
-        match to_dtype:
-            case None:
-                basis = self.basis
-            case 'float':
-                basis = self.basis.astype(float)
-            case 'int':
-                basis = self.basis.astype(int)
-            case _:
-                raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+        if to_dtype is None:
+            basis = self.basis
+        elif to_dtype in {'int', 'float'}:
+            basis = self.basis.astype(int if to_dtype == 'int' else float)
+        else:
+            raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+        edgeitems = edge if np.get_printoptions()['threshold'] < (edge := np.get_printoptions()['edgeitems']) else None
         if basis.size != 0:
             if basis.dtype == float:  # Add array of zeros to avoid `-0.` in print output
                 basis_lines = format_as_set([str(np.atleast_2d(base).T + np.zeros((self.n, 1))) for base in basis], edgeitems).splitlines()

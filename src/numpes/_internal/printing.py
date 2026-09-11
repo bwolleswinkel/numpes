@@ -11,11 +11,11 @@ if TYPE_CHECKING:
 
 
 # [untested/unverified]
-def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
-    """Replace the (assumed to be symmetric) numbers located in the upper-triangular part of an 
+def sym_replace(arr: str, char: Optional[str] = None) -> str:
+    """Replace the numbers located in the upper-triangular part of a 
     2d square NumPy array with `char`. This is to be used for arrays which are symmetric, and
     where the upper-triangular values can be inferred from the lower part. The function does
-    not check if the array provided is 2d  or square, and undefined behavior might follow
+    not check if the array provided is 2d or square (or for that matter, symmetric), and undefined behavior might follow
     otherwise.
 
     The function works for all size `n >= 1`, for integers and floating point, decimal and scientific notation, and preserves leading/trailing spaces and alignment due to negative values and dropped trailing zeros.
@@ -24,9 +24,13 @@ def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
     ----------
     arr : str
         String representation of an array, presumable `str(A)`, where `A` is a NumPy array of size `(n, n)`
-    char : str
-        Character for which to replace the upper-triangular part. It is assumed to be of length 1
-        (a single character), but this is not enforced.
+    char : str, optional
+        Character for which to replace the upper-triangular part, of length 1 (a single character). If `None`, the value config value `CFG.sym_char` will be used.
+
+    Raises
+    ------
+    ValueError
+        If `char` is not of length 1
 
     Warns
     -----
@@ -61,6 +65,11 @@ def sym_replace(arr: str, char: str = CFG.sym_char) -> str:
     # NOTE: This function works under the assumption that the 'footprint' of each number in a NumPy
     # string is consistent across all numbers, and that the footprint is determined by the
     # longest number (in terms of characters) in the array.
+    if char is None:
+        char = CFG.sym_char  # FIXME: Maybe we should also try except here, for better re-usability?
+    if len(char) != 1:
+        raise ValueError(f"'char' must be a single character with length equal to 1, received {repr(char)} of length {len(char)}")  # TODO: Would be nice is we could support colors, maybe by identifying the '\x1b[91m' parts, stripping it, and then replacing later?
+    
 
     lines = arr.splitlines()
     try:
@@ -110,11 +119,11 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
         List of string representation of 1-D arrays, presumable `str(v)`, where `v` is a NumPy array of size `(n,)`
     edgeitems : int, default=None
         Number of edgeitems after which truncation will take place. Default is `None`, meaning all
-        elements will be diplayed.
+        elements will be displayed.
 
     Warnings
     --------
-    This feature has not been rigorously tested, and undefined behaviour might follows for inputs
+    This feature has not been rigorously tested, and undefined behavior might follows for inputs
     not adhering to the assumptions on their sizes
 
     Examples
@@ -334,7 +343,7 @@ def format_spec_to_opts(format_spec: str,
         token = token[1:]
     if token.startswith('~'):
         digits = token[1:]
-        if not digits.isdigit():
+        if not digits.isdigit() or digits.startswith('0'):
             raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
         edgeitems = int(digits)
         token = ''

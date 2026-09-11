@@ -878,23 +878,17 @@ class Polytope:
     def _str_vrepr(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """"Description of the polytope in V-represntation"""
         try:
-            match to_dtype:
-                case None:
-                    verts, rays = self.vrepr
-                case 'float':
-                    verts, rays = self.verts.astype(float), self.rays.astype(float)
-                case 'int':
-                    verts, rays = self.verts.astype(int), self.rays.astype(int)
-                case _:
-                    raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+            if to_dtype is None:
+                verts, rays = self.vrepr
+            elif to_dtype in {'int', 'float'}:
+                verts, rays = self.verts.astype(dtype := int if to_dtype == 'int' else float), self.rays.astype(dtype)
+            else:
+                raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ConversionError as e:
             raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}") from e
-        edgeitems = np.get_printoptions()['edgeitems']
+        edgeitems = edge if np.get_printoptions()['threshold'] < (edge := np.get_printoptions()['edgeitems']) else None
         if verts.size != 0:
-            if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                verts_lines = format_as_set([str(np.atleast_2d(vert).T + np.zeros((self.n, 1))) for vert in verts], edgeitems).splitlines()
-            else:
-                verts_lines = format_as_set([str(np.atleast_2d(vert).T) for vert in verts], edgeitems).splitlines()
+            verts_lines = format_as_set([str(np.atleast_2d(vert).T + np.zeros((self.n, 1), dtype=int if verts.dtype == int else float)) for vert in (sorted(verts) if self.n == 1 else verts)], edgeitems).splitlines()
             nlines = len(verts_lines)
             idx_text = nlines // 2
             conv_lines = ["     " if idx != idx_text else "conv " for idx in range(nlines)]
@@ -902,10 +896,7 @@ class Polytope:
         else:
             comb_verts = None
         if rays.size != 0:
-            if verts.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                rays_lines = format_as_set([str(np.atleast_2d(ray).T + np.zeros((self.n, 1))) for ray in rays], edgeitems).splitlines()
-            else:
-                rays_lines = format_as_set([str(np.atleast_2d(ray).T) for ray in rays], edgeitems).splitlines()
+            rays_lines = format_as_set([str(np.atleast_2d(ray).T + np.zeros((self.n, 1), dtype=int if verts.dtype == int else float)) for ray in (sorted(rays) if self.n == 1 else rays)], edgeitems).splitlines()
             if comb_verts is None:
                 nlines = len(rays_lines)
                 idx_text = nlines // 2
@@ -930,15 +921,15 @@ class Polytope:
     def _str_hrepr(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """"Description of the polytope in H-represntation"""
         try:
-            match to_dtype:
-                case None:
-                    A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
-                case 'float':
-                    A, b, A_eq, b_eq = self.A.astype(float), self.b.astype(float), self.A_eq.astype(float), self.b_eq.astype(float)
-                case 'int':
-                    A, b, A_eq, b_eq = self.A.astype(int), self.b.astype(int), self.A_eq.astype(int), self.b_eq.astype(int)
-                case _:
-                    raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+            if to_dtype is None:
+                A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
+            elif to_dtype in {'int', 'float'}:
+                A, b, A_eq, b_eq = (self.A.astype(dtype := int if to_dtype == 'int' else float),
+                                    self.b.astype(dtype),
+                                    self.A_eq.astype(dtype),
+                                    self.b_eq.astype(dtype))
+            else:
+                raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ImportError as e:
             raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}") from e
         if A.size != 0:

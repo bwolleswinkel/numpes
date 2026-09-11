@@ -213,15 +213,12 @@ class Ellipsoid:
     # pylint: disable=invalid-name
     def _str_quad(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
         """Quadratic description of the ellipsoid"""
-        match to_dtype:
-            case None:
-                c, Q = self.c, self.Q
-            case 'float':
-                c, Q = self.c.astype(float), self.Q.astype(float)
-            case 'int':
-                c, Q = self.c.astype(int), self.Q.astype(int)
-            case _:
-                raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+        if to_dtype is None:
+            c, Q = self.c, self.Q
+        elif to_dtype in {'int', 'float'}:
+            c, Q = self.c.astype(dtype := int if to_dtype == 'int' else float), self.Q.astype(dtype)
+        else:
+            raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         if c.dtype == float:  # Add array of zeros to avoid `-0.` in print output
             c_as_str, Q_as_str = str(np.atleast_2d(c + np.zeros_like(c)).T), str(Q + np.zeros_like(Q))
         else:
