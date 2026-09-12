@@ -13,7 +13,6 @@ try:
 except ImportError as _:
     CVXPY_INSTALLED = False
 
-from numpes._internal.wraps import wraps
 from numpes.exceptions import ConversionError
 
 if TYPE_CHECKING:
@@ -75,7 +74,7 @@ class _GlobalConfig:
             self.__dict__['_locked'] = True
 
     def _reset(self) -> None:
-        """Reset all settings to their default values"""
+        """Reset all global config settings to their default value"""
         self._update(**_ConfigSchema().__dict__)
 
     def on_poly_convert_(self) -> Literal[True]:
@@ -356,9 +355,8 @@ def get_config(key: Literal['atol',
     return getattr(CFG._data, key)  # pylint: disable=protected-access
 
 
-@wraps(_GlobalConfig._reset)  # pylint: disable=protected-access
 def reset_config() -> None:
-    """Reset the global config to its default values"""
+    """Reset all global config settings to their default value"""
     CFG._reset()  # pylint: disable=protected-access
 
 

@@ -38,7 +38,6 @@ from numpes._config import CFG
 from numpes._internal.common import get_axes_color
 from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
-from numpes._internal.wraps import wraps
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils.linalg import is_sing, is_square, minimize_hrepr, minimize_vrepr
 from numpes.utils.spatial import conv, enum_facets, enum_gens, signed_angle
@@ -89,91 +88,28 @@ class Polytope:
                  A_eq: Optional[ArrayLike] = None,
                  b_eq: Optional[ArrayLike] = None,
                  ) -> None:
-        r"""Initialize a Polytope from vertices or half-spaces.
+        """Initialize a polytope from vertices, half-spaces, or dimension. See `pes.poly` for further documentation.
 
-        Parameters
-        ----------
-        args : tuple[()] | tuple[ArrayLike] | tuple[ArrayLike, ArrayLike]
-            Variable length positional arguments list. Must be of size 0, 1, or 2,
-            according to the initialization method:
-            - len(0) -> (): Initialize an empty polytope in R^n (requires `n`). Note that if the keywords `A` and `b` or
-            `verts` are provided instead, they will cause a dispatch 
-            to the appropriate constructor instead.
-            - len(1) -> (verts,): A matrix of shape (k, n) representing k vertices in R^n (V-representation).
-            - len(2) -> (A, b): A matrix of shape (m, n) and a vector of length (m,),
-            respectively, representing m half-spaces in R^n (H-representation).
-        n : int, optional
-            Dimension of the ambient space. Required if initializing an empty polytope (zero positional arguments).
-        verts : NDArray[("k", "n"), float], optional
-            A matrix of shape (k, n) representing k vertices in R^n (V-representation). Required if 
-            initializing from vertices (one positional argument).
-        rays : NDArray[("k", "n"), float], optional
-            Rays for unbounded polytopes.
-        A : NDArray[("m", "n"), float], optional
-            A matrix of shape (m, n) representing m half-spaces in R^n (H-representation). Required if
-            initializing from half-spaces (two positional arguments).
-        b : NDArray[("m",), float], optional
-            A vector of shape (m,) representing m half-spaces in R^n (H-representation). Required if
-            initializing from half-spaces (two positional arguments).
-        A_eq : NDArray[("m_eq", "n"), float], optional
-            Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b).
-        b_eq : NDArray[("m_eq",), float], optional
-            Vector of shape (m_eq,) defining m_eq equality constraints in H-representation (Ax = b).
-
+        This is a fallback method linked to multiple dispatch when no suitable methods are found.
+        
         Raises
         ------
-        InvalidCombinationOfArguments
-            If the provided arguments do not match any of the expected patterns for initialization.
-        TypeError
-            If the types of the provided arguments are inconsistent with the expected types for initialization.
-        ValueError
-            If the provided ambient dimension `n` is not a positive integer.
-
-        Examples
-        --------
-        Initialize a polytope from vertices (V-representation):
-        >>> verts = [[0, 0],
-        ...          [1, 0],
-        ...          [0, 1]]
-        >>> poly = pes.poly(verts)
-        >>> print(poly)
-        Polytope in R^2
-             /[[0]  [[1]  [[0] \
-        conv \ [0]], [0]], [1]]/
-
-        Initialize a polytope from half-spaces (H-representation):
-        >>> A = [[1, 0],
-        ...      [0, 1],
-        ...      [-1, 0],
-        ...      [0, -1]]
-        >>> b = [1, 1, 0, 0]
-        >>> poly = pes.poly(A, b)
-        >>> print(poly)
-        Polytope in R^2
-        [[ 1  0]  |    [[1]
-         [ 0  1]  |     [1]
-         [-1  0]  x <=  [0]
-         [ 0 -1]] |     [0]]
-
-        Initialize an empty polytope in R^2:
-        >>> poly = pes.poly(n=2)
-        >>> print(poly)
-        Polytope in R^2
-        [0 0] x <= [-1]
+        InvalidCombinationOfArgumentsError
+            If no positional or keywords arguments are provided
         """
-        self._vrepr: tuple[NDArray, NDArray] | None = None
-        self._hrepr: tuple[NDArray, NDArray] | None = None
-        self._is_empty: bool | None = None
-        self._is_degen: bool | None = None
-        self._is_bounded: bool | None = None
-        self._is_full_dim: bool | None = None
-        self._is_pointed: bool | None = None
-        self._is_singleton: bool | None = None
-        self._dim: int | None = None
-        self._vol: float | None = None
-        self._diam: float | None = None
-        self._width: float | None = None  # FIXME: We should create a method `width`, and call this`min_width`
-        self._chebcr: tuple[NDArray, float] | None = None
+        self._vrepr: tuple[NDArray, NDArray] | None
+        self._hrepr: tuple[NDArray, NDArray] | None
+        self._is_empty: bool | None
+        self._is_degen: bool | None
+        self._is_bounded: bool | None
+        self._is_full_dim: bool | None
+        self._is_pointed: bool | None
+        self._is_singleton: bool | None
+        self._dim: int | None
+        self._vol: float | None
+        self._diam: float | None
+        self._width: float | None  # FIXME: We should create a method `width`, and call this`min_width`
+        self._chebcr: tuple[NDArray, float] | None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
         kwargs = {key: value for key, value in {
@@ -185,14 +121,26 @@ class Polytope:
             'A_eq': A_eq,
             'b_eq': b_eq,
         }.items() if value is not None}
-        if len(args) !=0 or len(kwargs) != 0:
-            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided," \
-            f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
-            "combinations or arguments.")
 
-    @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['verts', 'A', 'b'])
+        if len(args) == 0 and 'n' in kwargs:
+            if 'rays' in kwargs:
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing an empty polytope")
+            if 'A_eq' in kwargs or 'b_eq' in kwargs:
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' " \
+                                                         "when initializing an empty polytope")
+        if len(args) == 0 and 'verts' in kwargs:
+            if 'n' in kwargs:
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
+        if len(args) !=0 or len(kwargs) != 0:
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments " \
+                                                    f"was provided, received args={args}, kwargs={kwargs}. " \
+                                                     "Please refer to the documentation for details on valid " \
+                                                     "combinations or arguments.")
+
+    @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['verts', 'rays', 'A', 'b', 'A_eq', 'b_eq'])
     def _init_empty(self,
-                    **kwargs: int,
+                    *,
+                    n: int,
                     ) -> None:
         """Initialize an empty polytope in R^n. Requires the keyword argument `n` for the ambient dimension.
 
@@ -204,41 +152,14 @@ class Polytope:
         Raises
         ------
         TypeError
-            If the required keyword argument `n` is missing or if any of the forbidden keyword arguments are provided.
+            If `n` is not an integer
+        ValueError
+            If n is integer, but not strictly positive
         """
-
-        def _validate_inputs(kwargs: dict[str, int]) -> int:
-            """Validate the inputs for empty polytope initialization
-
-            Returns
-            -------
-            n : int
-                The ambient dimension for the empty polytope
-            
-            Raises
-            ------
-            TypeError
-                If the required keyword argument `n` is missing or if any of the
-                forbidden keyword arguments are provided.
-            ValueError
-                If the provided ambient dimension `n` is not a positive integer.
-            """
-            if 'n' not in kwargs:
-                raise InvalidCombinationOfArgumentsError("Dimension 'n' must be provided for empty polytope initialization")
-            if 'rays' in kwargs:
-                raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing an empty polytope")
-            if 'A_eq' in kwargs or 'b_eq' in kwargs:
-                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq'" \
-                " when initializing an empty polytope")
-            n = kwargs['n']
-            if not isinstance(n, int):
-                raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
-            if n <= 0:
-                raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
-            return n
-
-        n = _validate_inputs(kwargs)
-
+        if not isinstance(n, int):
+            raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
+        if n <= 0:
+            raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
         self._vrepr = (np.empty((0, n)), np.empty((0, n)))
         self._hrepr = (np.array([[0] * n + [-1]]), np.empty((0, n + 1)))
         self._is_empty = True
@@ -252,11 +173,6 @@ class Polytope:
         self._diam = np.nan
         self._width = 0
         self._chebcr = (np.full(n, np.nan), np.nan)
-
-    @overload
-    def _init_vrepr(self, *args: ArrayLike) -> None: ...
-    @overload
-    def _init_vrepr(self, *, verts: ArrayLike) -> None: ...
 
     @__init__.register(len_args=1)
     @__init__.register(len_args=0, include_kwargs=['verts'])
@@ -307,8 +223,8 @@ class Polytope:
             verts = kwargs['verts']
         verts = np.atleast_2d(verts)
         if verts.ndim != 2:
-            raise ValueError(f"Vertices must be provided as a 2D array of shape (k, n)," \
-                             f" but received an array of shape {verts.shape}")
+            raise ValueError("Vertices must be provided as a 2D array of shape (k, n)," \
+                            f" but received an array of shape {verts.shape}")
         if np.isnan(verts).any():
             raise ValueError("Vertices 'verts' cannot contain NaN values")
         if 'rays' in kwargs:
@@ -335,11 +251,6 @@ class Polytope:
         self._diam = None
         self._width = None
         self._chebcr = None
-
-    @overload
-    def _init_hrepr(self, *args: ArrayLike) -> None: ...
-    @overload
-    def _init_hrepr(self, *, A: ArrayLike, b: ArrayLike) -> None: ...
 
     @__init__.register(len_args=2)
     @__init__.register(len_args=0, include_kwargs=['A', 'b'])
@@ -685,27 +596,7 @@ class Polytope:
 
     @classmethod
     def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
-        """Create a polytope from upper and lower bounds on each coordinate.
-
-        Parameters
-        ----------
-        lb : ArrayLike
-            Lower bound of each coordinate. Use `-np.inf` or `float('-inf')` for an unbounded lower bound on a coordinate.
-        ub : ArrayLike
-            Upper bound of each coordinate. Use `np.inf` or `float('inf')` for an unbounded upper bound on a coordinate.
-
-        Returns
-        -------
-        Polytope
-            A polytope with V- and H-representations set analytically.
-            Returns an empty polytope if the bounds are infeasible.
-
-        Raises
-        ------
-        ValueError
-            If bounds are not 1-D arrays of equal length, contain NaN values,
-            or are otherwise malformed.
-        """
+        """Create a polytope from upper and lower bounds on each coordinate. See `pes.poly_from_bounds` for further documentation.""" 
         lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
         if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
             raise ValueError(
@@ -785,32 +676,7 @@ class Polytope:
 
     @classmethod
     def from_point(cls, point: ArrayLike) -> Self:
-        """Create a singleton polytope containing the given point.
-
-        Parameters
-        ----------
-        point : ArrayLike
-            A point/vector in R^n.
-
-        Returns
-        -------
-        Polytope
-            A polytope that is a singleton containing the given point.
-
-        Raises
-        ------
-        ValueError
-            If the input point is not a 1D array or contains NaN or infinite values
-
-        Examples
-        --------
-        >>> poly = pes.poly_from_point([1, 2, 3])
-        >>> print(poly)
-        Polytope in R^3
-        [[1. 0. 0.]  |    [[1.]
-         [0. 1. 0.]  x ==  [2.]
-         [0. 0. 1.]] |     [3.]]
-        """
+        """Create a singleton polytope containing the given point. See `pes.poly_from_point` for further documentation."""
         point = np.atleast_1d(point)
         if point.ndim != 1:
             raise ValueError(f"Point must be a 1D array, but received an array of shape {point.shape}")
@@ -1359,8 +1225,35 @@ class Polytope:
         return ax
 
 
-@wraps(Polytope.__init__)  # pylint: disable=protected-access
-def poly(*args: Any,
+@overload
+def poly(verts: ArrayLike,
+         rays: Optional[ArrayLike] = None,
+         /,
+         ) -> Polytope: ...
+@overload
+def poly(A: ArrayLike,
+         b: ArrayLike,
+         A_eq: Optional[ArrayLike] = None,
+         b_eq: Optional[ArrayLike] = None,
+         /,
+         ) -> Polytope: ...
+@overload
+def poly(*,
+         n: int,
+         ) -> Polytope: ...
+@overload
+def poly(*,
+         verts: ArrayLike,
+         rays: Optional[ArrayLike] = None,
+         ) -> Polytope: ...
+@overload
+def poly(*,
+         A: ArrayLike,
+         b: ArrayLike,
+         A_eq: Optional[ArrayLike] = None,
+         b_eq: Optional[ArrayLike] = None,
+         ) -> Polytope: ...
+def poly(*args: Optional[ArrayLike],
          n: Optional[int] = None,
          verts: Optional[ArrayLike] = None,
          rays: Optional[ArrayLike] = None,
@@ -1368,8 +1261,69 @@ def poly(*args: Any,
          b: Optional[ArrayLike] = None,
          A_eq: Optional[ArrayLike] = None,
          b_eq: Optional[ArrayLike] = None,
-         ) -> Self:
-    """Wrapper function for `Polytope.__init__` to create a polytope"""
+         ) -> Polytope:
+    r"""Create a polytope from vertices, half-spaces, or dimension.
+
+    The polytope can be constructed based on keyword arguments, or with one or two positional arguments (V-representation or H-representation, respectively). See examples section for more details. 
+
+    Parameters
+    ----------
+    verts : NDArray, optional
+        A matrix of shape (k, n) representing k vertices in R^n (V-representation)
+    rays : NDArray, optional
+        A matrix of shape (k_rays, n) representing k_rays nonnegative rays in R^n (V-representation)
+    A : NDArray, optional
+        A matrix of shape (m, n) representing m half-spaces in R^n (H-representation)
+    b : NDArray, optional
+        A vector of size (m,) representing m half-spaces in R^n (H-representation)
+    A_eq : NDArray, optional
+        Matrix of shape (m_eq, n) defining m_eq equality constraints in H-representation (Ax = b)
+    b_eq : NDArray, optional
+        Vector of size (m_eq,) defining m_eq equality constraints in H-representation (Ax = b)
+    n : int, optional
+        Dimension of the ambient space
+
+    Raises
+    ------
+    InvalidCombinationOfArguments
+        If the provided arguments do not match any of the expected patterns for initialization
+    TypeError
+        If the types of the provided arguments are inconsistent with the expected types for initialization
+    ValueError
+        If the provided ambient dimension `n` is not a positive integer
+
+    Examples
+    --------
+    Initialize a polytope from vertices (V-representation):
+    >>> verts = [[0, 0],
+    ...          [1, 0],
+    ...          [0, 1]]
+    >>> poly = pes.poly(verts)
+    >>> print(poly)
+    Polytope in R^2
+         /[[0]  [[1]  [[0] \
+    conv \ [0]], [0]], [1]]/
+
+    Initialize a polytope from half-spaces (H-representation):
+    >>> A = [[1, 0],
+    ...      [0, 1],
+    ...      [-1, 0],
+    ...      [0, -1]]
+    >>> b = [1, 1, 0, 0]
+    >>> poly = pes.poly(A, b)
+    >>> print(poly)
+    Polytope in R^2
+    [[ 1  0]  |    [[1]
+     [ 0  1]  |     [1]
+     [-1  0]  x <=  [0]
+     [ 0 -1]] |     [0]]
+
+    Initialize an empty polytope in R^2:
+    >>> poly = pes.poly(n=2)
+    >>> print(poly)
+    Polytope in R^2
+    [0 0] x <= [-1]
+    """
     kwargs = {key: value for key, value in {
         'n': n,
         'verts': verts,
@@ -1380,29 +1334,25 @@ def poly(*args: Any,
         'b_eq': b_eq,
     }.items() if value is not None}
     if len(args) == 0 and len(kwargs) == 0:
-        raise InvalidCombinationOfArgumentsError("No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
-    return Polytope(*args, **kwargs)
+        raise InvalidCombinationOfArgumentsError("No arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
+    return Polytope(*args, **{key: value for key, value in kwargs.items() if value is not None})
 
 
-@wraps(Polytope._init_empty)  # pylint: disable=protected-access
 def poly_empty(n: int) -> Polytope:
     """Wrapper function for `Polytope._init_empty` to create an empty polytope"""
     return Polytope(n=n)
 
 
-@wraps(Polytope._init_vrepr)  # pylint: disable=protected-access
 def poly_from_verts(verts: ArrayLike, rays: Optional[ArrayLike]) -> Polytope:
     """Wrapper function for `Polytope._init_vrepr` to create a polytope from vertices, and optionally rays"""
     return Polytope(verts=verts, rays=rays)
 
 
-@wraps(Polytope._init_hrepr)  # pylint: disable=protected-access
 def poly_from_ineq(A: ArrayLike, b: ArrayLike, A_eq: Optional[ArrayLike] = None, b_eq: Optional[ArrayLike] = None) -> Polytope:
     """Wrapper function for `Polytope._init_hrepr` to create a polytope from inequalities, and optionally equalities"""
     return Polytope(A=A, b=b, A_eq=A_eq, b_eq=b_eq)
 
 
-@wraps(Polytope._init_ambient)  # pylint: disable=protected-access
 def poly_ambient(n: int) -> Polytope:
     """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
     polytope = Polytope()
@@ -1410,15 +1360,58 @@ def poly_ambient(n: int) -> Polytope:
     return polytope
 
 
-@wraps(Polytope.from_bounds)
 def poly_from_bounds(lb: ArrayLike, ub: ArrayLike) -> Polytope:
-    """Wrapper function for `Polytope.from_bounds` to create a polytope from lower and upper bounds"""
+    """Create a polytope from upper and lower bounds on each coordinate.
+
+    Parameters
+    ----------
+    lb : ArrayLike
+        Lower bound of each coordinate. Use `-np.inf` or `float('-inf')` for an unbounded lower bound on a coordinate.
+    ub : ArrayLike
+        Upper bound of each coordinate. Use `np.inf` or `float('inf')` for an unbounded upper bound on a coordinate.
+
+    Returns
+    -------
+    Polytope
+        A polytope with V- and H-representations set analytically.
+        Returns an empty polytope if the bounds are infeasible.
+
+    Raises
+    ------
+    ValueError
+        If bounds are not 1-D arrays of equal length, contain NaN values,
+        or are otherwise malformed.
+    """
     return Polytope.from_bounds(lb, ub)
 
 
-@wraps(Polytope.from_point)
 def poly_from_point(point: ArrayLike) -> Polytope:
-    """Wrapper function for `Polytope.from_point` to create a singleton polytope given a point/vector"""
+    """Create a singleton polytope containing the given point.
+
+    Parameters
+    ----------
+    point : ArrayLike
+        A point/vector in R^n.
+
+    Returns
+    -------
+    Polytope
+        A polytope that is a singleton containing the given point.
+
+    Raises
+    ------
+    ValueError
+        If the input point is not a 1D array or contains NaN or infinite values
+
+    Examples
+    --------
+    >>> poly = pes.poly_from_point([1, 2, 3])
+    >>> print(poly)
+    Polytope in R^3
+    [[1. 0. 0.]  |    [[1.]
+     [0. 1. 0.]  x ==  [2.]
+     [0. 0. 1.]] |     [3.]]
+    """
     return Polytope.from_point(point)
 
 

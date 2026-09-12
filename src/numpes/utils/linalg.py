@@ -121,7 +121,9 @@ def rot_mat(angles: list[float]) -> NDArray:
 
 
 # [untested/unverified]
-def rot_mat_2d(angle: float) -> NDArray:
+def rot_mat_2d(angle: float,
+               units: Literal['rad', 'deg'] = 'rad',
+               ) -> NDArray:
     """Create a 2D rotation matrix from a single angle in radians.
     
     Parameters
@@ -134,6 +136,9 @@ def rot_mat_2d(angle: float) -> NDArray:
     R : NDArray
         A 2 x 2 rotation matrix corresponding to the given angle
     """
+    if units not in {'rad', 'deg'}:
+        raise ValueError(f"Units must be either 'rad' or 'deg', received unknown option '{units}'")
+    angle = angle if units == 'rad' else np.deg2rad(angle)
     R = np.array([[np.cos(angle), -np.sin(angle)],
                   [np.sin(angle),  np.cos(angle)]])
     return R

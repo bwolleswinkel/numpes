@@ -42,7 +42,6 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal.common import get_axes_color
 from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
-from numpes._internal.wraps import wraps
 from numpes.exceptions import InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import plot_box, plot_line, plot_plane, plot_vector
@@ -86,42 +85,7 @@ class Subspace:
                  basis: Optional[ArrayLike] = None,
                  n: Optional[int] = None,
                  ) -> None:
-        r"""Initialize a Subspace from a set of basis vectors.
-
-        Parameters
-        ----------
-        basis: ArrayLike[shape=(d, n)]
-            Matrix of shape `(d, n)` defining `d` basis vectors of dimension `n`
-
-        Raises
-        ------
-        TypeError
-            If the types of the provided arguments are inconsistent with the expected types for initialization
-        ValueError
-            If the entries of `basis` contain invalid numerical values such as NaN of inf
-
-        Examples
-        --------
-        Initialize a subspace from basis vectors.
-        >>> basis = [[1, 0,  0],
-        ...          [0, 1, -1]]
-        >>> subs = pes.subs(basis)
-        >>> print(subs)
-        Subspace in R^3
-             /[[1]  [[ 0] \
-        span < [0] , [ 1] >
-             \ [0]]  [-1]]/
-
-        Initialize a trivial subspace in R^n.
-        >>> subs = pes.subs(n=5)
-        >>> print(subs)
-        Trivial subspace in R^5
-        /[[0] \
-        | [0] |
-        < [0] >
-        | [0] |
-        \ [0]]/
-        """
+        """Initialize a subspace from a set of basis vectors. See `pes.subs` for further documentation."""
         self._basis: NDArray = np.empty((0, 0))
         self._is_minimal: bool | None = None  # FIXME: Should this be 'minimal'? 'reduced'? '(non)-redundant'?  'echelon'? 'canonical'?
         self._is_trivial: bool | None = None
@@ -205,7 +169,7 @@ class Subspace:
 
     # [untested/unverified]
     @property
-    def perp(self) -> Self:
+    def perp(self) -> Subspace:
         """"Returns the subspace orthogonal to the currecnt subspace"""
         basis_ortho = sp.linalg.null_space(self.basis).T
         return Subspace(basis_ortho)
@@ -490,11 +454,44 @@ class Subspace:
         return ax
 
 
-# FIXME: I need to change `wraps` such that only the docstring gets copied, but not the signature
-@wraps(Subspace.__init__)  # pylint: disable=protected-access
 def subs(basis: Optional[ArrayLike] = None,
          /,
          n: Optional[int] = None,
          ) -> Subspace:
-    """Wrapper function for `Subspace.__init__` to create a subspace"""
+    r"""Initialize a subspace from a set of basis vectors.
+
+    Parameters
+    ----------
+    basis: ArrayLike[shape=(d, n)]
+        Matrix of shape `(d, n)` defining `d` basis vectors of dimension `n`
+
+    Raises
+    ------
+    TypeError
+        If the types of the provided arguments are inconsistent with the expected types for initialization
+    ValueError
+        If the entries of `basis` contain invalid numerical values such as NaN of inf
+
+    Examples
+    --------
+    Initialize a subspace from basis vectors.
+    >>> basis = [[1, 0,  0],
+    ...          [0, 1, -1]]
+    >>> subs = pes.subs(basis)
+    >>> print(subs)
+    Subspace in R^3
+         /[[1]  [[ 0] \
+    span < [0] , [ 1] >
+         \ [0]]  [-1]]/
+
+    Initialize a trivial subspace in R^n.
+    >>> subs = pes.subs(n=5)
+    >>> print(subs)
+    Trivial subspace in R^5
+    /[[0] \
+    | [0] |
+    < [0] >
+    | [0] |
+    \ [0]]/
+    """
     return Subspace(basis=basis, n=n)

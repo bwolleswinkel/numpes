@@ -11,7 +11,7 @@ numpes
 │  ├─ _internal
 │  │  ├─ __init__.py
 │  │  ├─ multipledispatch.py  # For multipledispatch method decorator for polytopes
-│  │  └─ wraps.py  # For better wrapper
+│  │  └─ ...
 │  │
 │  ├─ control
 │  │  ├─ __init__.py

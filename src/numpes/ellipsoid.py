@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import copy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, overload
 
 import numpy as np
 
@@ -18,12 +18,11 @@ from numpes._config import CFG
 from numpes._internal.common import get_axes_color
 from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_spec_to_opts, pad, repr_items, sym_replace
-from numpes._internal.wraps import wraps
-from numpes.exceptions import InvalidRepresentationError, InvalidCombinationOfArgumentsError
+from numpes.exceptions import InvalidCombinationOfArgumentsError, InvalidRepresentationError
 from numpes.utils.linalg import angles_givens, is_posdef, is_rot_mat
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Literal, Optional, Self
+    from typing import Any, Literal, Optional, Self
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from matplotlib.typing import ColorType
@@ -66,19 +65,28 @@ class Ellipsoid:
 
     @multipledispatch
     def __init__(self,
-                 *args: tuple[list[float], ArrayLike] | ArrayLike,
+                 *args: ArrayLike,
                  n: Optional[int] = None,
                  Q: Optional[ArrayLike] = None,
                  radii: Optional[list[float]] = None,
                  R: Optional[ArrayLike] = None,
                  c: Optional[ArrayLike] = None,
                  ) -> None:
-        self._rrepr: tuple[list[float], NDArray] | None = None
-        self._Q: NDArray = None
-        self.c: NDArray = np.empty(0)
-        self._angles: list[float] | None = None
-        self._dim: int | None = None
-        self._vol: float | None = None
+        """Initialize an ellipsoid from a quadratic matrix, radii, or dimension. See `pes.ellps` for further documentation.
+        
+        This is a fallback method linked to multiple dispatch when no suitable methods are found.
+                
+        Raises
+        ------
+        InvalidCombinationOfArgumentsError
+            If no positional or keywords arguments are provided
+        """
+        self._rrepr: tuple[list[float], NDArray] | None
+        self._Q: NDArray | None
+        self.c: NDArray
+        self._angles: list[float] | None
+        self._dim: int | None
+        self._vol: float | None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
         kwargs = {key: value for key, value in {
@@ -115,12 +123,12 @@ class Ellipsoid:
         self._dim = 0
         self._vol = 0
 
-    @__init__.register(len_args=1)
-    @__init__.register(len_args=0, include_kwargs=['Q'], exclude_kwargs=['n'])
+    @__init__.register(len_args=1, exclude_kwargs=['n', 'Q', 'radii', 'R'])
+    @__init__.register(len_args=0, include_kwargs=['Q'], exclude_kwargs=['n', 'radii', 'R'])
     def _init_quad(self,
                    Q: ArrayLike,
                    c: Optional[ArrayLike] = None,
-                   ) -> NDArray:
+                   ) -> None:
         """Initialize the ellipsoid from a quadratic matrix `Q`."""
         Q = np.atleast_2d(Q)
         if not Q.ndim == 2:
@@ -140,21 +148,21 @@ class Ellipsoid:
         self._rrepr = None
         self.Q = Q
         self.c = c
-        self._angles: list[float] | None = None
-        self._dim: int | None = None
-        self._vol: float | None = None
+        self._angles = None
+        self._dim = None
+        self._vol = None
 
-    @__init__.register(len_args=2)
-    @__init__.register(len_args=0, include_kwargs=['radii'], exclude_kwargs=['n'])
-    @__init__.register(len_args=0, include_kwargs=['radii', 'R'], exclude_kwargs=['n'])
+    @__init__.register(len_args=2, exclude_kwargs=['n', 'Q', 'radii', 'R'])
+    @__init__.register(len_args=0, include_kwargs=['radii'], exclude_kwargs=['n', 'Q'])
+    @__init__.register(len_args=0, include_kwargs=['radii', 'R'], exclude_kwargs=['n', 'Q'])
     def _init_rrepr(self,
                     radii: list[float],
-                    R: Optional[NDArray] = None,
-                    c: Optional[NDArray] = None,
+                    R: Optional[ArrayLike] = None,
+                    c: Optional[ArrayLike] = None,
                     ) -> None:
         radii_arr = np.atleast_1d(radii)
         if radii_arr.ndim != 1:
-            raise ValueError(f"Radii 'radii' must be a one-dimensional list of floats or array-like, received {radii}")
+            raise ValueError(f"Radii 'radii' must be a one-dimensional list of floats or array-like, received {radii!r}")
         radii = radii_arr.tolist()
         R = (np.atleast_2d(R)
              if R is not None
@@ -167,8 +175,8 @@ class Ellipsoid:
             raise ValueError(f"Number of 'radii' must equal shape of 'R', received radii of length {len(radii)} and rotation matrix of shape {R.shape}")
         if not (R.size == 1 and np.allclose(R, 1)) and not is_rot_mat(R):
             raise ValueError(f"Rotation matrix 'R' must be a valid rotation matrix, received R @ R.T={R @ R.T}, np.linalg.det(R)={np.linalg.det(R)}")
-        if any([radius < 0 for radius in radii]):
-            raise ValueError(f"Radii must be strictly non-negative, received non-negative radius of {radii_arr[np.argwhere(radii < 0).min()]} at index {np.argwhere(radii_arr < 0).min()}")
+        if any(radius < 0 for radius in radii):
+            raise ValueError(f"Radii must be strictly non-negative, received non-negative radius of {radii_arr[np.argwhere(radii_arr < 0).min()]} at index {np.argwhere(radii_arr < 0).min()}")
         if c is None:
             c = np.zeros(len(radii), dtype=radii_arr.dtype)
         else:
@@ -180,18 +188,18 @@ class Ellipsoid:
         self.rrepr = (radii, R)
         self._Q = None
         self.c = c
-        self._angles: list[float] | None = None
-        self._dim: int | None = None
-        self._vol: float | None = None
+        self._angles = None
+        self._dim = None
+        self._vol = None
 
     @property
     def rrepr(self) -> tuple[list[float], NDArray]:
         """R-representation of the ellipsoid"""
         if self._rrepr is None:
             if self._Q is None:
-                raise InvalidRepresentationError(f"The ellipsoid contains neither an " \
-                                                  "R-representation nor a quadratic matrix Q, " \
-                                                  "implying it is in an invalid state")
+                raise InvalidRepresentationError("The ellipsoid contains neither an " \
+                                                 "R-representation nor a quadratic matrix Q, " \
+                                                 "implying it is in an invalid state")
             eigvals, R = np.linalg.eigh(self.Q)
             with np.errstate(divide='ignore'):
                 radii = 1 / np.sqrt(np.maximum(eigvals, 0))
@@ -220,11 +228,11 @@ class Ellipsoid:
         """Quadratic matrix of the ellipsoid"""
         if self._Q is None:
             if self._rrepr is None:
-                raise InvalidRepresentationError(f"The ellipsoid contains neither an R-representation nor a quadratic matrix Q, implying it is in an invalid state")
+                raise InvalidRepresentationError("The ellipsoid contains neither an R-representation nor a quadratic matrix Q, implying it is in an invalid state")
             if not np.isclose(self.radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(self.radii).all():
-                self.Q = self.R @ np.diag(1 / np.square(self.radii)) @ self.R.T
+                self._Q = self.R @ np.diag(1 / np.square(self.radii)) @ self.R.T
             else:
-                self.Q = np.full((self.n, self.n), np.nan)
+                self._Q = np.full((self.n, self.n), np.nan)
         return self._Q
 
     @Q.setter
@@ -244,8 +252,8 @@ class Ellipsoid:
             return len(self.radii)
         if self._Q is not None:
             return self.Q.shape[0]
-        raise InvalidRepresentationError(f"The ellipsoid contains neither an R-representation " \
-                                          "nor a quadratic matrix Q, implying it is in an invalid state")
+        raise InvalidRepresentationError("The ellipsoid contains neither an R-representation " \
+                                         "nor a quadratic matrix Q, implying it is in an invalid state")
 
     @property
     def radii(self) -> list[float]:
@@ -333,8 +341,8 @@ class Ellipsoid:
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the ellipsoid based on a format specifier"""
         if format_spec == '':
-                    return str(self)
-        
+            return str(self)
+
         which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec)
 
         if which_debug == 'r':
@@ -354,11 +362,11 @@ class Ellipsoid:
                              formatter=cast('Any', formatter),
                              sign=sign,
                              ):
-                str_quad = self._str_quad(to_dtype=to_dtype)
+            str_quad = self._str_quad(to_dtype=to_dtype)
         if 'E' in format_spec:
             str_quad = str_quad.replace('e', 'E')
         comb += ("" if len(comb) == 0 else "\n") + str_quad
-        
+
         return comb
 
     # [untested/unverified]
@@ -602,15 +610,107 @@ class Ellipsoid:
         return ax
 
 
-@wraps(Ellipsoid.__init__)
-def ellps(*args: tuple[list[float], ArrayLike] | ArrayLike,
+@overload
+def ellps(Q: ArrayLike,
+          c: Optional[ArrayLike] = None,
+          /,
+          ) -> Ellipsoid: ...
+@overload
+def ellps(radii: list[float],
+          R: Optional[ArrayLike] = None,
+          c: Optional[ArrayLike] = None,
+          /,
+          ) -> Ellipsoid: ...
+@overload
+def ellps(*,
+          n: int,
+          ) -> Ellipsoid: ...
+@overload
+def ellps(*,
+          Q: ArrayLike,
+          c: Optional[ArrayLike] = None,
+          ) -> Ellipsoid: ...
+@overload
+def ellps(*,
+          radii: list[float],
+          R: Optional[ArrayLike] = None,
+          c: Optional[ArrayLike] = None,
+          ) -> Ellipsoid: ...
+def ellps(*args: Optional[ArrayLike],
           n: Optional[int] = None,
           Q: Optional[ArrayLike] = None,
           radii: Optional[list[float]] = None,
           R: Optional[ArrayLike] = None,
           c: Optional[ArrayLike] = None,
           ) -> Ellipsoid:
-    """Wrapper function for `Ellipsoid.__init__` to create an ellipsoid"""
+    """Create an ellipsoid from a quadratic matrix, radii (and rotation matrix), or dimension.
+
+    The ellipsoid can be constructed based on keyword arguments, or with one or two positional arguments (quadratic matrix or R-representation, respectively). See examples section for more details. 
+    
+    Parameters
+    ----------
+    Q : ArrayLike, optional
+        A quadratic matrix of shape (n, n) defining the ellipsoid inequality `x.T @ Q @ x <= 1`
+    radii : list of float, optional
+        Principal radii of the ellipsoid of length n for R^n
+    R : ArrayLike, optional
+        Rotation matrix of shape (n, n) orienting the ellipsoid
+    n : int, optional
+        Dimension of the ambient space
+    c : ArrayLike, optional
+        Center coordinates vector of the ellipsoid of size (n,)
+
+    Returns
+    -------
+    Ellipsoid
+        The constructed ellipsoid instance
+
+    Raises
+    ------
+    InvalidCombinationOfArguments
+        If the provided arguments do not match any of the expected patterns for construction
+    TypeError
+        If the types of the provided arguments are inconsistent with the expected types for construction
+    ValueError
+        If the provided ambient dimension `n` is not a positive integer
+
+    Examples
+    --------
+    Construct an ellipsoid from a quadratic form:
+    >>> Q = [[ 1  , -1/4],
+    ...      [-1/4,  2  ]]
+    >>> ellps = pes.ellps(Q)
+    >>> print(ellps)
+    Ellipsoid in R^2
+       [[ 1.     *  ]      [[0.]
+    Q:  [-0.25  2.  ]], c:  [0.]]
+
+    Construct an ellipsoid from radii:
+    >>> R = pes.utils.rot_mat_2d(45, units='deg')
+    >>> ellps = pes.ellps([1, 2], R)
+    >>> print(ellps)
+    Ellipsoid in R^2
+       [[0.625   *  ]      [[0]
+    Q:  [0.375 0.625]], c:  [0]]
+
+    Construct an empty ellipsoid in R^2:
+    >>> ellps = pes.ellps(n=2)
+    >>> print(ellps)
+    Ellipsoid in R^2
+       [[inf  * ]      [[nan]
+    Q:  [ 0. inf]], c:  [nan]]
+
+    For the first two construction methods, a center `c` can be provided:
+    >>> Q = [[1, 0, 0],
+    ...      [0, 2, 0],
+    ...      [0, 0, 3]]
+    >>> ellps = pes.ellps(Q, c=[-1, 0, 1])
+    >>> print(ellps)
+    Ellipsoid in R^3
+       [[1 * *]      [[-1]
+    Q:  [0 2 *] , c:  [ 0]
+        [0 0 3]]      [ 1]]
+    """
     kwargs = {key: value for key, value in {
         'n': n,
         'Q': Q,
@@ -618,18 +718,18 @@ def ellps(*args: tuple[list[float], ArrayLike] | ArrayLike,
         'R': R,
         'c': c,
     }.items() if value is not None}
+    if len(args) == 0 and len(kwargs) == 0:
+        raise InvalidCombinationOfArgumentsError("No arguments provided for ellipsoid initialization. Please refer to the documentation for valid argument combinations.")
     return Ellipsoid(*args, **{key: value for key, value in kwargs.items() if value is not None})
 
 
-@wraps(Ellipsoid._init_quad)
 def ellps_from_quad(Q: ArrayLike,
                     c: Optional[ArrayLike] = None,
                     ) -> Ellipsoid:
-    """Wrapper function for `Ellipsoid.from_quad` to create an ellipsoid from a quadratic matrix"""
+    """Wrapper function for `Ellipsoid._init_quad` to create an ellipsoid from a quadratic matrix"""
     return Ellipsoid(Q, c=c)
 
 
-@wraps(Ellipsoid._init_rrepr)
 def ellps_from_radii(radii: list[float],
                      R: Optional[ArrayLike] = None,
                      c: Optional[ArrayLike] = None,
@@ -638,7 +738,6 @@ def ellps_from_radii(radii: list[float],
     return Ellipsoid(radii, R, c=c)
 
 
-@wraps(Ellipsoid._init_empty)
 def ellps_empty(n: int) -> Ellipsoid:
     """Construct an empty ellipsoid in R^n"""
     return Ellipsoid(n=n)

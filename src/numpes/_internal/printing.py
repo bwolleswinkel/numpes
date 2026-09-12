@@ -69,7 +69,6 @@ def sym_replace(arr: str, char: Optional[str] = None) -> str:
         char = CFG.sym_char  # FIXME: Maybe we should also try except here, for better re-usability?
     if len(char) != 1:
         raise ValueError(f"'char' must be a single character with length equal to 1, received {repr(char)} of length {len(char)}")  # TODO: Would be nice is we could support colors, maybe by identifying the '\x1b[91m' parts, stripping it, and then replacing later?
-    
 
     lines = arr.splitlines()
     try:

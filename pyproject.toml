@@ -195,7 +195,7 @@ show_missing = true
 max-line-length = 120
 
 [tool.pylint.basic]
-good-names = ["A", "A_eq", "Ab", "Ab_eq", "M", "Q", "R", "G"]
+good-names = ["A", "A_eq", "Ab", "Ab_eq", "M", "Q", "_Q", "R", "G"]
 
 [tool.isort]
 line_length = 9999

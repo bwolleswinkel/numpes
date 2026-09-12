@@ -24,23 +24,24 @@ def test_polytope_init_no_args_no_kwargs():
         "Expected the constructor to return an instance of Polytope when called with no arguments."
     
 
-def test_polytope_init_no_args_no_kwargs_attr_none():
-    poly = pes.Polytope()
-    for attr_name in [
-        '_vrepr',
-        '_hrepr',
-        '_is_empty',
-        '_is_degen',
-        '_is_bounded',
-        '_is_full_dim',
-        '_is_pointed',
-        '_is_singleton',
-        '_dim',
-        '_vol',
-        '_chebcr'
-        ]:
-        assert getattr(poly, attr_name) is None, \
-            f"Expected attribute '{attr_name}' to be None for a polytope initialized with no arguments, but got {getattr(poly, attr_name)}."
+# FIXME: This should raise an error instead
+# def test_polytope_init_no_args_no_kwargs_attr_none():
+#     poly = pes.Polytope()
+#     for attr_name in [
+#         '_vrepr',
+#         '_hrepr',
+#         '_is_empty',
+#         '_is_degen',
+#         '_is_bounded',
+#         '_is_full_dim',
+#         '_is_pointed',
+#         '_is_singleton',
+#         '_dim',
+#         '_vol',
+#         '_chebcr'
+#         ]:
+#         assert getattr(poly, attr_name) is None, \
+#             f"Expected attribute '{attr_name}' to be None for a polytope initialized with no arguments, but got {getattr(poly, attr_name)}."
         
 
 @pytest.mark.parametrize('args, kwargs', [
@@ -312,7 +313,7 @@ class TestPoly:
 
     def test_poly_no_args_no_kwargs(self):
         with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
-            "No (keyword) arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")):
+            "No arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")):
             _ = pes.poly()
 
 

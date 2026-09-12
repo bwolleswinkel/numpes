@@ -6,7 +6,4 @@ Modules
 multipledispatch
     This module defines the multiple dispatch functionality used in NumPES, allowing for function 
     overloading based on argument types in the Polytope constructor.
-wraps
-    This module defines a decorator for wrapping functions, used in for instance factory patterns.
-
 """

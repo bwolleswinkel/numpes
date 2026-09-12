@@ -167,7 +167,10 @@ def _solve_lp_pulp(
         upper = bounds_pulp[i][1]
         lb = lower if lower is not None and np.isfinite(lower) else None
         ub = upper if upper is not None and np.isfinite(upper) else None
-        x_i = prob.add_variable(name=f"x_{i}", lowBound=lb, upBound=ub)
+        # FIXME[BUG]: A depreciation warning is shown, but errors occur when following the `prob.add_variable` method
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning, module="pulp")
+            x_i = pulp.LpVariable(name=f"x_{i}", lowBound=lb, upBound=ub)
         x.append(x_i)
     objective = pulp.lpSum([c[i] * x[i] for i in range(n)])
     prob += objective
@@ -188,7 +191,7 @@ def _solve_lp_pulp(
         for i, x_i in enumerate(x):
             x_i.setInitialValue(float(x_0[i]))
 
-    # BUG: A depreciation warning is shown, but it persists when following the advised `pulp[cbc]` solutions
+    # FIXME[BUG]: A depreciation warning is shown, but it persists when following the advised `pulp[cbc]` solutions
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning, module="pulp")
         solver = pulp.PULP_CBC_CMD(msg=0, warmStart=x_0 is not None)
