@@ -505,8 +505,11 @@ def subs(*args: ArrayLike,
     }.items() if value is not None}
     if len(args) == 0 and len(kwargs) == 0:
         raise InvalidCombinationOfArgumentsError("No arguments provided for subspace initialization. Please refer to the documentation for valid argument combinations.")
-    if len(args) == 1 and n is not None:
-        raise InvalidCombinationOfArgumentsError("Dimension 'n' cannot be provided when constructing from a basis")
+    if len(args) == 1:
+        if n is not None:
+            raise InvalidCombinationOfArgumentsError("Dimension 'n' cannot be provided when constructing from a basis")
+        if basis is not None:
+            raise InvalidCombinationOfArgumentsError("Keyword 'basis' cannot be provided, as the positional argument denotes the basis")
     if len(args) > 1:
         raise InvalidCombinationOfArgumentsError("Subspace takes at most one positional argument 'basis'")
     if len(args) == 1:
