@@ -684,7 +684,7 @@ class Polytope:
         return self.chebcr[1]
 
     @classmethod
-    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Polytope:
+    def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
         """Create a polytope from upper and lower bounds on each coordinate.
 
         Parameters
@@ -784,7 +784,7 @@ class Polytope:
         return polytope
 
     @classmethod
-    def from_point(cls, point: ArrayLike) -> Polytope:
+    def from_point(cls, point: ArrayLike) -> Self:
         """Create a singleton polytope containing the given point.
 
         Parameters
@@ -837,15 +837,15 @@ class Polytope:
 
     __array_ufunc__ = None  # Disable NumPy ufuncs for Polytope objects to trigger fallback to dunder methods
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> Polytope:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Invoked when `copy.deepcopy` is called on the object"""
         return self.copy(deepcopy=True, memo=memo)
 
-    def __matmul__(self, M: NDArray) -> Polytope:
+    def __matmul__(self, M: NDArray) -> Self:
         """Invoked when right-hand matrix multiplication is performed (i.e., `self @ M`)"""
         raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
 
-    def __rmatmul__(self, M: NDArray) -> Polytope:
+    def __rmatmul__(self, M: NDArray) -> Self:
         """Invoked when left-hand matrix multiplication is performed (i.e., `M @ self`)"""
         return self.mat_mul(M, in_place=False)
 
@@ -886,9 +886,14 @@ class Polytope:
                 raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         except ConversionError as e:
             raise ConversionError(f"Converting the polytope to V-representation for printing failed: {e}") from e
-        edgeitems = edge if np.get_printoptions()['threshold'] < (edge := np.get_printoptions()['edgeitems']) else None
+        edgeitems = (edge
+                     if np.get_printoptions()['threshold'] < (edge := np.get_printoptions()['edgeitems'])
+                     else None)
         if verts.size != 0:
-            verts_lines = format_as_set([str(np.atleast_2d(vert).T + np.zeros((self.n, 1), dtype=int if verts.dtype == int else float)) for vert in (sorted(verts) if self.n == 1 else verts)], edgeitems).splitlines()
+            verts_lines = format_as_set([str(np.atleast_2d(vert).T + np.zeros((self.n, 1), dtype=vert.dtype))
+                                         for vert in (sorted(verts)
+                                                      if self.n == 1
+                                                      else verts)], edgeitems).splitlines()  # Add array of zeros to avoid `-0.` in print output
             nlines = len(verts_lines)
             idx_text = nlines // 2
             conv_lines = ["     " if idx != idx_text else "conv " for idx in range(nlines)]
@@ -896,7 +901,10 @@ class Polytope:
         else:
             comb_verts = None
         if rays.size != 0:
-            rays_lines = format_as_set([str(np.atleast_2d(ray).T + np.zeros((self.n, 1), dtype=int if verts.dtype == int else float)) for ray in (sorted(rays) if self.n == 1 else rays)], edgeitems).splitlines()
+            rays_lines = format_as_set([str(np.atleast_2d(ray).T + np.zeros((self.n, 1), dtype=rays.dtype))
+                                        for ray in (sorted(rays)
+                                                    if self.n == 1
+                                                    else rays)], edgeitems).splitlines()  # Add array of zeros to avoid `-0.` in print output
             if comb_verts is None:
                 nlines = len(rays_lines)
                 idx_text = nlines // 2
@@ -933,34 +941,22 @@ class Polytope:
         except ImportError as e:
             raise ConversionError(f"Converting the polytope to H-representation for printing failed: {e}") from e
         if A.size != 0:
-            if A.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                A_as_str = str(A + np.zeros_like(A)).splitlines()
-            else:
-                A_as_str = str(A).splitlines()
+            A_as_str = str(A + np.zeros_like(A)).splitlines()  # Add array of zeros to avoid `-0.` in print output
             nlines = len(A_as_str)
             idx_text = nlines - (1 if nlines <= 2 else 2)
             A_lines = [pad(line, len(A_as_str[-1])) for line in A_as_str]
             x_lines = [" |    " if idx != idx_text else " x <= " for idx in range(nlines)]
-            if b.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                b_lines = str(np.atleast_2d(b).T + np.zeros((b.size, 1))).splitlines()
-            else:
-                b_lines = str(np.atleast_2d(b).T).splitlines()
+            b_lines = str(np.atleast_2d(b).T + np.zeros((b.size, 1), dtype=b.dtype)).splitlines()  # Add array of zeros to avoid `-0.` in print output
             comb_Ab = "\n".join(["".join(line) for line in zip(A_lines, x_lines, b_lines)])
         else:
             comb_Ab = None
         if A_eq.size != 0:
-            if A_eq.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                A_eq_as_str = str(A_eq + np.zeros_like(A_eq)).splitlines()
-            else:
-                A_eq_as_str = str(A_eq).splitlines()
+            A_eq_as_str = str(A_eq + np.zeros_like(A_eq)).splitlines()  # Add array of zeros to avoid `-0.` in print output
             nlines_eq = len(A_eq_as_str)
             idx_text_eq = nlines_eq - (1 if nlines_eq <= 2 else 2)
             A_eq_lines = [pad(line, len(A_eq_as_str[-1])) for line in A_eq_as_str]
             x_eq_lines = [" |    " if idx != idx_text_eq else " x == " for idx in range(nlines_eq)]
-            if b_eq.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                b_eq_lines = str(np.atleast_2d(b_eq).T + np.zeros((b_eq.size, 1))).splitlines()
-            else:
-                b_eq_lines = str(np.atleast_2d(b_eq).T).splitlines()
+            b_eq_lines = str(np.atleast_2d(b_eq).T + np.zeros((b_eq.size, 1), dtype=b_eq.dtype)).splitlines()  # Add array of zeros to avoid `-0.` in print output
             comb_Ab_eq = "\n".join(["".join(line) for line in zip(A_eq_lines, x_eq_lines, b_eq_lines)])
         else:
             comb_Ab_eq = None
@@ -1008,7 +1004,7 @@ class Polytope:
         if which_repr is None:
             return comb
 
-        with np.printoptions(threshold=0,
+        with np.printoptions(threshold=0 if edgeitems is not None else None,
                              edgeitems=edgeitems,
                              formatter=cast('Any', formatter),
                              sign=sign,
@@ -1372,7 +1368,7 @@ def poly(*args: Any,
          b: Optional[ArrayLike] = None,
          A_eq: Optional[ArrayLike] = None,
          b_eq: Optional[ArrayLike] = None,
-         ) -> Polytope:
+         ) -> Self:
     """Wrapper function for `Polytope.__init__` to create a polytope"""
     kwargs = {key: value for key, value in {
         'n': n,

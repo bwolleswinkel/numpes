@@ -205,7 +205,7 @@ class Subspace:
 
     # [untested/unverified]
     @property
-    def perp(self) -> Subspace:
+    def perp(self) -> Self:
         """"Returns the subspace orthogonal to the currecnt subspace"""
         basis_ortho = sp.linalg.null_space(self.basis).T
         return Subspace(basis_ortho)
@@ -213,8 +213,7 @@ class Subspace:
     def __str__(self) -> str:
         """Descriptive representation of the subspace"""
         header = self._str_header()
-        with np.printoptions(threshold=0):  # FIXME: Where to do this threshold?
-            str_basis = self._str_basis()
+        str_basis = self._str_basis()
         return header + "\n" + str_basis
 
     # [untested/unverified]
@@ -237,10 +236,7 @@ class Subspace:
             raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
         edgeitems = edge if np.get_printoptions()['threshold'] < (edge := np.get_printoptions()['edgeitems']) else None
         if basis.size != 0:
-            if basis.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-                basis_lines = format_as_set([str(np.atleast_2d(base).T + np.zeros((self.n, 1))) for base in basis], edgeitems).splitlines()
-            else:
-                basis_lines = format_as_set([str(np.atleast_2d(base).T) for base in basis], edgeitems).splitlines()
+            basis_lines = format_as_set([str(np.atleast_2d(base).T + np.zeros((self.n, 1), dtype=basis.dtype)) for base in basis], edgeitems).splitlines()  # Add array of zeros to avoid `-0.` in print output
             nlines = len(basis_lines)
             idx_text = nlines // 2
             span_lines = ["     " if idx != idx_text else "span " for idx in range(nlines)]
@@ -274,7 +270,7 @@ class Subspace:
         if which_repr is None:
             return comb
 
-        with np.printoptions(threshold=0,
+        with np.printoptions(threshold=0 if edgeitems is not None else None,
                              edgeitems=edgeitems,
                              formatter=cast('Any', formatter),
                              sign=sign,

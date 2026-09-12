@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import copy
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -15,12 +16,14 @@ except ImportError as _:
 
 from numpes._config import CFG
 from numpes._internal.common import get_axes_color
-from numpes._internal.printing import pad, repr_items, sym_replace
+from numpes._internal.multipledispatch import multipledispatch
+from numpes._internal.printing import format_spec_to_opts, pad, repr_items, sym_replace
 from numpes._internal.wraps import wraps
-from numpes.utils.linalg import angles_givens, is_posdef
+from numpes.exceptions import InvalidRepresentationError, InvalidCombinationOfArgumentsError
+from numpes.utils.linalg import angles_givens, is_posdef, is_rot_mat
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Literal, Optional
+    from typing import Any, Callable, Literal, Optional, Self
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from matplotlib.typing import ColorType
@@ -61,71 +64,198 @@ class Ellipsoid:
         Projects the ellipsoid to a subspace or a affine subset    
     """
 
+    @multipledispatch
     def __init__(self,
-                 R: ArrayLike,
-                 radii: ArrayLike,
+                 *args: tuple[list[float], ArrayLike] | ArrayLike,
+                 n: Optional[int] = None,
                  Q: Optional[ArrayLike] = None,
+                 radii: Optional[list[float]] = None,
+                 R: Optional[ArrayLike] = None,
                  c: Optional[ArrayLike] = None,
                  ) -> None:
-        R = np.atleast_2d(R)
-        radii = np.atleast_1d(radii)
-        if not R.ndim == 2:
-            raise ValueError(f"Rotation matrix 'R' must be a two-dimensional array, received {R.shape}")
-        if not R.shape[0] == R.shape[1]:
-            raise ValueError(f"Rotation matrix 'R' much be a square matrix of size (n, n), received {R.shape}")
-        if not radii.ndim == 1:
-            raise ValueError(f"Radii 'radii' must be a one-dimensional array-like, received {radii.shape}")
-        if not radii.size == R.shape[0]:
-            raise ValueError(f"Number of 'radii' must equal shape of 'R', received radii of size {radii.size} and rotation matrix of shape {R.shape}")
-        if (radii < 0).any():
-            raise ValueError(f"Radii must be strictly non-negative, received non-negative radius of {radii[np.argwhere(radii < 0).min()]} at index {np.argwhere(radii < 0).min()}")
-        # if np.isnan(radii).any():
-        #     raise ValueError(f"Radii cannot be NaN value, received {radii}")
-        self.radii: NDArray = radii
-        self.R: NDArray = R  # FIXME: Here, upon assignment, I should do the reordering of R based on the order or radii
-        # FIXME: I should implement this instead | Or should I do both representations? Tough decision...
-        self._rrepr: tuple[NDArray, NDArray] | None = (R, radii)
-        if Q is not None:
-            Q = np.atleast_2d(Q)
-            if not Q.ndim == 2:
-                raise ValueError(f"Quadratic matrix 'Q' must be a two-dimensional array, received {Q.shape}")
-            if not Q.shape[0] == Q.shape[1]:
-                raise ValueError(f"Quadratic matrix 'Q' much be a square matrix of size (n, n), received {Q.shape}")
-            if not Q.shape[0] == self.n:
-                raise ValueError(f"Quadratic matrix 'Q' must have size (n, n), n={self.n}, received {Q.shape}")
-            self.Q: NDArray = Q
-        else:
-            if not np.isclose(radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(radii).all():
-                self.Q = self.R @ np.diag(self.radii) @ self.R.T
-            else:
-                self.Q = np.full((self.n, self.n), np.nan)
+        self._rrepr: tuple[list[float], NDArray] | None = None
+        self._Q: NDArray = None
+        self.c: NDArray = np.empty(0)
+        self._angles: list[float] | None = None
+        self._dim: int | None = None
+        self._vol: float | None = None
+
+        # NOTE: This is the fallback method if no dispatchers match, and should raise an error
+        kwargs = {key: value for key, value in {
+            'n': n,
+            'Q': Q,
+            'radii': radii,
+            'R': R,
+            'c': c,
+        }.items() if value is not None}
+        if len(args) !=0 or len(kwargs) != 0:
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments " \
+                                                    f"was provided, received args={args}, kwarg={kwargs}. " \
+                                                     "Please refer to the documentation for details on valid " \
+                                                     "combinations or arguments.")
+
+    @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['Q', 'radii', 'R'])
+    def _init_empty(self,
+                    *,
+                    n: int,
+                    c: Optional[ArrayLike] = None,
+                    ) -> None:
+        """Initialize an empty ellipsoid"""
+        if not isinstance(n, int):
+            raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
+        if n <= 0:
+            raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
+        if c is not None:
+            raise InvalidCombinationOfArgumentsError("Center 'c' cannot be provided when " \
+                                                    f"initializing an empty ellipsoid, received c={c}")
+        self._rrepr = ([float('nan') for _ in range(n)], np.full((n, n), np.nan))
+        self._Q = np.diag([np.inf for _ in range(n)])
+        self.c = np.full(n, np.nan)
+        self._angles = [float('nan') for _ in range(n)]
+        self._dim = 0
+        self._vol = 0
+
+    @__init__.register(len_args=1)
+    @__init__.register(len_args=0, include_kwargs=['Q'], exclude_kwargs=['n'])
+    def _init_quad(self,
+                   Q: ArrayLike,
+                   c: Optional[ArrayLike] = None,
+                   ) -> NDArray:
+        """Initialize the ellipsoid from a quadratic matrix `Q`."""
+        Q = np.atleast_2d(Q)
+        if not Q.ndim == 2:
+            raise ValueError(f"Quadratic matrix 'Q' must be a two-dimensional array, received {Q.shape}")
+        if not Q.shape[0] == Q.shape[1]:
+            raise ValueError(f"Quadratic matrix 'Q' much be a square matrix of size (n, n), received {Q.shape}")
+        if not is_posdef(Q, semi_def=True):
+            raise ValueError(f"Quadratic matrix 'Q' much be positive (semi)-definite, received matrix with eigenvalues {np.linalg.eigvals(Q)}")
         if c is None:
-            self.c: NDArray = np.zeros(self.n)
+            c = np.zeros(Q.shape[0], dtype=Q.dtype)
         else:
             c = np.atleast_1d(c)
             if not c.ndim == 1:
                 raise ValueError(f"Center 'c' must be a one-dimensional array, received {c.shape}")
-            if not c.size == self.n:
-                raise ValueError(f"Center 'c' must be a vector of size (n,), n={self.n}, received {c.shape}")
-            self.c = c
-        self.cov: NDArray | None = None
-        self.chi: float | None = None
-        # FIXME: Maybe all of these can just be properties that are computed on demand, as they are not expensive to compute
-        self._is_empty: bool | None = np.isnan(radii).all()
-        self._is_ambient: bool | None = np.isinf(radii).all()
-        self._is_degen: bool | None = (np.isclose(radii, 0, atol=CFG.atol).any()
-                                       or np.isinf(radii).any())
-        self._is_bounded: bool | None = np.isfinite(radii).all()
-        self._is_full_dim: bool | None = not np.isclose(radii, 0, atol=CFG.atol).any()
-        self._is_singleton: bool | None = np.isclose(radii, 0, atol=CFG.atol).all()
+            if not c.size == Q.shape[0]:
+                raise ValueError(f"Center 'c' must be a vector of size (n,), n={Q.shape[0]}, received {c.shape}")
+        self._rrepr = None
+        self.Q = Q
+        self.c = c
+        self._angles: list[float] | None = None
+        self._dim: int | None = None
+        self._vol: float | None = None
+
+    @__init__.register(len_args=2)
+    @__init__.register(len_args=0, include_kwargs=['radii'], exclude_kwargs=['n'])
+    @__init__.register(len_args=0, include_kwargs=['radii', 'R'], exclude_kwargs=['n'])
+    def _init_rrepr(self,
+                    radii: list[float],
+                    R: Optional[NDArray] = None,
+                    c: Optional[NDArray] = None,
+                    ) -> None:
+        radii_arr = np.atleast_1d(radii)
+        if radii_arr.ndim != 1:
+            raise ValueError(f"Radii 'radii' must be a one-dimensional list of floats or array-like, received {radii}")
+        radii = radii_arr.tolist()
+        R = (np.atleast_2d(R)
+             if R is not None
+             else np.eye(len(radii)))
+        if R.ndim != 2:
+            raise ValueError(f"Rotation matrix 'R' must be a two-dimensional array, received {R.shape}")
+        if R.shape[0] != R.shape[1]:
+            raise ValueError(f"Rotation matrix 'R' much be a square matrix of size (n, n), received {R.shape}")
+        if len(radii) != R.shape[0]:
+            raise ValueError(f"Number of 'radii' must equal shape of 'R', received radii of length {len(radii)} and rotation matrix of shape {R.shape}")
+        if not (R.size == 1 and np.allclose(R, 1)) and not is_rot_mat(R):
+            raise ValueError(f"Rotation matrix 'R' must be a valid rotation matrix, received R @ R.T={R @ R.T}, np.linalg.det(R)={np.linalg.det(R)}")
+        if any([radius < 0 for radius in radii]):
+            raise ValueError(f"Radii must be strictly non-negative, received non-negative radius of {radii_arr[np.argwhere(radii < 0).min()]} at index {np.argwhere(radii_arr < 0).min()}")
+        if c is None:
+            c = np.zeros(len(radii), dtype=radii_arr.dtype)
+        else:
+            c = np.atleast_1d(c)
+            if not c.ndim == 1:
+                raise ValueError(f"Center 'c' must be a one-dimensional array, received {c.shape}")
+            if not c.size == len(radii):
+                raise ValueError(f"Center 'c' must be a vector of size (n,), n={len(radii)}, received {c.shape}")
+        self.rrepr = (radii, R)
+        self._Q = None
+        self.c = c
         self._angles: list[float] | None = None
         self._dim: int | None = None
         self._vol: float | None = None
 
     @property
+    def rrepr(self) -> tuple[list[float], NDArray]:
+        """R-representation of the ellipsoid"""
+        if self._rrepr is None:
+            if self._Q is None:
+                raise InvalidRepresentationError(f"The ellipsoid contains neither an " \
+                                                  "R-representation nor a quadratic matrix Q, " \
+                                                  "implying it is in an invalid state")
+            eigvals, R = np.linalg.eigh(self.Q)
+            with np.errstate(divide='ignore'):
+                radii = 1 / np.sqrt(np.maximum(eigvals, 0))
+            for i in range(R.shape[1] - 1):
+                if R[i, i] < 0:
+                    R[:, i] *= -1
+            if np.linalg.det(R) < 0:
+                R[:, -1] *= -1  # Ensure R is a proper rotation matrix with det(R) = 1
+            self._rrepr = (radii, R)
+        return self._rrepr
+
+    @rrepr.setter
+    def rrepr(self, value: tuple[list[float], NDArray]) -> None:
+        """Set the R-representation of the polytope as a tuple (radii, R)"""
+        self._rrepr = value
+        match CFG.on_property_assign:
+            case 'pass':
+                pass
+            case 'minimal':  # FIXME: I don't think minimal here is nice; better is 'reduce', or even 'canon' (for canonical)
+                self.minimal()
+            case _:
+                raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
+
+    @property
+    def Q(self) -> NDArray:
+        """Quadratic matrix of the ellipsoid"""
+        if self._Q is None:
+            if self._rrepr is None:
+                raise InvalidRepresentationError(f"The ellipsoid contains neither an R-representation nor a quadratic matrix Q, implying it is in an invalid state")
+            if not np.isclose(self.radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(self.radii).all():
+                self.Q = self.R @ np.diag(1 / np.square(self.radii)) @ self.R.T
+            else:
+                self.Q = np.full((self.n, self.n), np.nan)
+        return self._Q
+
+    @Q.setter
+    def Q(self, value: NDArray) -> None:
+        """Set the quadratic matrix of the ellipsoid of shape (n, n)"""
+        self._Q = value
+        match CFG.on_property_assign:
+            case 'pass' | 'minimal':
+                pass
+            case _:
+                raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
+
+    @property
     def n(self) -> int:
         """Dimension of the ambient space"""
-        return self.radii.size
+        if self._rrepr is not None:
+            return len(self.radii)
+        if self._Q is not None:
+            return self.Q.shape[0]
+        raise InvalidRepresentationError(f"The ellipsoid contains neither an R-representation " \
+                                          "nor a quadratic matrix Q, implying it is in an invalid state")
+
+    @property
+    def radii(self) -> list[float]:
+        """Radii of the ellipsoid"""
+        return self.rrepr[0]
+
+    @property
+    def R(self) -> NDArray:
+        """Rotation matrix of the ellipsoid"""
+        return self.rrepr[1]
 
     @property
     def angles(self) -> list[float]:
@@ -134,65 +264,16 @@ class Ellipsoid:
             self._angles = angles_givens(self.R)
         return self._angles
 
-    @classmethod
-    def from_quad(cls,
-                  Q: ArrayLike,
-                  c: Optional[ArrayLike] = None,
-                  ) -> Ellipsoid:
-        """Construct an ellipsoid from a quadratic matrix `Q` and optionally a center `c`"""
-        Q = np.atleast_2d(Q)
-        if not Q.ndim == 2:
-            raise ValueError(f"Quadratic matrix 'Q' must be a two-dimensional array, received {Q.shape}")
-        if not Q.shape[0] == Q.shape[1]:
-            raise ValueError(f"Quadratic matrix 'Q' much be a square matrix of size (n, n), received {Q.shape}")
-        if c is None:
-            c = np.zeros(Q.shape[0])
-        else:
-            c = np.atleast_1d(c)
-            if not c.ndim == 1:
-                raise ValueError(f"Center 'c' must be a one-dimensional array, received {c.shape}")
-            if not c.size == Q.shape[0]:
-                raise ValueError(f"Center 'c' must be a vector of size (n,), n={Q.shape[0]}, received {c.shape}")
-        if not is_posdef(Q, semi_def=True):
-            raise ValueError("Quadratic matrix 'Q' must be positive (semi)-definite")
-        eigvals, R = np.linalg.eigh(Q)
-        with np.errstate(divide='ignore'):
-            radii = 1 / np.sqrt(np.maximum(eigvals, 0))
-        # FROM: Gemini 3.1 Pro | 2026/08/22[untested/unverified]
-        # Flip columns sign to map the Givens angles to [0, π)
-        for i in range(R.shape[1] - 1):
-            if R[i, i] < 0:
-                R[:, i] *= -1
-        if np.linalg.det(R) < 0:
-            R[:, -1] *= -1  # Ensure R is a proper rotation matrix with det(R) = 1
-        return cls(R, radii, Q, c)
-
-    @classmethod
-    def from_cov(cls,
-                 cov: ArrayLike,
-                 a: float,
-                 mu: Optional[ArrayLike] = None,
-                 mode: Literal['chi', 'nstd', 'abs'] = 'chi',
-                 ) -> Ellipsoid:
-        """Construct an ellipsoid from a covariance matrix `cov`, factor `a`, and optionally a mean `mu`"""
-        cov = np.atleast_2d(cov)
-        if mu is None:
-            mu = np.zeros(cov.shape[0])
-        else:
-            mu = np.atleast_1d(mu)
-            if not mu.ndim == 1:
-                raise ValueError(f"Mean 'mu' must be a one-dimensional array, received {mu.shape}")
-            if not mu.size == cov.shape[0]:
-                raise ValueError(f"Mean 'mu' must be a vector of size (n,), n={cov.shape[0]}, received {mu.shape}")
-        if not cov.ndim == 2:
-            raise ValueError(f"Covariance matrix 'cov' must be a two-dimensional array, received {cov.shape}")
-        raise NotImplementedError(...)
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """Invoked when `copy.deepcopy` is called on the object"""
+        return self.copy(deepcopy=True, memo=memo)
 
     # [untested/unverified]
     def __str__(self) -> str:
         """Description of the ellipsoid"""
         header = self._str_header()
-        return header + "\n" + self._str_quad()
+        str_quad = self._str_quad()
+        return header + "\n" + str_quad
 
     # [untested/unverified]
     def _str_header(self) -> str:
@@ -219,130 +300,123 @@ class Ellipsoid:
             c, Q = self.c.astype(dtype := int if to_dtype == 'int' else float), self.Q.astype(dtype)
         else:
             raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
-        if c.dtype == float:  # Add array of zeros to avoid `-0.` in print output
-            c_as_str, Q_as_str = str(np.atleast_2d(c + np.zeros_like(c)).T), str(Q + np.zeros_like(Q))
-        else:
-            c_as_str, Q_as_str = str(np.atleast_2d(c).T), str(Q)
+        c_as_str, Q_as_str = str(np.atleast_2d(c + np.zeros_like(c)).T), str(Q + np.zeros_like(Q))  # Add array of zeros to avoid `-0.` in print output
         c_lines, Q_lines = c_as_str.splitlines(), Q_as_str.splitlines()
         nlines = len(Q_lines)
         try:
             idx_trunc = Q_lines.index(' ...')
-            # NOTE: This assumes the number of edgeitems above and below is always identical
-            c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]
+            c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]  # NOTE: This assumes the number of edgeitems above and below is always identical
         except ValueError as _:
             idx_trunc = None
         idx_text = nlines - (1
                             if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
                             else 2)
 
-        c_text = ['   ' if idx != idx_text else 'c: ' for idx in range(nlines)]
-        c_vals = [pad(line, max(len(line) for line in c_lines)) for line in c_lines]
-        Q_text = ['     ' if idx != idx_text else ', Q: ' for idx in range(nlines)]
-        Q_vals = sym_replace(Q_as_str).splitlines()
-        comb = '\n'.join([''.join(line) for line in zip(c_text, c_vals, Q_text, Q_vals)])
+        c_text = ['     ' if idx != idx_text else ', c: ' for idx in range(nlines)]
+        c_vals = c_lines
+        Q_text = ['   ' if idx != idx_text else 'Q: ' for idx in range(nlines)]
+        Q_sym_lines = sym_replace(Q_as_str).splitlines()
+        Q_vals = [pad(line, max(map(len, Q_sym_lines))) for line in Q_sym_lines]
+        comb = '\n'.join([''.join(line) for line in zip(Q_text, Q_vals, c_text, c_vals)])
         if self.n == 1:
             comb = comb.replace('[[', '[').replace(']]', ']')
 
         return comb
 
+    # [untested/unverified]
     def __repr__(self) -> str:
         """Return a representation of the ellipsoid attributes"""
         attrs = ", ".join(f"{key}={value}" for key, value in repr_items(self))
         return f"{self.__class__.__name__}({attrs})"
 
+    # [untested/unverified]
     def __format__(self, format_spec: str) -> str:
         """Format the printed description of the ellipsoid based on a format specifier"""
-        # FIXME: Unify this method and move it to `printing`
-        token = format_spec
-        comb = ""
-        threshold: int | None = 0
-        sign: Literal['-', '+', ' '] | None = None
-        formatter: dict[str, Callable[[Any], str]] | None = None
-        to_dtype: Literal['float', 'int'] | None = None
-        edgeitems: int | None = None
+        if format_spec == '':
+                    return str(self)
+        
+        which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec)
 
-        if token == '':
-            return str(self)
-        if token == 'r':
+        if which_debug == 'r':
             return repr(self)
-        if token == '#':
+        if which_debug == '#':
             attrs = ",\n    ".join(f"{key}={value}" for key, value in repr_items(self, compact_ndarray=True))
             return f"{self.__class__.__name__}(\n    {attrs},\n)"
-        if 'r' in token or '#' in token:
-            raise ValueError(f"Format specifiers 'r' and '#' do not except any additional symbols, received '{format_spec}'")
-        if token.startswith('i'):
+
+        comb = ""
+        if which_debug == 'i':
             comb += self._str_header()
-            token = token[1:]
-        if len(token) == 0:
+        if which_repr is None:
             return comb
-        if token[0] in {' ', '+', '-'}:
-            sign = cast('Literal["-", "+", " "]', token[0])
-            token = token[1:]
-        if token and token[0] in {'f', 'e', 'E'}:
-            sign = sign if sign is not None else ' '
-            float_format = 'f' if token[0] == 'f' else 'e'
-            formatter = {
-                'float': lambda value: f'{value:{sign}{float_format}}',
-            }
-            to_dtype = 'float'
-            token = token[1:]
-        if token.startswith('.'):
-            digits, idx = '', 1
-            while idx < len(token) and token[idx].isdigit():
-                digits += token[idx]
-                idx += 1
-            if not digits:
-                raise ValueError(f"Invalid format '{format_spec}': '.' character must be followed by at least one digit, received '{token}'")
-            token = token[idx:]
-            if token and token[0] in {'f', 'e', 'E'}:
-                char = token[0]
-                sign = sign if sign is not None else ' '
-                if char == 'f' and digits == '0':
-                    formatter = {
-                        'float': lambda value: f"{value:{sign}.0f}.",
-                    }
-                else:
-                    formatter = {
-                        'float': lambda value: f"{value:{sign}.{int(digits)}{char}}",
-                    }
-                to_dtype = 'float'
-                token = token[1:]
-            elif token and token[0] == 'd':
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' cannot be followed by 'd' as integer type does not take precision")
-            elif not token:
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', but was not followed by any character")
-            else:
-                raise ValueError(f"Invalid format '{format_spec}': precision format specifier '.*' must be followed by 'f', 'e', or 'E', received '{token[0]}'")
-        elif token.startswith('d'):
-            to_dtype = 'int'
-            token = token[1:]
-        if token.startswith('~'):
-            digits = token[1:]
-            if not digits.isdigit():
-                raise ValueError(f"Invalid format '{format_spec}': edgeitems modifier '~*' must be the final element and followed by a positive integer, received '{token}'")
-            edgeitems = int(digits)
-            token = ''
-        if token != '':
-            raise ValueError(f"Invalid format '{format_spec}': trailing junk characters '{token}'")
 
-        # FROM: GitHub Copilot Claude Sonnet 5 | 2026/09/04[untested/unverified]
-        if formatter is not None:
-            # A custom `formatter` bypasses NumPy's column-width alignment, so pad every
-            # formatted value to the same width here to keep rows equal length.
-            base_fmt = formatter['float']
-            values = np.concatenate([np.ravel(self.c), np.ravel(self.Q)]).astype(float)
-            width = max(len(base_fmt(value)) for value in values)
-            formatter = {'float': lambda value: base_fmt(value).rjust(width)}
-
-        with np.printoptions(threshold=threshold, sign=sign, formatter=cast('Any', formatter), edgeitems=edgeitems):
-            str_quad = self._str_quad(to_dtype=to_dtype)
-            if 'E' in format_spec:
-                str_quad = str_quad.replace('e', 'E')
-            comb += ("" if len(comb) == 0 else "\n") + str_quad
-
+        with np.printoptions(threshold=0 if edgeitems is not None else None,
+                             edgeitems=edgeitems,
+                             formatter=cast('Any', formatter),
+                             sign=sign,
+                             ):
+                str_quad = self._str_quad(to_dtype=to_dtype)
+        if 'E' in format_spec:
+            str_quad = str_quad.replace('e', 'E')
+        comb += ("" if len(comb) == 0 else "\n") + str_quad
+        
         return comb
 
-    # untested
+    # [untested/unverified]
+    # pylint: disable=protected-access
+    def copy(self,
+             deepcopy: bool = True,
+             memo: Optional[dict[int, Any]] = None,
+             ) -> Self:
+        """Return a (deep)copy of the ellipsoid. 
+
+        Parameters
+        ----------
+        deepcopy : bool, default=True
+            If True, a deep copy of the ellipsoid is returned (totally isolated from the original ellipsoid). If False, a shallow copy is returned.
+        memo : dict[int, Any], optional
+            A dictionary of objects already copied during the current copying pass, used by `copy.deepcopy` to avoid infinite recursion when copying objects with circular references. If None, a new empty dictionary is created.
+
+        Returns
+        -------
+        Ellipsoid
+            A (deep)copy of the ellipsoid
+
+        Warnings
+        --------
+        If `deepcopy` is set to False, the returned ellipsoid will share references to the same underlying data as the original ellipsoid. Modifications to the NumPy arrays or lists (`radii`, `R`, `Q`, `c`, and `angles`) in either ellipsoid will affect both ellipsoids.
+        """
+        if not deepcopy:
+            return copy(self)
+
+        memo = {} if memo is None else memo
+        if id(self) in memo:
+            return memo[id(self)]
+
+        obj = copy(self)
+        memo[id(self)] = obj
+
+        if self._rrepr is not None:
+            obj._rrepr = (list(self.radii), self.R.copy())
+        if self._Q is not None:
+            obj._Q = self.Q.copy()
+        if self._angles is not None:
+            obj._angles = list(self.angles)
+        obj.c = self.c.copy()
+
+        return obj
+
+    def minimal(self,
+                in_place: bool = True,
+                ) -> Self:
+        """Return a minimal representation of the ellipsoid by sorting the radii and rotation matrix in descending order"""
+        obj = self if in_place else self.copy()
+        idx_sort = np.argsort(obj.radii)[::-1]
+        R_sorted = obj.R[:, idx_sort]
+        if not np.isnan(R_sorted).any() and np.linalg.det(R_sorted) < 0:
+            R_sorted[:, -1] *= -1
+        obj._rrepr = ([obj.radii[idx] for idx in idx_sort], R_sorted)
+        return obj
+
     def plot(self,
              color: Optional[ColorType] = None,
              alpha: float = 0.5,
@@ -528,30 +602,43 @@ class Ellipsoid:
         return ax
 
 
-@wraps(Ellipsoid.from_quad)
-def ellps(Q: ArrayLike, c: Optional[ArrayLike] = None,) -> Ellipsoid:
+@wraps(Ellipsoid.__init__)
+def ellps(*args: tuple[list[float], ArrayLike] | ArrayLike,
+          n: Optional[int] = None,
+          Q: Optional[ArrayLike] = None,
+          radii: Optional[list[float]] = None,
+          R: Optional[ArrayLike] = None,
+          c: Optional[ArrayLike] = None,
+          ) -> Ellipsoid:
+    """Wrapper function for `Ellipsoid.__init__` to create an ellipsoid"""
+    kwargs = {key: value for key, value in {
+        'n': n,
+        'Q': Q,
+        'radii': radii,
+        'R': R,
+        'c': c,
+    }.items() if value is not None}
+    return Ellipsoid(*args, **{key: value for key, value in kwargs.items() if value is not None})
+
+
+@wraps(Ellipsoid._init_quad)
+def ellps_from_quad(Q: ArrayLike,
+                    c: Optional[ArrayLike] = None,
+                    ) -> Ellipsoid:
     """Wrapper function for `Ellipsoid.from_quad` to create an ellipsoid from a quadratic matrix"""
-    ellpsoid = Ellipsoid.from_quad(Q, c)
-    return ellpsoid
+    return Ellipsoid(Q, c=c)
 
 
-# [untested/unverified]
+@wraps(Ellipsoid._init_rrepr)
+def ellps_from_radii(radii: list[float],
+                     R: Optional[ArrayLike] = None,
+                     c: Optional[ArrayLike] = None,
+                     ) -> Ellipsoid:
+    """Construct an ellipsoid from a rotation matrix `R` and a set of radii `radii`"""
+    return Ellipsoid(radii, R, c=c)
+
+
+@wraps(Ellipsoid._init_empty)
 def ellps_empty(n: int) -> Ellipsoid:
     """Construct an empty ellipsoid in R^n"""
-    # FIXME: I don't know if these values make any sense
-    R = np.full((n, n), np.nan)
-    radii = np.full(n, np.nan)
-    Q = np.diag([np.inf for _ in range(n)])
-    c = np.full(n, np.nan)
-    ellpsoid = Ellipsoid(R, radii, Q=Q, c=c)
-    return ellpsoid
-
-
-@wraps(Ellipsoid.__init__)
-def ellps_from_radii(radii: ArrayLike, R: Optional[ArrayLike] = None, c: Optional[ArrayLike] = None) -> Ellipsoid:
-    """Construct an ellipsoid from a rotation matrix `R` and a set of radii `radii`"""
-    if R is None:
-        # FIXME: This is not correct! This should create an R matrix based on the sorted radii (I think), such that the major axis is always the largest. Oh no this is correct, this 'magic' should be done by the property assignment inside ellps
-        R = np.eye(np.atleast_1d(radii).size)
-    ellpsoid = Ellipsoid(R, radii, c=c)
-    return ellpsoid
+    return Ellipsoid(n=n)

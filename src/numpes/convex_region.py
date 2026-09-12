@@ -22,7 +22,7 @@ class ConvexRegion(ABC):
     Methods
     -------
     __bool__
-        Check if the convex region is empty
+        Check if the convex region is empty or trivial
     __contains__
         Check if a point x is contained in the convex region
 
@@ -48,7 +48,7 @@ class ConvexRegion(ABC):
 
     @abstractmethod
     def __bool__(self) -> bool:
-        """Check if the convex region is empty"""
+        """Check if the convex region is empty or trivial"""
 
     @abstractmethod
     def __contains__(self, other: NDArray) -> bool:
