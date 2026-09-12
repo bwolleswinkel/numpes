@@ -29,7 +29,7 @@ aff_subs
 from __future__ import annotations
 
 from copy import copy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, overload
 
 import numpy as np
 import scipy as sp
@@ -42,7 +42,7 @@ except ImportError as _:
 from numpes._config import CFG
 from numpes._internal.common import get_axes_color
 from numpes._internal.printing import format_as_set, format_spec_to_opts, repr_items
-from numpes.exceptions import InvalidRepresentationError
+from numpes.exceptions import InvalidCombinationOfArgumentsError, InvalidRepresentationError
 from numpes.utils.linalg import span
 from numpes.utils.plot import plot_box, plot_line, plot_plane, plot_vector
 
@@ -86,16 +86,6 @@ class Subspace:
                  n: Optional[int] = None,
                  ) -> None:
         """Initialize a subspace from a set of basis vectors. See `pes.subs` for further documentation."""
-        self._basis: NDArray = np.empty((0, 0))
-        self._is_minimal: bool | None = None  # FIXME: Should this be 'minimal'? 'reduced'? '(non)-redundant'?  'echelon'? 'canonical'?
-        self._is_trivial: bool | None = None
-        self._is_bounded: bool | None = None
-        self._is_lower_dim: bool | None = None
-        self._is_full_dim: bool | None = None
-        self._is_singleton: bool | None = None
-        self._dim: int | None = None
-        self._vol: float | None = None
-
         if basis is None:
             if n is None:
                 raise ValueError("If no basis is provided, the keyword argument 'n' must be provided")
@@ -104,20 +94,22 @@ class Subspace:
             if n <= 0:
                 raise ValueError(f"Ambient dimension 'n' must be positive integer, but received '{n}'")
             basis = np.empty((0, n))
-        self._init_basis(basis)
-
-    def _init_basis(self,
-                    basis: ArrayLike,
-                    ) -> None:
-        """Initialize a subspace given a set of basis vectors"""
         basis = np.atleast_2d(basis)
         if basis.ndim != 2:
-            raise ValueError(f"Basis vectors must be provided as a 2D array of shape (d, n)," \
-                             f" but received an array of shape {basis.shape}")
+            raise ValueError("Basis vectors must be provided as a 2D array of shape (d, n), " \
+                            f"but received an array of shape {basis.shape}")
         if np.isnan(basis).any() or not np.isfinite(basis).all():
             raise ValueError("Vertices 'basis' cannot contain NaN or inf values")
 
-        self.basis = basis
+        self.basis: NDArray = basis
+        self._is_minimal: bool | None = None  # FIXME: Should this be 'minimal'? 'reduced'? '(non)-redundant'?  'echelon'? 'canonical'?
+        self._is_trivial: bool | None = None
+        self._is_bounded: bool | None = None
+        self._is_lower_dim: bool | None = None
+        self._is_full_dim: bool | None = None
+        self._is_singleton: bool | None = None
+        self._dim: int | None = None
+        self._vol: float | None = None
 
     @property
     def basis(self) -> NDArray:
@@ -453,9 +445,20 @@ class Subspace:
 
         return ax
 
-
-def subs(basis: Optional[ArrayLike] = None,
+@overload
+def subs(basis: ArrayLike,
          /,
+         ) -> Subspace: ...
+@overload
+def subs(*,
+         n: int,
+         ) -> Subspace: ...
+@overload
+def subs(*,
+         basis: ArrayLike,
+         ) -> Subspace: ...
+def subs(*args: ArrayLike,
+         basis: Optional[ArrayLike] = None,
          n: Optional[int] = None,
          ) -> Subspace:
     r"""Initialize a subspace from a set of basis vectors.
@@ -467,6 +470,8 @@ def subs(basis: Optional[ArrayLike] = None,
 
     Raises
     ------
+    InvalidCombinationOfArgumentsError
+        If the provided arguments do not match any of the expected patterns for initialization
     TypeError
         If the types of the provided arguments are inconsistent with the expected types for initialization
     ValueError
@@ -494,4 +499,16 @@ def subs(basis: Optional[ArrayLike] = None,
     | [0] |
     \ [0]]/
     """
+    kwargs = {key: value for key, value in {
+        'n': n,
+        'basis': basis,
+    }.items() if value is not None}
+    if len(args) == 0 and len(kwargs) == 0:
+        raise InvalidCombinationOfArgumentsError("No arguments provided for subspace initialization. Please refer to the documentation for valid argument combinations.")
+    if len(args) == 1 and n is not None:
+        raise InvalidCombinationOfArgumentsError("Dimension 'n' cannot be provided when constructing from a basis")
+    if len(args) > 1:
+        raise InvalidCombinationOfArgumentsError("Subspace takes at most one positional argument 'basis'")
+    if len(args) == 1:
+        return Subspace(args[0])
     return Subspace(basis=basis, n=n)
