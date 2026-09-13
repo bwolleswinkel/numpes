@@ -347,6 +347,6 @@ def format_spec_to_opts(format_spec: str,
         edgeitems = int(digits)
         token = ''
     if token != '':
-        raise ValueError(f"Invalid format '{format_spec}': substring not recognized starting with '{token}'")
+        raise ValueError(f"Invalid format '{format_spec}': substring starting with '{token}' not recognized")
 
     return which_debug, which_repr, to_dtype, edgeitems, formatter, sign

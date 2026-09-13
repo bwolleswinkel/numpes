@@ -81,8 +81,8 @@ class Ellipsoid:
         InvalidCombinationOfArgumentsError
             If no positional or keywords arguments are provided
         """
-        self._rrepr: tuple[list[float], NDArray] | None
         self._Q: NDArray | None
+        self._rrepr: tuple[list[float], NDArray] | None
         self.c: NDArray
         self._angles: list[float] | None
         self._dim: int | None
@@ -116,8 +116,8 @@ class Ellipsoid:
         if c is not None:
             raise InvalidCombinationOfArgumentsError("Center 'c' cannot be provided when " \
                                                     f"initializing an empty ellipsoid, received c={c}")
-        self._rrepr = ([float('nan') for _ in range(n)], np.full((n, n), np.nan))
         self._Q = np.diag([np.inf for _ in range(n)])
+        self._rrepr = ([float('nan') for _ in range(n)], np.full((n, n), np.nan))
         self.c = np.full(n, np.nan)
         self._angles = [float('nan') for _ in range(n)]
         self._dim = 0
@@ -145,8 +145,8 @@ class Ellipsoid:
                 raise ValueError(f"Center 'c' must be a one-dimensional array, received {c.shape}")
             if not c.size == Q.shape[0]:
                 raise ValueError(f"Center 'c' must be a vector of size (n,), n={Q.shape[0]}, received {c.shape}")
-        self._rrepr = None
         self.Q = Q
+        self._rrepr = None
         self.c = c
         self._angles = None
         self._dim = None
@@ -185,12 +185,34 @@ class Ellipsoid:
                 raise ValueError(f"Center 'c' must be a one-dimensional array, received {c.shape}")
             if not c.size == len(radii):
                 raise ValueError(f"Center 'c' must be a vector of size (n,), n={len(radii)}, received {c.shape}")
-        self.rrepr = (radii, R)
         self._Q = None
+        self.rrepr = (radii, R)
         self.c = c
         self._angles = None
         self._dim = None
         self._vol = None
+
+    @property
+    def Q(self) -> NDArray:
+        """Quadratic matrix of the ellipsoid"""
+        if self._Q is None:
+            if self._rrepr is None:
+                raise InvalidRepresentationError("The ellipsoid contains neither an R-representation nor a quadratic matrix Q, implying it is in an invalid state")
+            if not np.isclose(self.radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(self.radii).all():
+                self._Q = self.R @ np.diag(1 / np.square(self.radii)) @ self.R.T
+            else:
+                self._Q = np.full((self.n, self.n), np.nan)
+        return self._Q
+
+    @Q.setter
+    def Q(self, value: NDArray) -> None:
+        """Set the quadratic matrix of the ellipsoid of shape (n, n)"""
+        self._Q = value
+        match CFG.on_property_assign:
+            case 'pass' | 'minimal':
+                pass
+            case _:
+                raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
     @property
     def rrepr(self) -> tuple[list[float], NDArray]:
@@ -220,28 +242,6 @@ class Ellipsoid:
                 pass
             case 'minimal':  # FIXME: I don't think minimal here is nice; better is 'reduce', or even 'canon' (for canonical)
                 self.minimal()
-            case _:
-                raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
-
-    @property
-    def Q(self) -> NDArray:
-        """Quadratic matrix of the ellipsoid"""
-        if self._Q is None:
-            if self._rrepr is None:
-                raise InvalidRepresentationError("The ellipsoid contains neither an R-representation nor a quadratic matrix Q, implying it is in an invalid state")
-            if not np.isclose(self.radii, 0, rtol=CFG.rtol, atol=CFG.atol).any() and np.isfinite(self.radii).all():
-                self._Q = self.R @ np.diag(1 / np.square(self.radii)) @ self.R.T
-            else:
-                self._Q = np.full((self.n, self.n), np.nan)
-        return self._Q
-
-    @Q.setter
-    def Q(self, value: NDArray) -> None:
-        """Set the quadratic matrix of the ellipsoid of shape (n, n)"""
-        self._Q = value
-        match CFG.on_property_assign:
-            case 'pass' | 'minimal':
-                pass
             case _:
                 raise ValueError(f"Unknown value '{CFG.on_property_assign}' for 'on_property_assign' config setting")
 
@@ -332,6 +332,40 @@ class Ellipsoid:
         return comb
 
     # [untested/unverified]
+    def _str_rrepr(self, to_dtype: Optional[Literal['float', 'int']] = None) -> str:
+        """Spectral representation of the Ellipsoid"""
+        if to_dtype is None:
+            c, radii, R = self.c, np.array(self.radii), self.R
+        elif to_dtype in {'int', 'float'}:
+            c, radii, R = self.c.astype(dtype := int if to_dtype == 'int' else float), np.array(self.radii).astype(dtype), self.R.astype(dtype)
+        else:
+            raise ValueError(f"Unrecognized value '{to_dtype}' for 'to_dtype'")
+        c_as_str, radii_as_str, R_as_str = (str(np.atleast_2d(c + np.zeros_like(c)).T),
+                                            np.array2string(radii + np.zeros_like(radii), separator=', '),
+                                            str(R + np.zeros_like(R)))  # Add array of zeros to avoid `-0.` in print output
+        c_lines, radii_lines, R_lines = c_as_str.splitlines(), radii_as_str.splitlines(), R_as_str.splitlines()
+        nlines = len(R_lines)
+        try:
+            idx_trunc = R_lines.index(' ...')
+            c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]  # NOTE: This assumes the number of edgeitems above and below is always identical
+        except ValueError as _:
+            idx_trunc = None
+        idx_text = nlines - (1
+                            if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
+                            else 2)
+
+        radii_vals = f"radii: {"\n".join([line if idx == 0 else " " + line for idx, line in enumerate(radii_lines)]) + ",\n"}"
+        c_text = ["     " if idx != idx_text else ", c: " for idx in range(nlines)]
+        c_vals = c_lines
+        R_text = ["       " if idx != idx_text else "    R: " for idx in range(nlines)]
+        R_vals = [pad(line, max(map(len, R_lines))) for line in R_lines]
+        comb = radii_vals + "\n".join([''.join(line) for line in zip(R_text, R_vals, c_text, c_vals)])
+        if self.n == 1:
+            comb = comb.replace("[[", "[").replace("]]", "]")
+
+        return comb
+
+    # [untested/unverified]
     def __repr__(self) -> str:
         """Return a representation of the ellipsoid attributes"""
         attrs = ", ".join(f"{key}={value}" for key, value in repr_items(self))
@@ -343,7 +377,7 @@ class Ellipsoid:
         if format_spec == '':
             return str(self)
 
-        which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec)
+        which_debug, which_repr, to_dtype, edgeitems, formatter, sign = format_spec_to_opts(format_spec, valid_repr={'', 'q', 's'})  # FIXME: We really ought to rename R-representation to spectral representation, 's'
 
         if which_debug == 'r':
             return repr(self)
@@ -362,10 +396,15 @@ class Ellipsoid:
                              formatter=cast('Any', formatter),
                              sign=sign,
                              ):
-            str_quad = self._str_quad(to_dtype=to_dtype)
+            if which_repr in {'', 'q'}:
+                str_repr = self._str_quad(to_dtype=to_dtype)
+            elif which_repr == 's':
+                str_repr = self._str_rrepr(to_dtype=to_dtype)
+            else:
+                raise AssertionError(f"'which_repr' should only be '', 'q', or 's', received {which_repr}")
         if 'E' in format_spec:
-            str_quad = str_quad.replace('e', 'E')
-        comb += ("" if len(comb) == 0 else "\n") + str_quad
+            str_repr = str_repr.replace('e', 'E')
+        comb += ("" if len(comb) == 0 else "\n") + str_repr
 
         return comb
 
