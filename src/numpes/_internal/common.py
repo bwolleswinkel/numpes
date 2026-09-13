@@ -8,7 +8,7 @@ try:
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     MATPLOTLIB_INSTALLED = False
 
 from numpes._internal.axes import Axes1D
@@ -57,7 +57,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
                    display_name: str = "object",
                    ) -> tuple[Axes1D | Axes | Axes3D, ColorType]:
     """Get the correct axes object and color based on provided arguments.
-    
+
     Parameters
     ----------
     ax : Axes or None
@@ -75,7 +75,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
         Matplotlib Axes object
     color : ColorType
         Color to be used in plotting
-    
+
     Raises
     ------
     ImportError
@@ -85,7 +85,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
     """
 
     if not MATPLOTLIB_INSTALLED:
-        raise ImportError("Matplotlib is required for plotting. " \
+        raise ImportError("Matplotlib is required for plotting. "
                           "Please install it with 'pip install matplotlib' and try again.")
 
     if ax is None:

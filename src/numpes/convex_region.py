@@ -9,7 +9,7 @@ from numpy.typing import NDArray
 
 class ConvexRegion(ABC):
     """Base class for all convex regions. A convex region in R^n is defined as a collection U = {x ∈ R^n} for which x, y in U implies x * λ + y * (λ - 1) in U, for all λ ∈ [0, 1].
-    
+
     Properties
     ----------
     n : int

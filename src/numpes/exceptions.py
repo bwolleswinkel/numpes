@@ -45,7 +45,7 @@ class ConversionError(NumpesException, RuntimeError):
     Examples
     --------
     >>> with pes.algo_options(on_poly_convert='error'):
-    ...     try: 
+    ...     try:
     ...         poly = pes.poly([[1,  2],
     ...                          [0, -1]])
     ...         print(f"{poly:h}")

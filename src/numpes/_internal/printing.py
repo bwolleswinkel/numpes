@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 # [untested/unverified]
 def sym_replace(arr: str, char: Optional[str] = None) -> str:
-    """Replace the numbers located in the upper-triangular part of a 
+    """Replace the numbers located in the upper-triangular part of a
     2d square NumPy array with `char`. This is to be used for arrays which are symmetric, and
     where the upper-triangular values can be inferred from the lower part. The function does
     not check if the array provided is 2d or square (or for that matter, symmetric), and undefined behavior might follow
@@ -73,7 +73,7 @@ def sym_replace(arr: str, char: Optional[str] = None) -> str:
     lines = arr.splitlines()
     try:
         idx_trunc = lines.index(' ...')
-    except ValueError as _:
+    except ValueError:
         idx_trunc = None
 
     # The num_length is equal to the length of the first line, minus the three characters '[[' and ']', minus the ' ' characters in between the numbers, all divided by the number of columns. If there is truncation, we must subtract the three '...' characters and divide by one fewer column
@@ -109,9 +109,8 @@ def sym_replace(arr: str, char: Optional[str] = None) -> str:
 # [untested/unverified]
 def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
     """Format a list of 1-D vectors as elements of a set. It is assumed that `elements` contains
-    column-vector representations of NumPy arrays, all of equal length `n`, although no verification is performed, and unexpected
-    behaviour might follow for inputs not satisfying these assumptions.
-    
+    column-vector representations of NumPy arrays, all of equal length `n`, although no verification is performed, and unexpected behavior might follow for inputs not satisfying these assumptions.
+
     Parameters
     ----------
     elements : list[str]
@@ -135,7 +134,7 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
     \\ [0]], [1]], [0]]/
 
     Setting `edgeitems` to an integer causes truncation when the number of elements exceeds this.
-     
+
     >>> verts = np.arange(100).reshape(20, 5)
     >>> print(format_as_set([str(np.atleast_2d(vert).T) for vert in verts], edgeitems=3))
     /[[0]  [[5]  [[10]       [[85]  [[90]  [[95] \\
@@ -148,7 +147,7 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
     nlines = len(elem_lines[0])
     try:
         idx_trunc = elem_lines[0].index(' ...')
-    except ValueError as _:
+    except ValueError:
         idx_trunc = None
     idx_text = nlines // 2
     if edgeitems is not None and len(elem_lines) > (edgeitems * 2):
@@ -162,7 +161,7 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
             left_brackets = ['/', '\\']
             right_brackets = ['\\', '/']
         case _:
-            left_brackets, right_brackets =[], []
+            left_brackets, right_brackets = [], []
             for idx in range(nlines):
                 if idx == 0:
                     left_brackets.append('/')
@@ -190,12 +189,11 @@ def format_as_set(elements: list[str], edgeitems: Optional[int] = None) -> str:
     return comb
 
 
-
 # [untested/unverified]
 def pad(text: str, length: int, char: str = " ") -> str:
     """Pad a string that is shorter than a certain length by appending copies of `char` (to the end).
     Leaves the string unchanged if the string is of greater or equal length.
-    
+
     Parameters
     ----------
     test : str
@@ -204,7 +202,7 @@ def pad(text: str, length: int, char: str = " ") -> str:
         Length up to which the string must be padded
     char : str, default=" "
         Character with which to pad the array. Must be of length 1. Default character is a space.
-    
+
     Raises
     ------
     ValueError
@@ -252,7 +250,6 @@ def repr_items(obj: object,
         return repr(value)
 
     return [(key, fmt_repr_value(value, compact_ndarray)) for key, value in obj.__dict__.items()]
-
 
 
 def format_spec_to_opts(format_spec: str,

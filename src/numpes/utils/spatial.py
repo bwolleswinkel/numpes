@@ -22,7 +22,7 @@ import scipy as sp
 try:
     import cdd
     CDD_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     CDD_INSTALLED = False
 
 from numpes._config import CFG
@@ -36,29 +36,28 @@ if TYPE_CHECKING:
 # FROM: GitHub Copilot Claude Sonnet 4.5 | 2026/02/08[unverified]
 def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Enumerate the vertices and rays of a polytope defined by its facets using the double description method.
-    
+
     Parameters
     ----------
     Ab : NDArray
         A matrix of size `(m, n + 1)` containing `m` facet normals.
     Ab_eq : NDArray | None, default=None
         A n_eq x n + 1 array of m_eq facet normals corresponding to equalities.
-    
+
     Returns
     -------
     verts : NDArray
         A (k, n) array of k vertices in n-dimensional space.
     rays : NDArray
         A (k_rays, n) array of k_rays rays in n-dimensional space.
-    
     """
     if not CDD_INSTALLED:
         raise ImportError("The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.")
 
     # Validate dimension consistency between Ab and Ab_eq
     if Ab_eq is not None and Ab.shape[0] > 0 and Ab_eq.shape[0] > 0 and Ab.shape[1] != Ab_eq.shape[1]:
-        raise ValueError(f"Both Ab and Ab_eq should have the same number of columns n + 1," \
-        f" but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")
+        raise ValueError(f"Both Ab and Ab_eq should have the same number of columns n + 1,"
+                         f" but received Ab.shape={Ab.shape} and Ab_eq.shape={Ab_eq.shape}")
 
     # Special case: Unconstrained space (entire plane/space)
     if Ab.size == 0 and (Ab_eq is None or Ab_eq.size == 0):
@@ -110,8 +109,8 @@ def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, ND
     # to indicate vertices vs rays, but can return -5.30825384e-16
     verts_mask = np.abs(gmat[:, 0] - 1.0) < 1E-12
     ray_mask = np.abs(gmat[:, 0]) < 1E-12
-    verts = gmat[verts_mask, 1:] if np.any(verts_mask) else np.empty((0, gmat.shape[1]-1))
-    rays_and_lines = gmat[ray_mask, 1:] if np.any(ray_mask) else np.empty((0, gmat.shape[1]-1))
+    verts = gmat[verts_mask, 1:] if np.any(verts_mask) else np.empty((0, gmat.shape[1] - 1))
+    rays_and_lines = gmat[ray_mask, 1:] if np.any(ray_mask) else np.empty((0, gmat.shape[1] - 1))
 
     # Handle bidirectional lines (convert to pairs of opposite rays)
     if lin_set:
@@ -121,7 +120,7 @@ def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, ND
                 ray_list.extend([rays_and_lines[i], -rays_and_lines[i]])
             else:
                 ray_list.append(rays_and_lines[i])
-        rays = np.array(ray_list) if ray_list else np.empty((0, gmat.shape[1]-1))
+        rays = np.array(ray_list) if ray_list else np.empty((0, gmat.shape[1] - 1))
     else:
         rays = rays_and_lines
 
@@ -135,14 +134,14 @@ def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, ND
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/14[untested/unverified]
 def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Enumerate the facets of a polytope defined by its vertices using the double description method.
-    
+
     Parameters
     ----------
     verts : NDArray
         A (k, n) array of k vertices in n-dimensional space.
     rays : NDArray | None, default=None
         A (k_rays, n) array of k_rays rays in n-dimensional space.
-        
+
     Returns
     -------
     Ab : NDArray
@@ -161,7 +160,7 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
 
     # Validate dimension consistency between verts and rays
     if rays is not None and verts.shape[1] != rays.shape[1]:
-        raise ValueError(f"Both verts and rays should have the same number of columns n," \
+        raise ValueError(f"Both verts and rays should have the same number of columns n,"
                          f" but received verts.shape={verts.shape} and rays.shape={rays.shape}")
 
     # Special case: Empty polytope (no vertices and no rays)
@@ -214,12 +213,12 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
 # FROM: GitHub Copilot ChatGPT 4.1 | 2026/01/28[unverified]
 def conv(verts: NDArray) -> NDArray:
     """Compute the convex hull of a set of points given by `verts`
-    
+
     Parameters
     ----------
     verts : NDArray
         A (k, n) array of k points in n-dimensional space.
-        
+
     Returns
     -------
     hull_verts : NDArray
@@ -268,7 +267,7 @@ def conv(verts: NDArray) -> NDArray:
 
 def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> float:
     """Compute the signed angle between two vectors `v_1` and `v_2` in 2D or 3D space.
-    
+
     Parameters
     ----------
     v_1 : NDArray
@@ -285,11 +284,11 @@ def signed_angle(v_1: NDArray, v_2: NDArray, look: Optional[NDArray] = None) -> 
         Signed angle in radians, range (-π, π]. If either `v_1` or `v_2` is zero, the result
         is undefined and `np.nan` is returned. Counter-clockwise rotation from `v_1` to `v_2`
         is positive when viewed from the `look` direction.
-        
+
     Raises
     ------
     ValueError
-        If vectors have different sizes, are not 2D/3D, are zero vectors, if look vector is not 
+        If vectors have different sizes, are not 2D/3D, are zero vectors, if look vector is not
         3-dimensional when provided, or if look vector is zero.
     """
     if v_1.size != v_2.size:

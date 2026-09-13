@@ -8,8 +8,7 @@ AffineSubset
     Class representing a affine subset, which is a linear translation of a subspace by some offset vector
 QuotientSpace
     Class representing a quotient space, which is a vector space of affine subsets forming a equivalence relation between similar bases
-    
-    
+
 Functions
 ---------
 subs
@@ -36,7 +35,7 @@ import scipy as sp
 
 try:
     import matplotlib.pyplot as plt
-except ImportError as _:
+except ImportError:
     pass
 
 from numpes._config import CFG
@@ -60,11 +59,11 @@ if TYPE_CHECKING:
 # TODO: Inherit from a common base class ConvexRegion
 class Subspace:
     """Subspace represented by its basis vectors.
-    
+
     A (linear) subspace is the collection of all vectors that are the linear combination of a set of
     basis vectors. A subspace cannot be empty and always includes the zero vector: if this is the only
-    element, it is refferred to as the trivial subspace.
-    
+    element, it is referred to as the trivial subspace.
+
     Attributes
     ----------
     basis: NDArray[shape=(d, n)]
@@ -96,8 +95,8 @@ class Subspace:
             basis = np.empty((0, n))
         basis = np.atleast_2d(basis)
         if basis.ndim != 2:
-            raise ValueError("Basis vectors must be provided as a 2D array of shape (d, n), " \
-                            f"but received an array of shape {basis.shape}")
+            raise ValueError("Basis vectors must be provided as a 2D array of shape (d, n), "
+                             f"but received an array of shape {basis.shape}")
         if np.isnan(basis).any() or not np.isfinite(basis).all():
             raise ValueError("Vertices 'basis' cannot contain NaN or inf values")
 
@@ -119,7 +118,7 @@ class Subspace:
     @basis.setter
     def basis(self, value: NDArray) -> None:
         """Set the basis vectors of the subspace.
-        
+
         Note
         ----
         By default, the config option `pes.get_config()['on_property_assign'] == 'reduce'`,
@@ -248,7 +247,7 @@ class Subspace:
              deepcopy: bool = True,
              memo: Optional[dict[int, Any]] = None,
              ) -> Self:
-        """Return a (deep)copy of the subspace. 
+        """Return a (deep)copy of the subspace.
 
         Parameters
         ----------
@@ -298,7 +297,7 @@ class Subspace:
              ax: Optional[Axes1D | Axes | Axes3D] = None,
              ) -> Axes1D | Axes | Axes3D:
         """Plot the subspace. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
-                
+
         Parameters
         ----------
         color : ColorType, optional
@@ -313,7 +312,7 @@ class Subspace:
             Whether to show the ellipsoid using `plt.show()`
         ax : Axes1D, Axes, or Axes3D, optional
             An pre-defined axes object on which to plot (for plotting multiple convex regions)
-        
+
         Returns
         -------
         ax : Axes1D, Axes, or Axes3D
@@ -392,7 +391,7 @@ class Subspace:
                    ax: Optional[Axes1D | Axes | Axes3D] = None,
                    ) -> Axes1D | Axes | Axes3D:
         """Plot the basis vectors of the subspace. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
-                
+
         Parameters
         ----------
         color : ColorType, optional
@@ -405,7 +404,7 @@ class Subspace:
             Whether to show the basis vectors using `plt.show()`
         ax : Axes1D, Axes, or Axes3D, optional
             An pre-defined axes object on which to plot (for plotting multiple convex regions)
-        
+
         Returns
         -------
         ax : Axes1D, Axes, or Axes3D
@@ -444,6 +443,7 @@ class Subspace:
             plt.show()
 
         return ax
+
 
 @overload
 def subs(basis: ArrayLike,

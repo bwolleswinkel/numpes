@@ -1,5 +1,5 @@
-isort src/numpes
-ruff check src/numpes
+isort src
+ruff check src
 # C0301=lines-to-long
 # W0511=fixme
 # R0912=too-many-branches
@@ -12,8 +12,12 @@ ruff check src/numpes
 # R0917=too-many-positional-arguments
 # R0902=too-many-instance-attributes
 # R0801=duplicate-code
-pylint --disable=C0301,W0511,R0912,R0911,R0904,R0915,C0302,R0801,R0914,R0913,R0917,R0902 src/numpes
-mypy src/numpes
+pylint --disable=C0301,W0511,R0912,R0911,R0904,R0915,C0302,R0801,R0914,R0913,R0917,R0902 src
+# E501: line too long
+# F401: imported but unused
+# W503: line break before binary operator
+flake8 --ignore=E501,W503 --per-file-ignores="__init__.py:F401" src
+mypy src
 
 # For targeting a specific warning
 pylint -d all -e <NUMBER> src/numpes

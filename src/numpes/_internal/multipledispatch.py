@@ -69,8 +69,8 @@ class DispatcherFunction(Protocol):
 # FROM: GitHub Copilot, Claude Sonnet 4 | 2026/01/15[untested/unverified]
 def multipledispatch(func: Callable[[Any], Any]) -> DispatcherFunction:
     """Decorator that enables multiple dispatch functionality for a function or method.
-    
-    The decorated function `func` can then use dispatch decorators, such as 
+
+    The decorated function `func` can then use dispatch decorators, such as
     `@func.args(len=n)` to dispatch based on the number of positional arguments.
 
     Parameters

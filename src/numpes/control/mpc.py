@@ -3,6 +3,6 @@
 Functions
 ---------
 mpc_init_feas
-    Calculates the polytope which represent the set of feasible initial conditions 
+    Calculates the polytope which represent the set of feasible initial conditions
     for a given MPC problem
 """

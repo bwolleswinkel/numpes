@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, final
 try:
     import cvxpy as cvx
     CVXPY_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     CVXPY_INSTALLED = False
 
 from numpes.exceptions import ConversionError
@@ -79,12 +79,12 @@ class _GlobalConfig:
 
     def on_poly_convert_(self) -> Literal[True]:
         """Method that is called when a polytope is converted from one representation to another.
-        
+
         Returns
         -------
         Literal[True]
             If the conversion is allowed to proceed
-            
+
         Raises
         ------
         UserWarning
@@ -152,7 +152,7 @@ def set_algo_options(*,
         What constitutes a successful optimization
     extra_kwargs: {}
         Additional keyword arguments (should be empty) used to catch invalid config keys and printing options
-    
+
     Raises
     ------
     KeyError
@@ -334,7 +334,7 @@ def get_config(key: Literal['atol',
                             'format_spec_subs',
                             ]) -> int | float | str | None:
     """Get the current configuration of the global config. Valid keys are:
-    
+
     - atol -> `float`
     - rtol -> `float`
     - on_poly_convert -> `str`

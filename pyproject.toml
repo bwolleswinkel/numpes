@@ -55,6 +55,7 @@ dev = [
   "isort",
   "pylint",
   "ruff",
+  "flake8",
 ]
 
 [build-system]

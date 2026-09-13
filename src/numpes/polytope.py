@@ -3,7 +3,7 @@
 Classes
 -------
 Polytope
-    A class representing a convex polytope defined by either linear (in)equalities 
+    A class representing a convex polytope defined by either linear (in)equalities
     or as the convex hull of a set of vertices and corresponding rays.
 
 Functions
@@ -31,7 +31,7 @@ try:
     from matplotlib.colors import to_rgba
     from matplotlib.patches import Patch
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
-except ImportError as _:
+except ImportError:
     pass
 
 from numpes._config import CFG
@@ -56,11 +56,11 @@ if TYPE_CHECKING:
 # TODO: Inherit from a common base class ConvexRegion
 class Polytope:
     """Polytope represented in either V-representation (vertices) or H-representation (half-spaces).
-    
-    A polytope is the convex hull of a finite set of points in R^n (V-representation) or the bounded intersection 
-    of a finite number of half-spaces (H-representation). This class provides methods to convert between these 
+
+    A polytope is the convex hull of a finite set of points in R^n (V-representation) or the bounded intersection
+    of a finite number of half-spaces (H-representation). This class provides methods to convert between these
     representations and perform operations on polytopes.
-    
+
     Attributes
     ----------
     A : NDArray[('m', 'n'), float]
@@ -91,7 +91,7 @@ class Polytope:
         """Initialize a polytope from vertices, half-spaces, or dimension. See `pes.poly` for further documentation.
 
         This is a fallback method linked to multiple dispatch when no suitable methods are found.
-        
+
         Raises
         ------
         InvalidCombinationOfArgumentsError
@@ -126,15 +126,15 @@ class Polytope:
             if 'rays' in kwargs:
                 raise InvalidCombinationOfArgumentsError("Cannot provide 'rays' when initializing an empty polytope")
             if 'A_eq' in kwargs or 'b_eq' in kwargs:
-                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' " \
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' "
                                                          "when initializing an empty polytope")
         if len(args) == 0 and 'verts' in kwargs:
             if 'n' in kwargs:
                 raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
-        if len(args) !=0 or len(kwargs) != 0:
-            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments " \
-                                                    f"was provided, received args={args}, kwargs={kwargs}. " \
-                                                     "Please refer to the documentation for details on valid " \
+        if len(args) != 0 or len(kwargs) != 0:
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments "
+                                                     f"was provided, received args={args}, kwargs={kwargs}. "
+                                                     "Please refer to the documentation for details on valid "
                                                      "combinations or arguments.")
 
     @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['verts', 'rays', 'A', 'b', 'A_eq', 'b_eq'])
@@ -205,9 +205,10 @@ class Polytope:
         }
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
-            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
-                f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
-                "combinations or arguments.")
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided, "
+                                                     f"received args={args}, kwargs={dict(kwargs)}. Please refer "
+                                                     "to the documentation for details on valid "
+                                                     "combinations or arguments.")
         if 'n' in kwargs:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
         if 'A' in kwargs or 'b' in kwargs:
@@ -216,22 +217,23 @@ class Polytope:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
         if len(args) == 1:
             if isinstance(*args, int):
-                raise TypeError("A single positional argument cannot be an integer (for an empty polytope " \
-                "initialization). Please refer to the documentation for valid argument combinations.")
+                raise TypeError("A single positional argument cannot be an integer (for an empty polytope "
+                                "initialization). Please refer to the documentation for valid argument "
+                                "combinations.")
             (verts,) = args
         else:
             verts = kwargs['verts']
         verts = np.atleast_2d(verts)
         if verts.ndim != 2:
-            raise ValueError("Vertices must be provided as a 2D array of shape (k, n)," \
-                            f" but received an array of shape {verts.shape}")
+            raise ValueError("Vertices must be provided as a 2D array of shape (k, n),"
+                             f" but received an array of shape {verts.shape}")
         if np.isnan(verts).any():
             raise ValueError("Vertices 'verts' cannot contain NaN values")
         if 'rays' in kwargs:
             rays = kwargs['rays']
             rays = np.atleast_2d(rays)
             if rays.ndim != 2 or rays.shape[1] != verts.shape[1]:
-                raise ValueError(f"Rays must be provided as a 2D array of shape (k_rays, " \
+                raise ValueError(f"Rays must be provided as a 2D array of shape (k_rays, "
                                  f"n={verts.shape[1]}), but received an array of shape {rays.shape}")
             if np.isnan(rays).any():
                 raise ValueError("Rays 'rays' cannot contain NaN values")
@@ -288,8 +290,8 @@ class Polytope:
         unknown_kwargs = {k: v for k, v in kwargs.items() if k not in known_kwargs}
         if unknown_kwargs:
             raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
-                f" received args={args}, kwargs={dict(kwargs)}. Please refer to the documentation for details on valid "
-                "combinations or arguments.")
+                                                     f" received args={args}, kwargs={dict(kwargs)}. Please refer " "to the documentation for details on valid "
+                                                     "combinations or arguments.")
         if 'n' in kwargs:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from half-spaces")
         if 'verts' in kwargs:
@@ -302,7 +304,7 @@ class Polytope:
             A, b = kwargs['A'], kwargs['b']
         A, b = np.atleast_2d(A), np.atleast_1d(b)
         if A.ndim != 2 or b.ndim != 1 or A.shape[0] != b.size:
-            raise ValueError(f"A must be a matrix of size (m, n) and b must be a vector of size (m,)," \
+            raise ValueError(f"A must be a matrix of size (m, n) and b must be a vector of size (m,),"
                              f" but received A={A.shape}, b={b.shape}.")
         if np.isnan(A).any() or np.isnan(b).any():
             raise ValueError("Inequality matrices 'A' and 'b' cannot contain NaN values")
@@ -310,7 +312,7 @@ class Polytope:
             A_eq, b_eq = kwargs['A_eq'], kwargs['b_eq']
             A_eq, b_eq = np.atleast_2d(A_eq), np.atleast_1d(b_eq)
             if A_eq.ndim != 2 or b_eq.ndim != 1 or A_eq.shape[0] != b_eq.size or A_eq.shape[1] != A.shape[1]:
-                raise ValueError(f"A_eq must be a matrix of shape (m_eq, n={A.shape[1]}) and b_eq must be a vector " \
+                raise ValueError(f"A_eq must be a matrix of shape (m_eq, n={A.shape[1]}) and b_eq must be a vector "
                                  f"of size (m_eq,), but received shape A_eq={A_eq.shape}, b_eq={b_eq.shape}.")
             if np.isnan(A_eq).any() or np.isnan(b_eq).any():
                 raise ValueError("Equality matrices 'A_eq' and 'b_eq' cannot contain NaN values")
@@ -351,7 +353,7 @@ class Polytope:
 
         def _validate_inputs(n: int) -> None:
             """Validate the inputs for polytope initialization covering R^n.
-            
+
             Raises
             ------
             TypeError
@@ -427,8 +429,8 @@ class Polytope:
             return self.verts.shape[1]
         if self._hrepr is not None:
             return self.A.shape[1]
-        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
-        "V-representation or H-representation")
+        raise InvalidRepresentationError("Polytope is not properly initialized with either "
+                                         "V-representation or H-representation")
 
     @property
     def verts(self) -> NDArray:
@@ -502,7 +504,7 @@ class Polytope:
                 else:
                     raise NotImplementedError("This feature is not yer implemented")
             else:
-                raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                raise InvalidRepresentationError("Polytope is not properly initialized with either "
                                                  "V-representation or H-representation")
         return self._is_empty
 
@@ -596,7 +598,7 @@ class Polytope:
 
     @classmethod
     def from_bounds(cls, lb: ArrayLike, ub: ArrayLike) -> Self:
-        """Create a polytope from upper and lower bounds on each coordinate. See `pes.poly_from_bounds` for further documentation.""" 
+        """Create a polytope from upper and lower bounds on each coordinate. See `pes.poly_from_bounds` for further documentation."""
         lower, upper = np.atleast_1d(lb), np.atleast_1d(ub)
         if lower.ndim != 1 or upper.ndim != 1 or lower.size != upper.size:
             raise ValueError(
@@ -722,7 +724,7 @@ class Polytope:
             return header + "\n" + self._str_hrepr()
         if self._vrepr is not None:
             return header + "\n" + self._str_vrepr()
-        raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+        raise InvalidRepresentationError("Polytope is not properly initialized with either "
                                          "V-representation or H-representation")
 
     # [untested/unverified]
@@ -779,9 +781,10 @@ class Polytope:
         else:
             comb_rays = None
         if comb_verts is not None and comb_rays is not None:
-            comb =  "\n".join(["".join(line) for line in zip(comb_verts.splitlines(),
-                                                             ["   " if idx != idx_text else " + " for idx in range(nlines)],
-                                                             comb_rays.splitlines())])
+            comb = "\n".join(["".join(line) for line in zip(
+                comb_verts.splitlines(),
+                ["   " if idx != idx_text else " + " for idx in range(nlines)],
+                comb_rays.splitlines())])
         elif comb_verts is not None:
             comb = comb_verts
         elif comb_rays is not None:
@@ -881,7 +884,7 @@ class Polytope:
                 elif self._vrepr is not None:
                     str_repr = self._str_vrepr(to_dtype=to_dtype)
                 else:
-                    raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+                    raise InvalidRepresentationError("Polytope is not properly initialized with either "
                                                      "V-representation or H-representation")
             elif which_repr == 'v':
                 str_repr = self._str_vrepr(to_dtype=to_dtype)
@@ -901,7 +904,7 @@ class Polytope:
              deepcopy: bool = True,
              memo: Optional[dict[int, Any]] = None,
              ) -> Self:
-        """Return a (deep)copy of the polytope. 
+        """Return a (deep)copy of the polytope.
 
         Parameters
         ----------
@@ -946,7 +949,7 @@ class Polytope:
                 in_place: bool = True,
                 ) -> Self:
         """Matrix multiplication with a matrix `M`.
-        
+
         Parameters
         ----------
         M : NDArray
@@ -981,7 +984,7 @@ class Polytope:
 
         vrepr, hrepr = self._vrepr, self._hrepr
         if vrepr is None and hrepr is None:
-            raise InvalidRepresentationError("Polytope is not properly initialized with either " \
+            raise InvalidRepresentationError("Polytope is not properly initialized with either "
                                              "V-representation or H-representation")
         obj = self if in_place else self.copy()
         M_is_sing = is_sing(M)
@@ -1037,7 +1040,7 @@ class Polytope:
              ax: Optional[Axes1D | Axes | Axes3D] = None,
              ) -> Axes1D | Axes | Axes3D:
         """Plot the polytope. Only available when `self.n` ∈ {1, 2, 3}. Matplolib must be installed.
-        
+
         Parameters
         ----------
         color : ColorType, optional
@@ -1060,7 +1063,7 @@ class Polytope:
             Whether to show the polytope using `plt.show()`
         ax : Axes1D, Axes, or Axes3D, optional
             An pre-defined axes object on which to plot (for plotting multiple convex regions)
-        
+
         Returns
         -------
         ax : Axes1D, Axes, or Axes3D
@@ -1079,7 +1082,7 @@ class Polytope:
 
         Examples
         --------
-        >>> A = [[ 0,  1], 
+        >>> A = [[ 0,  1],
         ...      [-2,  0],
         ...      [ 1,  1],
         ...      [ 0, -1]]
@@ -1264,7 +1267,7 @@ def poly(*args: Optional[ArrayLike],
          ) -> Polytope:
     r"""Create a polytope from vertices, half-spaces, or dimension.
 
-    The polytope can be constructed based on keyword arguments, or with one or two positional arguments (V-representation or H-representation, respectively). See examples section for more details. 
+    The polytope can be constructed based on keyword arguments, or with one or two positional arguments (V-representation or H-representation, respectively). See examples section for more details.
 
     Parameters
     ----------
@@ -1432,22 +1435,22 @@ def poly_from_name(name: Literal['triangle',
                                  'pyramid'],
                    ) -> Polytope:
     """Create a polytope from a libary based on a provided name.
-    
+
     Parameters
     ----------
     name: str
         Name of the polytope in the libary to be created. Options are:
         - 'house' (2D)
         - 'pyramid' (3D)
-    
+
     Returns
     -------
     poly : Polytope
         The resulting polytope in both V-representaion and H-representation
-        
+
     Raises
     ------
-    ValueError 
+    ValueError
         If the provided `name` is not recognized
     """
     match name:
@@ -1511,7 +1514,7 @@ def poly_from_name(name: Literal['triangle',
                           [ 0, -2,  1],  # Front slant: -2y + z <= 0
                           [ 2,  0,  1],  # Right slant: 2x + z <= 2
                           [ 0,  2,  1]   # Back slant: 2y + z <= 2
-            ])
+                          ])
             b = np.array([0, 0, 0, 2, 2])
             is_empty = False
             is_degen = False

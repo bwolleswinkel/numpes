@@ -1,4 +1,4 @@
-"""The utils subpackage contains utility functions for the NumPES package. These functions are 
+"""The utils subpackage contains utility functions for the NumPES package. These functions are
 not specific to any particular control algorithm, but are used by multiple algorithms in the package.
 
 Modules

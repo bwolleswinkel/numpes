@@ -15,18 +15,19 @@ from numpes._config import CFG
 try:
     import cvxpy as cvx
     CVXPY_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     CVXPY_INSTALLED = False
 try:
     import pulp  # type: ignore[import-untyped]
     PULP_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     PULP_INSTALLED = False
 
 if TYPE_CHECKING:
     from typing import Optional, Sequence
 
     from numpy.typing import NDArray
+
 
 class Status(Enum):
     """Status of a optimization program solver run"""
@@ -106,11 +107,8 @@ def _solve_lp_cvxpy(
 
     bounds_cvx: NDArray | None = None
     if bounds is not None:
-        bounds_cvx = np.array([
-            (elem[0] if elem[0] is not None else -np.inf,
-             elem[1] if elem[1] is not None else np.inf)
-             for elem in bounds
-        ])
+        bounds_cvx = np.array([(elem[0] if elem[0] is not None else -np.inf,
+                                elem[1] if elem[1] is not None else np.inf) for elem in bounds])
     x = cvx.Variable(c.size)
     cons_ineq = [A @ x <= b] if A is not None and A.size > 0 and b is not None else []
     cons_eq = [A_eq @ x == b_eq] if A_eq is not None and A_eq.size > 0 and b_eq is not None else []
@@ -212,29 +210,27 @@ def _solve_lp_pulp(
     )
 
 
-def solve_lp(
-        c: NDArray,
-        A: Optional[NDArray] = None,
-        b: Optional[NDArray] = None,
-        A_eq: Optional[NDArray] = None,
-        b_eq: Optional[NDArray] = None,
-        bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
-        x_0: Optional[NDArray] = None,
-    ) -> OptimizationProgramResult:
-    """Solve a linear program in the form `min c.T @ x` subject to `A @ x <= b`, `A_eq @ x = b_eq`, 
+def solve_lp(c: NDArray,
+             A: Optional[NDArray] = None,
+             b: Optional[NDArray] = None,
+             A_eq: Optional[NDArray] = None,
+             b_eq: Optional[NDArray] = None,
+             bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
+             x_0: Optional[NDArray] = None,
+             ) -> OptimizationProgramResult:
+    """Solve a linear program in the form `min c.T @ x` subject to `A @ x <= b`, `A_eq @ x = b_eq`,
     and `bounds` on `x`"""
 
-    def _validate_inputs(
-        c: NDArray,
-        A: Optional[NDArray] = None,
-        b: Optional[NDArray] = None,
-        A_eq: Optional[NDArray] = None,
-        b_eq: Optional[NDArray] = None,
-        bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
-        x_0: Optional[NDArray] = None,
-    ) -> None:
+    def _validate_inputs(c: NDArray,
+                         A: Optional[NDArray] = None,
+                         b: Optional[NDArray] = None,
+                         A_eq: Optional[NDArray] = None,
+                         b_eq: Optional[NDArray] = None,
+                         bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
+                         x_0: Optional[NDArray] = None,
+                         ) -> None:
         """Validate the inputs to the linear program solver
-        
+
         Raises
         ------
         ValueError
@@ -271,8 +267,7 @@ def solve_lp(
 
     # FIXME: I don't know if this implementation makes mathematical sense
     if c.size == 0:
-        feasible = ((b is None or (b > 0 or np.allclose(b, 0, rtol=CFG.rtol, atol=CFG.atol)))
-                    and (b_eq is None or np.allclose(b_eq, 0, rtol=CFG.rtol, atol=CFG.atol)))
+        feasible = ((b is None or (b > 0 or np.allclose(b, 0, rtol=CFG.rtol, atol=CFG.atol))) and (b_eq is None or np.allclose(b_eq, 0, rtol=CFG.rtol, atol=CFG.atol)))
         return OptimizationProgramResult(
             success=feasible,
             status=Status.OPTIMAL if feasible else Status.INFEASIBLE,
@@ -290,7 +285,7 @@ def solve_lp(
         case 'cvxpy':
             try:
                 res = _solve_lp_cvxpy(c, A, b, A_eq, b_eq, bounds, x_0)
-            except cvx.SolverError as _:
+            except cvx.SolverError:
                 # FIXME: Maybe I should propagate this error in a different manner, by raising an actual RunTimeError; this is a somewhat dangerous workaround
                 res = OptimizationProgramResult(success=False,
                                                 status=Status.NUMERICAL_ISSUES_ENCOUNTERED,

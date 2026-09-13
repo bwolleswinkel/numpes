@@ -11,7 +11,7 @@ try:
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
     from matplotlib.patches import Ellipse
-except ImportError as _:
+except ImportError:
     pass
 
 from numpes._config import CFG
@@ -35,16 +35,16 @@ if TYPE_CHECKING:
 # TODO: Inherit from a common base class ConvexRegion
 class Ellipsoid:
     """Ellipsoid in R^n represented by a rotation matrix `R` and a set of radii `radii`.
-    
-    An non-degenerate ellipsoid is a convex region satisfying a quadratic inequality. This class 
+
+    An non-degenerate ellipsoid is a convex region satisfying a quadratic inequality. This class
     provides methods to perform operations and transformations on ellipsoids.
-    
+
     Attributes
     ----------
     c : NDArray
-        Center of the ellipsoid 
+        Center of the ellipsoid
     Q : NDArray or None
-        Positive (semi)-definite matrix defining the quadratic inequality 
+        Positive (semi)-definite matrix defining the quadratic inequality
         `(x - self.c).T @ self.Q @ (x - self.c)`.
     radii : NDArray
         Radii of the semi-principal axis of the ellipsoid
@@ -60,7 +60,7 @@ class Ellipsoid:
     Methods
     -------
     proj
-        Projects the ellipsoid to a subspace or a affine subset    
+        Projects the ellipsoid to a subspace or a affine subset
     """
 
     @multipledispatch
@@ -73,9 +73,9 @@ class Ellipsoid:
                  c: Optional[ArrayLike] = None,
                  ) -> None:
         """Initialize an ellipsoid from a quadratic matrix, radii, or dimension. See `pes.ellps` for further documentation.
-        
+
         This is a fallback method linked to multiple dispatch when no suitable methods are found.
-                
+
         Raises
         ------
         InvalidCombinationOfArgumentsError
@@ -96,10 +96,10 @@ class Ellipsoid:
             'R': R,
             'c': c,
         }.items() if value is not None}
-        if len(args) !=0 or len(kwargs) != 0:
-            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments " \
-                                                    f"was provided, received args={args}, kwarg={kwargs}. " \
-                                                     "Please refer to the documentation for details on valid " \
+        if len(args) != 0 or len(kwargs) != 0:
+            raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments "
+                                                     f"was provided, received args={args}, kwarg={kwargs}. "
+                                                     "Please refer to the documentation for details on valid "
                                                      "combinations or arguments.")
 
     @__init__.register(len_args=0, len_kwargs='!=0', exclude_kwargs=['Q', 'radii', 'R'])
@@ -114,8 +114,8 @@ class Ellipsoid:
         if n <= 0:
             raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
         if c is not None:
-            raise InvalidCombinationOfArgumentsError("Center 'c' cannot be provided when " \
-                                                    f"initializing an empty ellipsoid, received c={c}")
+            raise InvalidCombinationOfArgumentsError("Center 'c' cannot be provided when "
+                                                     f"initializing an empty ellipsoid, received c={c}")
         self._Q = np.diag([np.inf for _ in range(n)])
         self._rrepr = ([float('nan') for _ in range(n)], np.full((n, n), np.nan))
         self.c = np.full(n, np.nan)
@@ -219,8 +219,8 @@ class Ellipsoid:
         """R-representation of the ellipsoid"""
         if self._rrepr is None:
             if self._Q is None:
-                raise InvalidRepresentationError("The ellipsoid contains neither an " \
-                                                 "R-representation nor a quadratic matrix Q, " \
+                raise InvalidRepresentationError("The ellipsoid contains neither an "
+                                                 "R-representation nor a quadratic matrix Q, "
                                                  "implying it is in an invalid state")
             eigvals, R = np.linalg.eigh(self.Q)
             with np.errstate(divide='ignore'):
@@ -252,7 +252,7 @@ class Ellipsoid:
             return len(self.radii)
         if self._Q is not None:
             return self.Q.shape[0]
-        raise InvalidRepresentationError("The ellipsoid contains neither an R-representation " \
+        raise InvalidRepresentationError("The ellipsoid contains neither an R-representation "
                                          "nor a quadratic matrix Q, implying it is in an invalid state")
 
     @property
@@ -314,11 +314,11 @@ class Ellipsoid:
         try:
             idx_trunc = Q_lines.index(' ...')
             c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]  # NOTE: This assumes the number of edgeitems above and below is always identical
-        except ValueError as _:
+        except ValueError:
             idx_trunc = None
         idx_text = nlines - (1
-                            if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
-                            else 2)
+                             if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
+                             else 2)
 
         c_text = ['     ' if idx != idx_text else ', c: ' for idx in range(nlines)]
         c_vals = c_lines
@@ -348,11 +348,11 @@ class Ellipsoid:
         try:
             idx_trunc = R_lines.index(' ...')
             c_lines = c_lines[:idx_trunc] + [' ...'] + c_lines[-idx_trunc:]  # NOTE: This assumes the number of edgeitems above and below is always identical
-        except ValueError as _:
+        except ValueError:
             idx_trunc = None
         idx_text = nlines - (1
-                            if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
-                            else 2)
+                             if (nlines <= 2 or (nlines == 3 and idx_trunc is not None))
+                             else 2)
 
         radii_vals = f"radii: {"\n".join([line if idx == 0 else " " + line for idx, line in enumerate(radii_lines)]) + ",\n"}"
         c_text = ["     " if idx != idx_text else ", c: " for idx in range(nlines)]
@@ -414,7 +414,7 @@ class Ellipsoid:
              deepcopy: bool = True,
              memo: Optional[dict[int, Any]] = None,
              ) -> Self:
-        """Return a (deep)copy of the ellipsoid. 
+        """Return a (deep)copy of the ellipsoid.
 
         Parameters
         ----------
@@ -476,7 +476,7 @@ class Ellipsoid:
              ax: Optional[Axes1D | Axes | Axes3D] = None,
              ) -> Axes1D | Axes | Axes3D:
         """Plot the ellipsoid. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
-                
+
         Parameters
         ----------
         color : ColorType, optional
@@ -497,7 +497,7 @@ class Ellipsoid:
             Whether to show the ellipsoid using `plt.show()`
         ax : Axes1D, Axes, or Axes3D, optional
             An pre-defined axes object on which to plot (for plotting multiple convex regions)
-        
+
         Returns
         -------
         ax : Axes1D, Axes, or Axes3D
@@ -563,8 +563,8 @@ class Ellipsoid:
                 sphere = np.array([self.radii[0] * np.outer(np.cos(u), np.sin(v)),
                                    self.radii[1] * np.outer(np.sin(u), np.sin(v)),
                                    self.radii[2] * np.outer(np.ones_like(u), np.cos(v))])
-                xx, yy, zz = [(self.R @ sphere.reshape(3, -1)).reshape(3, *sphere.shape[1:])[i] + \
-                               self.c[i] for i in range(3)]
+                xx, yy, zz = [(self.R @ sphere.reshape(3, -1)).reshape(3, *sphere.shape[1:])[i]
+                              + self.c[i] for i in range(3)]
                 ax.plot_surface(xx, yy, zz,  # type: ignore[union-attr]
                                 rstride=4, cstride=4,
                                 color=color,
@@ -594,7 +594,7 @@ class Ellipsoid:
                    ax: Optional[Axes1D | Axes | Axes3D] = None,
                    ) -> Axes1D | Axes | Axes3D:
         """Plot the radii of the ellipsoid. Only available when `self.n` ∈ {1, 2, 3}. Matplotlib must be installed.
-                
+
         Parameters
         ----------
         color : ColorType, optional
@@ -607,7 +607,7 @@ class Ellipsoid:
             Whether to show the radii using `plt.show()`
         ax : Axes1D, Axes, or Axes3D, optional
             An pre-defined axes object on which to plot (for plotting multiple convex regions)
-        
+
         Returns
         -------
         ax : Axes1D, Axes, or Axes3D
@@ -684,8 +684,8 @@ def ellps(*args: Optional[ArrayLike],
           ) -> Ellipsoid:
     """Create an ellipsoid from a quadratic matrix, radii (and rotation matrix), or dimension.
 
-    The ellipsoid can be constructed based on keyword arguments, or with one or two positional arguments (quadratic matrix or R-representation, respectively). See examples section for more details. 
-    
+    The ellipsoid can be constructed based on keyword arguments, or with one or two positional arguments (quadratic matrix or R-representation, respectively). See examples section for more details.
+
     Parameters
     ----------
     Q : ArrayLike, optional

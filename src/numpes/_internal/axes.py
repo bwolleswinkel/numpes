@@ -76,7 +76,7 @@ class Axes1D(_AxesBase):
         """
         # FIXME: Do I actually want to do this?
         # Check if `linewidth` is provided in kwargs, else set to 2
-        if 'linewidth' not in kwargs and 'lw' not in kwargs or ('linewidth' in kwargs and kwargs['linewidth'] is None) or ('lw' in kwargs and kwargs['lw'] is None):
+        if kwargs.get('linewidth', 3) is None or kwargs.get('lw', 3) is None:
             kwargs['linewidth'] = 3
         # Handle case where only x-values are provided
         # FIXME: What about NumPy arrays? Can you do length there?

@@ -11,7 +11,7 @@ try:
     from mpl_toolkits.mplot3d import proj3d  # type: ignore[import-untyped]
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
     MATPLOTLIB_INSTALLED: bool = True
-except ImportError as _:
+except ImportError:
     MATPLOTLIB_INSTALLED = False
 
 from numpes._internal.axes import Axes1D
@@ -20,9 +20,7 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from matplotlib.axes import Axes
-    from matplotlib.collections import PolyCollection
-    from matplotlib.lines import Line2D
-    from mpl_toolkits.mplot3d.art3d import Line3D, Poly3DCollection
+    from mpl_toolkits.mplot3d.art3d import Line3D
     from mpl_toolkits.mplot3d.axes3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike
 
@@ -44,8 +42,15 @@ def plot_line(ax: Axes,
 
         # Check if it is 1d
         if ndim == 1:
-            # FIXME: The `bidirectional` also needs to be taken into account here
-            line_obj.set_xdata(limits[0])
+            if bidirectional:
+                xdata = limits[0]
+            elif line[0] > 0:
+                xdata = [max(point[0], limits[0][0]), limits[0][1]]
+            else:
+                xdata = [limits[0][0], min(point[0], limits[0][1])]
+            if xdata[0] > xdata[1]:
+                xdata = []
+            line_obj.set_xdata(xdata)
             line_obj.set_ydata([0, 0])
             return
 
@@ -68,9 +73,16 @@ def plot_line(ax: Axes,
             if ndim == 2:
                 # 2D case with extension
                 t_min, t_max = min(t_values), max(t_values)
-                t_range = t_max - t_min
-                t_min -= t_range * 0.1
-                t_max += t_range * 0.1
+                if bidirectional:
+                    t_range = t_max - t_min
+                    t_min -= t_range * 0.1
+                    t_max += t_range * 0.1
+                else:
+                    t_min = max(0, t_min)
+                if t_min > t_max:
+                    line_obj.set_xdata([])
+                    line_obj.set_ydata([])
+                    return
                 coords = [center + t * line for t in [t_min, t_max]]
                 line_obj.set_xdata([c[0] for c in coords])
                 line_obj.set_ydata([c[1] for c in coords])
@@ -88,6 +100,8 @@ def plot_line(ax: Axes,
 
                 t_enter = max(tb[0] for tb in t_bounds)
                 t_exit = min(tb[1] for tb in t_bounds)
+                if not bidirectional:
+                    t_enter = max(t_enter, 0)
 
                 if t_enter <= t_exit:
                     coords = [center + t * line for t in [t_enter, t_exit]]
@@ -118,7 +132,7 @@ def plot_line(ax: Axes,
         raise ValueError(f"Point must be {ndim}D for {ndim}D line")
 
     # Calculate center point
-    center = point + line / 2
+    center = point
 
     # Create line object and setup callbacks
     if ndim == 1:
@@ -168,19 +182,19 @@ def plot_plane(ax: Axes | Axes3D,
             if isinstance(edge[0], list):
                 y_val, z_val = edge[1], edge[2]
                 if abs(normal[0]) > 1e-10:
-                    x_intersect = (d - normal[1]*y_val - normal[2]*z_val) / normal[0]
+                    x_intersect = (d - normal[1] * y_val - normal[2] * z_val) / normal[0]
                     if xlim[0] <= x_intersect <= xlim[1]:
                         intersections.append([x_intersect, y_val, z_val])
             elif isinstance(edge[1], list):
                 x_val, z_val = edge[0], edge[2]
                 if abs(normal[1]) > 1e-10:
-                    y_intersect = (d - normal[0]*x_val - normal[2]*z_val) / normal[1]
+                    y_intersect = (d - normal[0] * x_val - normal[2] * z_val) / normal[1]
                     if ylim[0] <= y_intersect <= ylim[1]:
                         intersections.append([x_val, y_intersect, z_val])
             else:
                 x_val, y_val = edge[0], edge[1]
                 if abs(normal[2]) > 1e-10:
-                    z_intersect = (d - normal[0]*x_val - normal[1]*y_val) / normal[2]
+                    z_intersect = (d - normal[0] * x_val - normal[1] * y_val) / normal[2]
                     if zlim[0] <= z_intersect <= zlim[1]:
                         intersections.append([x_val, y_val, z_intersect])
 
@@ -212,6 +226,7 @@ def plot_plane(ax: Axes | Axes3D,
         # Create polygon collection
         poly_collection = PolyCollection([], linewidths=0, **kwargs)
         ax.add_collection(poly_collection)
+
         # Set the lambda function to call
         def update_plane_full():
             xlim, ylim = ax.get_xlim(), ax.get_ylim()
@@ -394,7 +409,7 @@ def plot_vector(ax: Axes,
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
 def add_1d_subplot(fig: Figure, *args, **kwargs):
     """Create and add an Axes1D subplot to a figure.
-    
+
     Parameters:
     -----------
     fig : Figure
@@ -403,7 +418,7 @@ def add_1d_subplot(fig: Figure, *args, **kwargs):
         Position arguments (like subplot(111) or subplot(2,1,1))
     **kwargs : dict
         Additional keyword arguments passed to subplot creation
-    
+
     Returns:
     --------
     Axes1D

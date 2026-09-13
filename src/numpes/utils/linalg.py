@@ -1,5 +1,5 @@
-"""Module containing linear algebra functionality for matrices such as 
-removing linearly dependent rows, removing redundant inequalities, and 
+"""Module containing linear algebra functionality for matrices such as
+removing linearly dependent rows, removing redundant inequalities, and
 small utilities such as checking if a matrix is singular
 
 Functions
@@ -70,7 +70,7 @@ def is_posdef(M: NDArray, semi_def: bool = False) -> bool:
         return True
     try:
         _ = np.linalg.cholesky(M)
-    except np.linalg.LinAlgError as _:
+    except np.linalg.LinAlgError:
         return False
     return True
 
@@ -89,12 +89,12 @@ def is_rot_mat(R: NDArray) -> bool:
 # [untested/unverified]
 def rot_mat(angles: list[float]) -> NDArray:
     """Construct a rotation matrix from a sequence of Givens angles.
-    
+
     Parameters
     ----------
     angles : list[float]
         A list of Givens angles in radians in QR-like adjacent-plane sweep order
-        
+
     Returns
     -------
     R : NDArray
@@ -125,12 +125,12 @@ def rot_mat_2d(angle: float,
                units: Literal['rad', 'deg'] = 'rad',
                ) -> NDArray:
     """Create a 2D rotation matrix from a single angle in radians.
-    
+
     Parameters
     ----------
     angle : float
         The rotation angle in radians
-        
+
     Returns
     -------
     R : NDArray
@@ -151,7 +151,7 @@ def rot_mat_3d(angles: list[float],
                ) -> NDArray:
     # FIXME: Instead of using 'proper_euler' and 'tait_bryan', I should use the much more clear 'xyz', 'XYZ', etc., for intrinsic and ectrinsit rotation, and just keep 'givens' and 'yaw_pitch_roll' as special cases.
     """Create a 3D rotation matrix from a sequence of angles based on the specified convention.
-    
+
     Parameters
     ----------
     angles : list[float]
@@ -165,7 +165,7 @@ def rot_mat_3d(angles: list[float],
 
     Returns
     -------
-    R : NDArray 
+    R : NDArray
         A 3 x 3 rotation matrix corresponding to the given angles and convention
 
     Examples
@@ -221,7 +221,7 @@ def angles_givens(R: NDArray) -> list[float]:
     ------
     ValueError
         If `R` is not valid rotation matrix
-    
+
     Notes
     -----
     The returned order is the QR-like adjacent plane sweep used by `rot_mat`: for each
@@ -297,7 +297,7 @@ def angles_3d_convert(angles: list[float],
                       to_convention: str | Literal['yaw_pitch_roll', 'givens'] = 'givens',
                       ) -> list[float]:
     """Convert a sequence of 3D rotation angles from one convention to another.
-        
+
     Parameters
     ----------
     angles : list[float]
@@ -514,10 +514,12 @@ def reduce_ineq(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> NDArray:
         redundant[idx] = True
         res = solve_lp(-Ab[idx, :-1], Ab[~redundant, :-1], Ab[~redundant, -1], Ab_eq[:, :-1], Ab_eq[:, -1], None)
         # If the LP is successful and the max value is <= b_i, it's redundant
-        if (res.success
+        if (
+            res.success
             and res.status != Status.UNBOUNDED
             and -res.value < Ab[idx, -1]  # type: ignore[operator]
-            and not np.isclose(-res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)):  # type: ignore[operator]
+            and not np.isclose(-res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)  # type: ignore[operator]
+        ):
             redundant[idx] = True
         else:
             redundant[idx] = False
@@ -554,10 +556,12 @@ def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
         # If the minimum of a_i x over the feasible set equals b_i, then
         # the inequality a_i x <= b_i is tight for every feasible x.
         res = solve_lp(Ab[idx, :-1], Ab[:, :-1], Ab[:, -1], A_eq, b_eq, None)
-        if (res.success
+        if (
+            res.success
             and res.status != Status.UNBOUNDED
             and res.value is not None
-            and np.isclose(res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)):
+            and np.isclose(res.value, Ab[idx, -1], rtol=CFG.rtol, atol=CFG.atol)
+        ):
             implicit_mask[idx] = True
 
     Ab_eq_new = Ab[implicit_mask, :]  # pylint: disable=invalid-name

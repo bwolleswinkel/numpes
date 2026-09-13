@@ -9,8 +9,8 @@ Provides
 
 How to use the documentation
 ----------------------------
-Documentation is available in two forms: docstrings provided with the code, 
-and a `Read the Docs<https://numpes.readthedocs.io/en/latest/>`_ hosted version with 
+Documentation is available in two forms: docstrings provided with the code,
+and a `Read the Docs<https://numpes.readthedocs.io/en/latest/>`_ hosted version with
 more elaborate explanations and examples.
 
 The docstring examples assume that `numpes` has been imported as `pes`:
@@ -34,7 +34,7 @@ utils
 Modules
 -------
 polytope
-    Provides the Polytope and Zonotope class for representing 
+    Provides the Polytope and Zonotope class for representing
     convex polytopes and zonotopes, respectively, and related functions
 ellipsoid
     Provides the Ellipsoid class for representing ellipsoids, and related functions
