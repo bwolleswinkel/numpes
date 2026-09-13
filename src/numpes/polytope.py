@@ -30,7 +30,6 @@ try:
     import matplotlib.pyplot as plt
     from matplotlib.colors import to_rgba
     from matplotlib.patches import Patch
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection, PolyCollection  # type: ignore[import-untyped]
 except ImportError:
     pass
 
@@ -40,7 +39,8 @@ from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils.linalg import is_sing, is_square, minimize_hrepr, minimize_vrepr
-from numpes.utils.spatial import conv, enum_facets, enum_gens, signed_angle
+from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d
+from numpes.utils.spatial import conv, enum_facets, enum_gens
 
 if TYPE_CHECKING:
     from typing import Any, Literal, Optional, Self
@@ -1091,56 +1091,6 @@ class Polytope:
         >>> poly.plot()  # doctest: +SKIP
         .. image:: # FIXME
         """
-
-        def _plot_poly_2d(points: NDArray,
-                          ax: Axes,
-                          color: ColorType,
-                          alpha: float,
-                          linewidth: float | None,
-                          linestyle: str,
-                          label: str | None,
-                          plot_edges: bool,
-                          ) -> None:
-            if points.shape[0] < 3:
-                raise RuntimeError("At least three points are required to plot a polytope in 2D")
-            centroid = np.mean(points, axis=0)
-            points_sorted = sorted(points,
-                                   key=lambda p: signed_angle(points[0] - centroid,
-                                                              p - centroid))
-            ax.add_collection(PolyCollection([points_sorted],
-                                             facecolor=to_rgba(color, alpha=alpha),
-                                             edgecolor=(to_rgba(color, alpha=1)
-                                                        if plot_edges
-                                                        else 'none'),
-                                             linewidth=linewidth,
-                                             linestyle=linestyle,
-                                             label=label))
-
-        def _plot_facet_3d(points: NDArray,
-                           ax: Axes,
-                           color: ColorType,
-                           alpha: float,
-                           linewidth: float | None,
-                           linestyle: str,
-                           plot_edges: bool,
-                           ) -> None:
-            # NOTE: Assumes all points are coplanar
-            if points.shape[0] < 3:
-                raise RuntimeError("At least three points are required to define a facet in 3D")
-            centroid = np.mean(points, axis=0)
-            look = np.cross(points[1] - points[0], points[2] - points[0])
-            points_sorted = sorted(points,
-                                   key=lambda p: signed_angle(points[0] - centroid,
-                                                              p - centroid,
-                                                              look=look))
-            ax.add_collection3d(Poly3DCollection([np.array(points_sorted)],  # type: ignore[attr-defined]
-                                                 facecolor=to_rgba(color, alpha=alpha),
-                                                 edgecolor=(to_rgba(color, alpha=1)
-                                                            if plot_edges
-                                                            else 'none'),
-                                                 linewidth=linewidth,
-                                                 linestyle=linestyle))
-
         # TODO: Also implement the logic when `self` is lower-dimensional, so when it is a single plane, or a line.
         # TODO: Also add a degeneracy check for plotting
         display_name = f"{self.__class__.__name__.lower()}"
@@ -1160,12 +1110,13 @@ class Polytope:
                                   else "0")
                     ax.text(np.mean(edges), annotation, color='black')
                 if plot_edges:
+                    # FIXME: Should be replaced by `ax.plot(edges, '.', color=color)`, but Axes1D needs to be updated to only take one argument
                     ax.scatter(edges, color=color)
                 if label is not None:
                     ax.legend()
             case 2:
                 ax, color = get_axes_color(ax, color, 2, display_name=display_name)
-                _plot_poly_2d(self.verts, ax, color, alpha, linewidth, linestyle, label, plot_edges)
+                plot_bounded_poly_2d(ax, self.verts, color, alpha, linewidth, linestyle, label, plot_edges)
                 ax.autoscale_view()
                 if annotate_facets:
                     for idx in range(self.m):
@@ -1191,7 +1142,7 @@ class Polytope:
                                                         self.b[idx],
                                                         rtol=CFG.rtol,
                                                         atol=CFG.atol), :]
-                    _plot_facet_3d(verts_facet, ax, color, alpha, linewidth, linestyle, plot_edges)
+                    plot_bounded_facet_3d(ax, verts_facet, color, alpha, linewidth, linestyle, plot_edges)
                     if annotate_facets:
                         annotation = (annotate_facets[idx]
                                       if isinstance(annotate_facets, list)

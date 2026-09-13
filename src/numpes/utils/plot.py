@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 try:
+    from matplotlib.colors import to_rgba
     from matplotlib.figure import Figure
     from matplotlib.lines import Line2D
     from matplotlib.patches import FancyArrowPatch
@@ -15,11 +16,13 @@ except ImportError:
     MATPLOTLIB_INSTALLED = False
 
 from numpes._internal.axes import Axes1D
+from numpes.utils.spatial import signed_angle
 
 if TYPE_CHECKING:
     from typing import Optional
 
     from matplotlib.axes import Axes
+    from matplotlib.typing import ColorType
     from mpl_toolkits.mplot3d.art3d import Line3D
     from mpl_toolkits.mplot3d.axes3d import Axes3D  # type: ignore[import-untyped]
     from numpy.typing import ArrayLike
@@ -404,6 +407,71 @@ def plot_vector(ax: Axes,
                        label=label,
                        )
         ax.add_line(proxy)
+
+
+def plot_bounded_poly_2d(ax: Axes,
+                         verts: ArrayLike,
+                         color: ColorType,
+                         alpha: float,
+                         linewidth: float | None,
+                         linestyle: str,
+                         label: str | None,
+                         plot_edges: bool,
+                         ) -> None:
+    verts = np.atleast_2d(verts)
+    if len(verts) == 1:
+        ax.plot(verts[0][0], verts[0][1], 'o', color=color, label=label)
+        return
+    if is_lower_dim := len(verts) == 2 and linewidth is None:
+        linewidth = 1.5
+        if plot_edges:
+            for idx in range(2):
+                ax.plot(*verts[idx], '.', color=color, label=label)
+    centroid = np.mean(verts, axis=0)
+    points_sorted = sorted(verts, key=lambda p: signed_angle(verts[0] - centroid, p - centroid))
+    ax.add_collection(PolyCollection([points_sorted],
+                                     facecolor=to_rgba(color, alpha=alpha),
+                                     edgecolor=(to_rgba(color, alpha=1)
+                                                if (plot_edges or is_lower_dim)
+                                                else 'none'),
+                                     linewidth=linewidth,
+                                     linestyle=linestyle,
+                                     label=label))
+
+
+def plot_bounded_facet_3d(ax: Axes,
+                          verts: ArrayLike,
+                          color: ColorType,
+                          alpha: float,
+                          linewidth: float | None,
+                          linestyle: str,
+                          plot_edges: bool,
+                          ) -> None:
+    # NOTE: Assumes all points are coplanar
+    verts = np.atleast_2d(verts)
+    if len(verts) == 1:
+        ax.plot(*verts[0], 'o', color=color)
+        return
+    if is_lower_dim := len(verts) == 2 and linewidth is None:
+        linewidth = 1.5
+        if plot_edges:
+            for idx in range(2):
+                ax.plot(*verts[idx], '.', color=color)
+    centroid = np.mean(verts, axis=0)
+    if len(verts) > 2:
+        look = np.cross(verts[1] - verts[0], verts[2] - verts[0])
+        points_sorted = np.array(sorted(verts,
+                                        key=lambda p: signed_angle(verts[0] - centroid, p - centroid,
+                                                                   look=look)))
+    else:
+        points_sorted = verts
+    ax.add_collection3d(Poly3DCollection([points_sorted],  # type: ignore[attr-defined]
+                                         facecolor=to_rgba(color, alpha=alpha),
+                                         edgecolor=(to_rgba(color, alpha=1)
+                                                    if (plot_edges or is_lower_dim)
+                                                    else 'none'),
+                                         linewidth=linewidth,
+                                         linestyle=linestyle))
 
 
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/01/12[untested/unverified]
