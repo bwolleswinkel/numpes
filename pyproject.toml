@@ -86,6 +86,8 @@ deps = [
 commands = [
   [
     "pytest",
+    "-p",
+    "tests.conftest",
     "--cov=numpes",
     "--cov-report=term-missing",
     "--cov-report=",
@@ -107,6 +109,8 @@ deps = [
 commands = [
   [
     "pytest",
+    "-p",
+    "tests.conftest",
     "--cov=numpes",
     "--cov-report=term-missing",
     "--cov-report=",
@@ -128,6 +132,8 @@ deps = [
 commands = [
   [
     "pytest",
+    "-p",
+    "tests.conftest",
     "--cov=numpes",
     "--cov-report=term-missing",
     "--cov-report=",
@@ -149,6 +155,8 @@ deps = [
 commands = [
   [
     "pytest",
+    "-p",
+    "tests.conftest",
     "--cov=numpes",
     "--cov-report=term-missing",
     "--cov-report=",
@@ -160,9 +168,32 @@ commands = [
   ]
 ]
 
+[tool.tox.env.benchmarks]
+extras = ["full"]
+deps = [
+  "pytest",
+  "pytest-benchmark",
+  "plotly",
+]
+set_env = { PYTEST_ADDOPTS = "--benchmark-only --benchmark-time-unit=ms --benchmark-min-rounds=10 --benchmark-columns=min,max,stddev,median,rounds --benchmark-save-data --benchmark-storage=file://.benchmarks --benchmark-json=.benchmarks/latest.json --override-ini=python_files=time_*.py --override-ini=python_classes=Time* --override-ini=python_functions=time_*" }
+commands = [
+  [
+    "pytest",
+    "--noconftest",
+    "-p",
+    "benchmarks.conftests",
+    "benchmarks/",
+  ],
+  [
+    "python",
+    "benchmarks/plot_results.py",
+    "{posargs}",
+  ],
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
-addopts = "--import-mode=importlib --strict-markers --noconftest -p tests.conftest"  # This is to make sure conftest and the auto-use fixture for global reset are also triggered during doctests
+addopts = "--import-mode=importlib --strict-markers --noconftest"
 testpaths = ["tests"]
 markers = [
   # Function-based markers

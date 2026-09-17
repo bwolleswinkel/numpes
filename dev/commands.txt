@@ -39,3 +39,21 @@ conda activate venvnumpestest
 conda install pip
 env "CFLAGS=-I$(brew --prefix)/include -L$(brew --prefix)/lib" python -m pip install pycddlib
 pip install --no-cache-dir -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ numpes[full]
+
+# For 'rebuilding' the tox full suite when it cannot properly install wheel for pycddlib
+conda activate venvnumpesdev
+
+export CFLAGS="-I$(brew --prefix cddlib)/include -I$(brew --prefix gmp)/include"
+export LDFLAGS="-L$(brew --prefix cddlib)/lib -L$(brew --prefix gmp)/lib"
+export PKG_CONFIG_PATH="$(brew --prefix cddlib)/lib/pkgconfig:$(brew --prefix gmp)/lib/pkgconfig"
+
+tox -e full --recreate
+
+# For running CI with docker on my desktop (only tests Linux matrix entry)
+1. Activate Docker desktop application (just open the app)
+2. From the repo root, run:
+act -W .github/workflows/run-package-tests.yml \
+  -j tests \
+  --container-architecture linux/amd64
+3. If `act` asks for an image, use:
+-P ubuntu-latest=catthehacker/ubuntu:act-latest

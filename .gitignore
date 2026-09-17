@@ -2,6 +2,7 @@
 .tox/
 __pycache__/
 .hypothesis/
+.benchmarks/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
