@@ -53,6 +53,13 @@ class TestMinimizeVrepr:
          np.array([[0, 0, 0],
                    [1, 1, 0]]),
          np.array([[0, 1, 1]])),
+        (np.array([[1.4, 1.2, 0]]),
+         np.array([[0, 0, 0],
+                   [0, 1, 1],
+                   [0, 0, 0]]),
+         np.array([[  0,   0, 0],
+                   [1.4, 1.2, 0]]),
+         np.array([[0, 1, 1]])),
     ])
     def test_parametrize_verts_zero_ray_maps_to_conv_hull(self, verts: NDArray, rays: NDArray, expected_verts: NDArray, expected_rays: NDArray):
         """Test whether when provided with vertices and a zero rays, the zero rays i correctly mapped to the zero vertex and appended"""
