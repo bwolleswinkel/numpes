@@ -39,6 +39,7 @@ from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils.linalg import is_sing, is_square, minimize_hrepr, minimize_vrepr
+from numpes.utils.linprog import Status, solve_lp
 from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d
 from numpes.utils.spatial import conv, enum_facets, enum_gens
 
@@ -497,12 +498,13 @@ class Polytope:
         """Check whether the polytope is empty (i.e., has no points)"""
         if self._is_empty is None:
             if self._vrepr is not None:
-                self._is_empty = self.verts.size == 0 and self.rays.size == 0
+                self._is_empty = self.k == 0 and self.k_rays == 0
             elif self._hrepr is not None:
-                if np.all(self.Ab == np.array([[0] * self.n + [-1]])).item() and self.Ab_eq.size == 0:
+                if np.array_equal(self.Ab, np.array([[0] * self.n + [-1]])) and self.m_eq == 0:
                     self._is_empty = True
                 else:
-                    raise NotImplementedError("This feature is not yer implemented")
+                    res = solve_lp(np.zeros(self.n), self.A, self.b, self.A_eq, self.b_eq)
+                    self._is_empty = res.status == Status.INFEASIBLE
             else:
                 raise InvalidRepresentationError("Polytope is not properly initialized with either "
                                                  "V-representation or H-representation")

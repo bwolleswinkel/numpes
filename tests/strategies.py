@@ -33,6 +33,9 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
                 poly = pes.Polytope(A, b)
             except (RuntimeError, ValueError) as _:  # FIXME: Can we log this error instead?
                 reject()
+            if exclude_degen:  # FIXME: We need more checks here
+                if poly.is_empty:
+                    reject()
         case 'both':
             num_verts = draw(st.integers(n + 1, n + 10))
             verts = draw(arrays(float, (num_verts, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
@@ -40,7 +43,7 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
                 Ab, _ = pes.utils.enum_facets(verts)
             except RuntimeError as _:
                 reject()
-            poly = pes.Polytope(n=n)
+            poly = pes.Polytope(n=n)  # FIXME: This should NOT be the way to initialize! This sets a lot of private variables
             poly._vrepr = (verts, np.empty((0, n)))
             poly._hrepr = (Ab, np.empty((0, n + 1)))
         case _:
