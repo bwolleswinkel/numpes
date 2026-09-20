@@ -8,10 +8,11 @@ import numpy as np
 import pytest
 from hypothesis import given, assume
 from hypothesis.extra.numpy import arrays
-from hypothesis.strategies import integers, tuples
+from hypothesis.strategies import integers, tuples, sampled_from
 
 import numpes as pes
 
+from tests.conftest import N_MAX
 from tests.helpers import lsort, approx, normalize, requires
 from tests.strategies import poly_rand, poly_rand_pair
 
@@ -55,7 +56,7 @@ class TestPolytopeMinkSum:
 
     @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and equality `==` is also not implemented")
     @given(poly_pair=integers(
-        min_value=1, max_value=10).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
+        min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
     def test_commutative(self, poly_pair: tuple[Polytope, Polytope]) -> None:
         poly_1, poly_2 = poly_pair
@@ -66,7 +67,7 @@ class TestPolytopeMinkSum:
 
     @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and `.vol` is also not yet implemented")
     @given(poly_pair=integers(
-        min_value=1, max_value=10).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
+        min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
     def test_volume_lesser_equal(self, poly_pair: tuple[Polytope, Polytope]) -> None:
         poly_1, poly_2 = poly_pair
@@ -266,7 +267,7 @@ class TestPolytopeMatMul:
             f"Projecting '{poly_data.name}' with Ab_eq_org=\n{poly.Ab_eq}\nwith non-square matrix M=\n{M_proj_xy}\nshould yield a polytope with Ab_eq_res=[0, 0, 1, 0]=\n{np.array([[0, 0, 1, 0]])},\nbut got Ab_eq_res=\n{poly_res.Ab_eq}\ninstead"
 
     @given(poly=integers(
-        min_value=5, max_value=10).flatmap(lambda n: poly_rand(repr='vrepr', n=n, exclude_degen=False))
+        min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand(repr='vrepr', n=n, exclude_degen=False))
     )
     def test_random_invalid_right_multiplication_raises_invalid_operation_error(self, poly: Polytope) -> None:
         """Test whether trying the right-multiply a polytope with a matrix raises a `InvalidOperationError`"""
@@ -292,7 +293,7 @@ class TestPolytopeMatMul:
         ...,
     ])
     @given(poly=integers(
-        min_value=5, max_value=10).flatmap(lambda n: poly_rand(repr='vrepr', n=n, exclude_degen=False))
+        min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand(repr='vrepr', n=n, exclude_degen=False))
     )
     def test_parameterize_invalid_wrong_type_matrix(self, poly: Polytope, M: Any) -> None:
         """Test that passing in anything other then a NumPy array for M raises a TypeError"""
@@ -336,3 +337,69 @@ class TestPolytopeMatMul:
             f"Input matrix 'M' must be of size (m, {poly.n}), received shape={M.shape}"
             )):
             _ = M @ poly
+
+
+class TestPolytopeCopy:
+    """Tests for the `Polytope.copy()` method"""
+
+    @pytest.mark.skip("getattr(poly, key) == approx(value) does not work for arrays/tuples")
+    @given(poly=tuples(
+        integers(min_value=1, max_value=N_MAX),
+        sampled_from(['vrepr', 'hrepr']),
+        ).flatmap(lambda pair: poly_rand(repr=pair[1], n=pair[0], exclude_degen=False))
+    )
+    def test_random_copy_has_same_dict(self, poly: Polytope) -> None:
+        """Test whether creating a copy of the polytope creates a polytope with the same dictionary"""
+        poly_copy = poly.copy()
+        assert isinstance(poly_copy, pes.Polytope), \
+            f"Expected returned copy to be a Polytope, but received {type(poly_copy)}"
+        for key, value in poly_copy.__dict__.items():
+            assert getattr(poly, key) == approx(value), \
+                f"Expected all dictionary values of the instance to be equal, but got key={key} with  getattr(poly, key)={getattr(poly, key)} not being equal to {value} (of the copied polytope)"
+
+    @pytest.mark.coupled('pes.Polytope.__repr__')
+    @given(poly=tuples(
+        integers(min_value=1, max_value=N_MAX),
+        sampled_from(['vrepr', 'hrepr']),
+        ).flatmap(lambda pair: poly_rand(repr=pair[1], n=pair[0], exclude_degen=False))
+    )
+    def test_random_copy_has_same_repr(self, poly: Polytope) -> None:
+        """Test whether creating a copy of the polytope creates a polytope with the same repr(poly)"""
+        poly_copy = poly.copy()
+        assert isinstance(poly_copy, pes.Polytope), \
+            f"Expected returned copy to be a Polytope, but received {type(poly_copy)}"
+        assert repr(poly) == repr(poly_copy), \
+            f"Expected both polytopes to have the same repr(), but received repr(poly)={repr(poly)} and repr(poly_copy)={repr(poly_copy)}"
+
+    @pytest.mark.coupled('pes.Polytope.verts')
+    @given(
+        poly=integers(min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand(repr='vrepr', n=n, exclude_degen=False))
+    )
+    def test_random_vrepr_deepcopy_independent_attr(self, poly: Polytope) -> None:
+        """Test whether creating a deepcopy of the polytope creates a polytope with independent attributes"""
+        poly_copy = poly.copy()
+        assert poly_copy.verts == approx(poly.verts), \
+            f"Expected vertices of copy to be identical before modification, but received poly_copy.verts=\n{poly_copy.verts} and poly.verts=\n{poly.verts}"
+        poly._vrepr[0][0, :] += np.ones_like(poly._vrepr[0][0, :])
+        assert poly.verts[0, :] == approx(poly_copy.verts[0, :] + np.ones_like(poly_copy.verts[0, :])), \
+            f"Expected modified vertices to be poly.verts[0, :] + ones_like, but received poly.verts=\n{poly.verts[0, :]}"
+        assert poly_copy.verts != approx(poly.verts), \
+            f"Expected vertices of copy to be different after modification, but received poly_copy.verts=\n{poly_copy.verts} and poly.verts=\n{poly.verts}"
+
+    def test_vrepr_shallow_copy_keeps_dependent_attr(self) -> None:
+        """Check that a shallow copy keeps its dependencies of certain attributes"""
+        verts = np.array([[0, 0],
+                          [1, 0],
+                          [0, 1]])
+        with pes.algo_options(on_property_assign='pass'):  # To maintain the link to the array
+            poly = pes.poly(verts)
+        poly_copy = poly.copy(deepcopy=False)
+        assert poly_copy.verts == approx(poly.verts), \
+            f"Expected vertices of copy to be identical before modification, but received poly_copy.verts=\n{poly_copy.verts} and poly.verts=\n{poly.verts}"
+        verts[0, :] = np.array([2, 2])
+        assert poly.verts == approx(np.array([[2, 2],
+                                              [1, 0],
+                                              [0, 1]])), \
+            f"Expected modified vertices to be [[2, 2], [1, 0], [0, 1]], but received poly.verts=\n{poly.verts}"
+        assert poly_copy.verts == approx(poly.verts), \
+            f"Expected vertices of copy to be still identical after modification, but received poly_copy.verts=\n{poly_copy.verts} and poly.verts=\n{poly.verts}"
