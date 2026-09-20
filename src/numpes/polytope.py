@@ -542,7 +542,38 @@ class Polytope:
     def is_singleton(self) -> bool:
         """Check whether the polytope is a singleton (i.e., contains a single point)"""
         if self._is_singleton is None:
-            raise NotImplementedError("This property is not yet implemented")
+            if self._vrepr is not None:
+                if self.k == 1 and self.k_rays == 0:
+                    self._is_singleton = True
+                else:
+                    verts, rays = minimize_vrepr(self.verts, self.rays)
+                    self._is_singleton = verts.shape[0] == 1 and rays.size == 0
+            elif self._hrepr is not None:
+                if self.m == 0 and np.array_equal(self.A_eq, np.eye(self.n)):
+                    self._is_singleton = True
+                else:
+                    if self.is_empty:
+                        self._is_singleton = False
+                    else:
+                        for i in range(self.n):
+                            c = np.zeros(self.n)
+                            c[i] = 1
+                            res_min = solve_lp(c, self.A, self.b, self.A_eq, self.b_eq)
+                            if not res_min.success or res_min.status == Status.UNBOUNDED:
+                                self._is_singleton = False
+                                break
+                            res_max = solve_lp(-c, self.A, self.b, self.A_eq, self.b_eq)
+                            if not res_max.success or res_max.status == Status.UNBOUNDED:
+                                self._is_singleton = False
+                                break
+                            if not np.isclose(-res_max.value, res_min.value, rtol=CFG.rtol, atol=CFG.atol):
+                                self._is_singleton = False
+                                break
+                        else:
+                            self._is_singleton = True
+            else:
+                raise InvalidRepresentationError("Polytope is not properly initialized with either "
+                                                 "V-representation or H-representation")
         return self._is_singleton
 
     @property

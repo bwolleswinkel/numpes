@@ -7,14 +7,15 @@ import numpes as pes
 import numpy as np
 import pytest
 from hypothesis import given
-from hypothesis.strategies import integers, tuples, sampled_from, booleans
+from hypothesis.strategies import integers, floats, tuples, sampled_from, booleans
+from hypothesis.extra.numpy import arrays
 
 from tests.strategies import poly_rand, poly_rand_pair
 from tests.helpers import lsort, approx
-from tests.conftest import N_MAX
+from tests.conftest import N_MAX, ATOL
 
 if TYPE_CHECKING:
-    from typing import Callable
+    from typing import Callable, Literal
     from numpes import Polytope
     from numpy.typing import ArrayLike, NDArray
     from tests.conftest import PolytopeData
@@ -196,3 +197,163 @@ class TestPolytopeIsEmpty:
         poly = pes.poly_ambient(n)
         assert not poly.is_empty, \
             f"Expected ambient polytope initialization with n={n}, poly={poly} to result in False, but received True"
+
+
+class TestPolytopeIsSingleton:
+    """Tests for the `Polytope.is_singleton` property"""
+
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @given(poly=tuples(
+        integers(min_value=1, max_value=N_MAX),
+        sampled_from(['vrepr', 'hrepr']),
+        ).flatmap(lambda pair: poly_rand(repr=pair[1], n=pair[0], exclude_degen=True))
+    )
+    def test_random_nondegen_minimal(self, poly: Polytope) -> None:
+        """Test whether non-degenerate, minimal polytopes are correctly classified as not singletons"""
+        assert not poly.is_singleton, \
+            f"Expected `poly.is_singleton` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        ([[0, 0, 0], [0, 0, 1]], None),
+        ([0, 0], [1, 0]),
+        (None, [1, 2, 3]),
+        ([0, -1, 0], [0, 0, 0]),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_no_singleton(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from V-representation gets marked as not a singleton"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert not poly.is_singleton, \
+            f"Expected `poly.is_singleton` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.empty((0, 3)), np.empty((0, 3))),  # Ambient space
+        (np.empty((0, 8)), np.empty((0, 8))),  # Ambient space
+        (np.array([[0, 0, 0, 0]]), np.empty((0, 4))),  # Ambient space
+        (np.array([[0, 0,  1]]), np.empty((0, 3))),
+        (np.array([[0, 0,  1],
+                   [1, 2, 3]]), np.empty((0, 3))),
+        (np.array([[0, 0, -1]]), np.empty((0, 3))),  # Empty
+        (np.empty((0, 4)), np.array([[1, 0, 1, 2],
+                                     [1, 0, 1, 3]])),  # Empty
+        (np.empty((0, 3)), np.array([[1, 1, 2]])),  # Line
+        (np.array([[ 1, 0,  2],
+                   [-1, 0, -2]]), np.empty((0, 3))),  # Line
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_no_singleton(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from H-representation gets marked as not a singleton"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert not poly.is_singleton, \
+            f"Expected `poly.is_singleton` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        ([0, 0, 1], None),
+        ([-0.5, 0.6, 7.1], None),
+        (np.ones(100), None),
+        ([[1, 2, 3],
+          [1, 2, 3]], None),
+        ([[1, 2 + ATOL / 2, 3],
+          [1, 2           , 3]], None),
+        (None, [0, 0, 0, 0]),  # Zero vertex
+        (None, [[0, 0, 0, 0],
+                [0, 0, 0, 0]]),  # Zero vertex
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_singleton(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether singleton polytopes initialized from V-representation gets marked as a singleton"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert poly.is_singleton, \
+            f"Expected `poly.is_singleton` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.empty((0, 4)), np.array([[1, 0, 0, 2],
+                                     [0, 1, 0, 3],
+                                     [0, 0, 1, 4]])),
+        (np.array([[ 1,  0,  2],
+                   [ 0,  1,  3],
+                   [-1,  0, -2],
+                   [ 0, -1, -3]]), np.empty((0, 3))),
+        (np.array([[ 1,  0,  4.0],
+                   [-1,  0, -4.0]]), np.array([[0, 1, -2]])),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_singleton(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether singleton polytopes initialized from H-representation gets marked as a singleton"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert poly.is_singleton, \
+            f"Expected `poly.is_singleton` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.poly_empty')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_empty(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_empty(n)` does not result in a singleton"""
+        poly = pes.poly_empty(n)
+        assert not poly.is_singleton, \
+            f"Expected empty polytope initialization with n={n}, poly={poly} to result in False, but received True"
+
+    @pytest.mark.coupled('pes.poly_ambient')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_ambient(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_ambient(n)` does not result in a singleton"""
+        poly = pes.poly_ambient(n)
+        assert not poly.is_singleton, \
+            f"Expected ambient polytope initialization with n={n}, poly={poly} to result in False, but received True"
+
+    @pytest.mark.coupled('pes.poly_from_point')
+    @given(
+        point=tuples(sampled_from([int, float]), integers(min_value=1, max_value=N_MAX)).flatmap(
+            lambda args: arrays(args[0],
+                                args[1],
+                                elements=(floats(-100, 100, allow_infinity=False, allow_nan=False)
+                                          if issubclass(args[0], float)
+                                          else integers(-100, 100)))
+        )
+    )
+    def test_random_poly_from_point(self, point: NDArray) -> None:
+        """Test that initializing a polytope with `pes.poly_from_point(point)` does result in a singleton"""
+        poly = pes.poly_from_point(point)
+        assert poly.is_singleton, \
+            f"Expected polytope initialization with point={point}, poly={poly} to result in True, but received False"
