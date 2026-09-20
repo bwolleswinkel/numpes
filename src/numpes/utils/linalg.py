@@ -372,8 +372,14 @@ def minimize_vrepr(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDAr
     if rays is None:
         rays = np.empty((0, n))
     # 0: Check for the special zero rays case, which should be mapped to a zero vertex
-    if verts.size == 0 and np.allclose(rays, 0, rtol=CFG.rtol, atol=CFG.atol):
-        return np.zeros((1, n)), np.empty((0, n))
+    if rays.size != 0:
+        zero_indices = np.zeros(rays.shape[0], dtype=bool)
+        for idx, ray in enumerate(rays):
+            if np.allclose(ray, 0, rtol=CFG.rtol, atol=CFG.atol):
+                zero_indices[idx] = True
+    rays = rays[~zero_indices, :]
+    if np.count_nonzero(zero_indices) > 0:
+        verts = np.vstack((verts, np.zeros(n)))
     # 1: Find redundant rays
     rays = reduce_rays(rays)
     # 1-A: Check of the rays span the entire space

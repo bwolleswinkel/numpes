@@ -37,6 +37,31 @@ class TestMinimizeVrepr:
         assert verts_res == approx(np.zeros((1, rays.shape[1]))), \
             f"Given verts={verts} and rays={rays}, expected reduced verts to be equal to a zero vertex with shape (1, {rays.shape[1]}), but got verts_res=\n{verts_res}"
 
+    @pytest.mark.parametrize('verts, rays, expected_verts, expected_rays', [
+        (np.array([[0, 0]]),
+         np.array([[0, 0]]),
+         np.array([[0, 0]]),
+         np.empty((0, 2))),
+        (np.array([[1, 1]]),
+         np.array([[0, 0]]),
+         np.array([[0, 0],
+                   [1, 1]]),
+         np.empty((0, 2))),
+        (np.array([[1, 1, 0]]),
+         np.array([[0, 0, 0],
+                   [0, 1, 1]]),
+         np.array([[0, 0, 0],
+                   [1, 1, 0]]),
+         np.array([[0, 1, 1]])),
+    ])
+    def test_parametrize_verts_zero_ray_maps_to_conv_hull(self, verts: NDArray, rays: NDArray, expected_verts: NDArray, expected_rays: NDArray):
+        """Test whether when provided with vertices and a zero rays, the zero rays i correctly mapped to the zero vertex and appended"""
+        verts_res, rays_res = pes.utils.minimize_vrepr(verts, rays)
+        assert lsort(verts_res) == approx(lsort(expected_verts)), \
+            f"Given verts=\n{verts}\nand rays=\n{rays},\nexpected reduced verts to be equal to expected_verts=\n{expected_verts},\nbut got verts_res=\n{verts_res}"
+        assert lsort(rays_res) == approx(lsort(expected_rays)), \
+            f"Given verts=\n{verts}\nand rays=\n{rays},\nexpected reduced rays to be equal to expected_rays=\n{expected_rays},\nbut got rays_res=\n{rays_res}"
+
     @pytest.mark.parametrize('verts, rays', [
         (np.array([[1]]),
          np.array([[ 1],
