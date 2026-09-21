@@ -38,7 +38,7 @@ from numpes._internal.common import get_axes_color
 from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
-from numpes.utils.linalg import is_sing, is_square, minimize_hrepr, minimize_vrepr
+from numpes.utils.linalg import find_implicit, is_sing, is_square, minimize_hrepr, minimize_vrepr
 from numpes.utils.linprog import Status, solve_lp
 from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d
 from numpes.utils.spatial import conv, enum_facets, enum_gens
@@ -528,7 +528,22 @@ class Polytope:
     def is_full_dim(self) -> bool:
         """Check whether the polytope is full-dimensional"""
         if self._is_full_dim is None:
-            raise NotImplementedError("This property is not yet implemented")
+            if self._dim is not None:
+                self._is_full_dim = self.dim == self.n
+            elif self._hrepr is not None and self.m_eq > 0 and not np.allclose(self.Ab_eq, 0, rtol=CFG.rtol, atol=CFG.atol):  # Ignore trivial constraint
+                self._is_full_dim = False
+            elif self._vrepr is not None:
+                diff_verts = self.verts[1:] - self.verts[0] if self.k >= 2 else self.verts
+                M = np.vstack((diff_verts, self.rays))
+                self._is_full_dim = np.linalg.matrix_rank(M, tol=CFG.atol) == self.n
+            elif self.is_empty:
+                self._is_full_dim = False
+            elif self._hrepr is not None:  # No equality constraints: find any implicit ones
+                _, Ab_eq = find_implicit(self.Ab, self.Ab_eq)
+                self._is_full_dim = Ab_eq.size == 0
+            else:
+                raise InvalidRepresentationError("Polytope is not properly initialized with either "
+                                                 "V-representation or H-representation")
         return self._is_full_dim
 
     @property
@@ -762,13 +777,14 @@ class Polytope:
 
     # [untested/unverified]
     def _str_header(self) -> str:
-        # NOTE: These methods are not yet implemented
-        # if self.is_empty:
-        #     return f"Empty polytope in R^{self.n}"
-        # if self.is_singleton:
-        #     return f"Singleton polytope in R^{self.n}"
-        # if self.is_lower_dim:
-        #     return f"Lower dimensional polytope in R^{self.n}"
+        if self.is_empty:
+            return f"Empty polytope in R^{self.n}"
+        if self.is_singleton:
+            return f"Singleton polytope in R^{self.n}"
+        # if not self.is_full_dim and not self.is_bounded:
+        #     return f"Unbounded lower dimensional polytope in R^{self.n}"
+        if not self.is_full_dim:
+            return f"Lower dimensional polytope in R^{self.n}"
         # if not self.is_bounded:
         #     return f"Unbounded polytope in R^{self.n}"
         # if self.is_full_space:
@@ -1308,7 +1324,7 @@ def poly(*args: Optional[ArrayLike],
     Initialize an empty polytope in R^2:
     >>> poly = pes.poly(n=2)
     >>> print(poly)
-    Polytope in R^2
+    Empty polytope in R^2
     [0 0] x <= [-1]
     """
     kwargs = {key: value for key, value in {
@@ -1394,7 +1410,7 @@ def poly_from_point(point: ArrayLike) -> Polytope:
     --------
     >>> poly = pes.poly_from_point([1, 2, 3])
     >>> print(poly)
-    Polytope in R^3
+    Singleton polytope in R^3
     [[1. 0. 0.]  |    [[1.]
      [0. 1. 0.]  x ==  [2.]
      [0. 0. 1.]] |     [3.]]

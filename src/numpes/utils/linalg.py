@@ -55,7 +55,7 @@ def is_sing(M: NDArray) -> bool:
     """Check if the matrix `M` is singular (i.e., non-invertible)"""
     if not is_square(M):
         return True
-    if np.linalg.matrix_rank(M, rtol=CFG.rtol) < M.shape[0]:
+    if np.linalg.matrix_rank(M, tol=CFG.atol) < M.shape[0]:
         return True
     return False
 
@@ -490,6 +490,10 @@ def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArra
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/18[unverified]
 def reduce_eq(Ab_eq: NDArray) -> NDArray:
     """Remove linearly dependent rows from equality constraint matrix"""
+    if Ab_eq.shape[0] == 0:
+        return Ab_eq
+    zero_rows = np.all(np.isclose(Ab_eq, 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+    Ab_eq = Ab_eq[~zero_rows]
     if Ab_eq.shape[0] <= 1:
         return Ab_eq
     rank = np.linalg.matrix_rank(Ab_eq, tol=CFG.atol)

@@ -1004,6 +1004,10 @@ class TestMinimizeHrepr:
          np.array([[0, -1, 0],
                    [0,  1, 1]]),
          np.array([[1, 0, 2]])),
+        (np.array([[1, 2, 3]]),
+         np.array([[0, 0, 0]]),
+         np.array([[1, 2, 3]]),
+         np.empty((0, 3))),
     ])
     def test_repeated_eq_redundant(self, Ab: NDArray, Ab_eq: NDArray, expected_Ab: NDArray, expected_Ab_eq: NDArray) -> None:
         """Test the reduction of redundant equalities when there are repeated equality constraints"""

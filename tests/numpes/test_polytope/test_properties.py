@@ -357,3 +357,193 @@ class TestPolytopeIsSingleton:
         poly = pes.poly_from_point(point)
         assert poly.is_singleton, \
             f"Expected polytope initialization with point={point}, poly={poly} to result in True, but received False"
+
+
+class TestPolytopeIsFullDim:
+    """Tests for the `Polytope.is_full_dim` property"""
+
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @given(poly=tuples(
+        integers(min_value=1, max_value=N_MAX),
+        sampled_from(['vrepr', 'hrepr']),
+        ).flatmap(lambda pair: poly_rand(repr=pair[1], n=pair[0], exclude_degen=True))
+    )
+    def test_random_nondegen_minimal(self, poly: Polytope) -> None:
+        """Test whether non-degenerate, minimal polytopes are correctly classified as full dimensional"""
+        assert poly.is_full_dim, \
+            f"Expected `poly.is_full_dim` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        ([[1, 0],
+          [0, 1],
+          [1, 1]], None),
+        ([[  0,   0],
+          [  1,   0],
+          [  0,   1],
+          [  1,   1],
+          [0.5, 0.5]], None),
+        ([[0, 0],
+          [1, 1]], [1, 0]),
+        ([[0, 0]], [[1, 0],
+                    [1, 1]]),
+        ([[  0,        0],
+          [ 10,        0],
+          [100,        0],
+          [  0, 2 * ATOL]], None),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_full_dim(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from V-representation gets marked as full dimensional"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert poly.is_full_dim, \
+            f"Expected `poly.is_full_dim` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        ([[1, 0],
+          [0, 1],
+          [0, 1]], None),
+        ([0.4, 0.8], None),
+        (None, [1.2, -3.1]),
+        (None, [[0,  1],
+                [0,  2],
+                [0, -3]]),
+        ([[  1,   0],
+          [  0,   1],
+          [0.5, 0.5]], None),
+        ([[0, 0],
+          [1, 1]], [1, 1]),
+        ([[1, 1],
+          [2, 2]], [0, 0]),
+        ([[0, 0]], [[1, 1]]),
+        ([[  0,        0],
+          [ 10,        0],
+          [100,        0],
+          [  0, ATOL / 2]], None),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_lower_dim(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether lower-dimensional polytopes initialized from V-representation get marked as not full-dimensional"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert not poly.is_full_dim, \
+            f"Expected `poly.is_full_dim` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.empty((0, 3)), np.empty((0, 3))),  # Ambient space
+        (np.empty((0, 8)), np.empty((0, 8))),  # Ambient space
+        (np.array([[0, 0, 0, 0]]), np.empty((0, 4))),  # Ambient space
+        (np.array([[0, 0, 0, 10]]), np.empty((0, 4))),  # Ambient space, trivial inequality constraint
+        (np.array([[0, 0,  1]]), np.empty((0, 3))),
+        (np.array([[0, 0, 1],
+                   [1, 2, 3]]), np.empty((0, 3))),
+        (np.empty((0, 3)), np.array([[0, 0, 0]])),  # Trivial equality constraint 
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_full_dim(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from H-representation gets marked as full-dimensional"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert poly.is_full_dim, \
+            f"Expected `poly.is_full_dim` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.array([[0, 0, -1]]), np.empty((0, 3))),  # Empty
+        (np.array([[0, 0, -5]]), np.empty((0, 3))),  # Empty
+        (np.empty((0, 4)), np.array([[1, 0, 1, 2],
+                                     [1, 0, 1, 3]])),  # Empty
+        (np.array([[1, 2, 3]]), np.array([[0, 0, -10]])),  # Empty
+        (np.array([[1, 2, 3]]), np.array([[0, 0, 10]])),  # Empty
+        (np.empty((0, 3)), np.array([[1, 1, 2]])),  # Line
+        (np.array([[ 1, 0,  2],
+                   [-1, 0, -2]]), np.empty((0, 3))),  # Line
+        (np.array([[ 1, 0,  0, 1],
+                   [-1, 0,  0, 0],
+                   [0,  1,  0, 1],
+                   [0, -1,  0, 0],
+                   [0,  0,  1, 0],
+                   [0,  0, -1, 0]]), np.empty((0, 4))),  # Plane, implicit equalities
+        (np.array([[1, 0,  0, 1],
+                   [0, 1,  0, 1],
+                   [0, 0,  1, 0],
+                   [0, 0, -1, 0]]), np.empty((0, 4))),  # Plane, unbounded, implicit equalities
+        (np.array([[1, 0,  0, 1],
+                   [0, 1,  0, 1]]), np.array([[0, 0, 1, 2]])),  # Plane, unbounded, explicit equalities
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_lower_dim(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether lower dimensional polytopes initialized from H-representation gets marked as not full-dimensional"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert not poly.is_full_dim, \
+            f"Expected `poly.is_full_dim` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.poly_empty')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_empty(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_empty(n)` does not result in a full dimensional polytope"""
+        poly = pes.poly_empty(n)
+        assert not poly.is_full_dim, \
+            f"Expected empty polytope initialization with n={n}, poly={poly} to result in False, but received True"
+
+    @pytest.mark.coupled('pes.poly_ambient')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_ambient(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_ambient(n)` does result in a full-dimensional polytope"""
+        poly = pes.poly_ambient(n)
+        assert poly.is_full_dim, \
+            f"Expected ambient polytope initialization with n={n}, poly={poly} to result in True, but received False"
+
+    @pytest.mark.coupled('pes.poly_from_point')
+    @given(
+        point=tuples(sampled_from([int, float]), integers(min_value=1, max_value=N_MAX)).flatmap(
+            lambda args: arrays(args[0],
+                                args[1],
+                                elements=(floats(-100, 100, allow_infinity=False, allow_nan=False)
+                                          if issubclass(args[0], float)
+                                          else integers(-100, 100)))
+        )
+    )
+    def test_random_poly_from_point(self, point: NDArray) -> None:
+        """Test that initializing a polytope with `pes.poly_from_point(point)` does not result in a full-dimensional polytope"""
+        poly = pes.poly_from_point(point)
+        assert not poly.is_full_dim, \
+            f"Expected singleton polytope initialization with point={point}, poly={poly} to result in False, but received True"

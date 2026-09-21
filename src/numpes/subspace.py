@@ -147,7 +147,7 @@ class Subspace:
     def dim(self) -> int:
         """Dimension of the subspace"""
         if self._dim is None:
-            self._dim = np.linalg.matrix_rank(self.basis, CFG.atol)
+            self._dim = np.linalg.matrix_rank(self.basis, tol=CFG.atol)
         return self._dim
 
     # [untested/unverified]
