@@ -521,7 +521,28 @@ class Polytope:
     def is_bounded(self) -> bool:
         """Check whether the polytope is bounded"""
         if self._is_bounded is None:
-            raise NotImplementedError("This property is not yet implemented")
+            if self._vrepr is not None:
+                self._is_bounded = self.k_rays == 0 or np.allclose(self.rays, 0, rtol=CFG.rtol, atol=CFG.atol)
+            elif self._hrepr is not None:
+                res_feas = solve_lp(np.zeros(self.n), self.A, self.b, self.A_eq, self.b_eq)
+                if res_feas.status == Status.INFEASIBLE:
+                    self._is_bounded = True
+                else:  # FIXME: I think this can be replaced by a single recession-cone LP
+                    for i in range(self.n):
+                        for sign in (1, -1):
+                            c = np.zeros(self.n)
+                            c[i] = sign
+                            res_rec = solve_lp(c, self.A, np.zeros(self.m), self.A_eq, np.zeros(self.m_eq), bounds=[(-1.0, 1.0)] * self.n)
+                            if res_rec.success and res_rec.value < -CFG.atol:
+                                self._is_bounded = False
+                                break
+                        if self._is_bounded is False:  # NOTE: Distinguish from `None` case
+                            break
+                    else:
+                        self._is_bounded = True
+            else:
+                raise InvalidRepresentationError("Polytope is not properly initialized with either "
+                                                 "V-representation or H-representation")
         return self._is_bounded
 
     @property
@@ -536,7 +557,7 @@ class Polytope:
                 diff_verts = self.verts[1:] - self.verts[0] if self.k >= 2 else self.verts
                 M = np.vstack((diff_verts, self.rays))
                 self._is_full_dim = np.linalg.matrix_rank(M, tol=CFG.atol) == self.n
-            elif self.is_empty:
+            elif self.is_empty:  # FIXME: This now has a side-effect; is that what we want?
                 self._is_full_dim = False
             elif self._hrepr is not None:  # No equality constraints: find any implicit ones
                 _, Ab_eq = find_implicit(self.Ab, self.Ab_eq)
@@ -781,12 +802,12 @@ class Polytope:
             return f"Empty polytope in R^{self.n}"
         if self.is_singleton:
             return f"Singleton polytope in R^{self.n}"
-        # if not self.is_full_dim and not self.is_bounded:
-        #     return f"Unbounded lower dimensional polytope in R^{self.n}"
+        if not self.is_bounded:
+            if not self.is_full_dim:
+                return f"Unbounded lower dimensional polytope in R^{self.n}"
+            return f"Unbounded polytope in R^{self.n}"
         if not self.is_full_dim:
             return f"Lower dimensional polytope in R^{self.n}"
-        # if not self.is_bounded:
-        #     return f"Unbounded polytope in R^{self.n}"
         # if self.is_full_space:
         #     return f"Full space polytope in R^{self.n}"
         return f"Polytope in R^{self.n}"
@@ -1357,7 +1378,37 @@ def poly_from_ineq(A: ArrayLike, b: ArrayLike, A_eq: Optional[ArrayLike] = None,
 
 
 def poly_ambient(n: int) -> Polytope:
-    """Wrapper function for `Polytope._init_ambient` to create a polytope covering R^n"""
+    r"""Create a polytope spanning the entire ambient space R^n.
+
+    Parameters
+    ----------
+    n : int, optional
+        Dimension of the ambient space
+
+    Raises
+    ------
+    TypeError
+        If the types of the provided arguments are inconsistent with the expected types for initialization
+    ValueError
+        If the provided ambient dimension `n` is not a positive integer
+
+    Examples
+    --------
+    Initialize an ambient polytope in R^3:
+    >>> poly = pes.poly_ambient(n=3)
+    >>> print(poly)
+    Unbounded polytope in R^3
+    No constraints on x
+
+    Plotting the vertex representation reveals the canonical form for the rays:
+    >>> poly = pes.poly_ambient(n=10)
+    >>> print(f"{poly:v~2}")
+           /[[1.]  [[0.]       [[0.]  [[-1.] \
+           | [0.]   [1.]        [0.]   [-1.] |
+    nonneg < ...  , ...  , ..., ...  , ...   >
+           | [0.]   [0.]        [0.]   [-1.] |
+           \ [0.]]  [0.]]       [1.]]  [-1.]]/
+    """
     polytope = Polytope()
     polytope._init_ambient(n)  # pylint: disable=protected-access
     return polytope

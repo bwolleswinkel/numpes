@@ -1123,6 +1123,9 @@ class TestMinimizeHrepr:
     def test_equivalence_enum_gens_facets_redundant(self) -> None:
         ...
 
+    def test_singleton(self) -> None:  # FIXME: we know for a fact that this is broken, so this should be fixed with priority
+        """Test whether a singleton polytope correctly gets converted to the canonical form [I] x == point"""
+
     @pytest.mark.parametrize('Ab, Ab_eq, expected_Ab, expected_Ab_eq', [
         (np.array([[-1,  0, 0],
                    [ 0, -1, 0],

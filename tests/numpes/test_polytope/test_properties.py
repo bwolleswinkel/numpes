@@ -547,3 +547,191 @@ class TestPolytopeIsFullDim:
         poly = pes.poly_from_point(point)
         assert not poly.is_full_dim, \
             f"Expected singleton polytope initialization with point={point}, poly={poly} to result in False, but received True"
+
+
+class TestPolytopeIsBounded:
+    """Tests for the `Polytope.is_bounded` property"""
+
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @given(poly=tuples(
+        integers(min_value=1, max_value=N_MAX),
+        sampled_from(['vrepr', 'hrepr']),
+        ).flatmap(lambda pair: poly_rand(repr=pair[1], n=pair[0], exclude_degen=True))
+    )
+    def test_random_nondegen_minimal(self, poly: Polytope) -> None:
+        """Test whether non-degenerate, minimal polytopes are correctly classified as bounded"""
+        assert poly.is_bounded, \
+            f"Expected `poly.is_bounded` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        ([[1, 0],
+          [0, 1],
+          [1, 1]], None),
+        ([[  0,   0],
+          [  1,   0],
+          [  0,   1],
+          [  1,   1],
+          [0.5, 0.5]], None),
+        ([[0, 0],
+          [0, 0],
+          [1, 1]], None),
+        (None, [0, 0, 0, 0]),
+        (None, [[0,        0, 0, 0],
+                [0, ATOL / 2, 0, 0]]),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_bounded(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from V-representation gets marked as bounded"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert poly.is_bounded, \
+            f"Expected `poly.is_bounded` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('verts, rays', [
+        (None, [1, 0]),
+        (None, [[0, 0],
+                [1, 0]]),
+        ([4.5, 9.0], [0.01, -0.01]),
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_vrepr_unbounded(self, verts: ArrayLike, rays: ArrayLike | None, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether unbounded polytopes initialized from V-representation gets marked as unbounded"""
+        if verts is None:
+            verts = np.empty((0, np.atleast_2d(rays).shape[1]))
+        if rays is None:
+            rays = np.empty((0, np.atleast_2d(verts).shape[1]))
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(verts, rays=rays)
+        assert not poly.is_bounded, \
+            f"Expected `poly.is_bounded` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.array([[ 1.,  1., 1.],
+                   [-1.,  0., 0.],
+                   [ 0., -1., 0.]]), np.empty((0, 3))),  # Simplex
+        (np.array([[ 0., -1., 0.],
+                   [-1.,  1., 1.],
+                   [-1.,  0., 0.],
+                   [ 1.,  1., 2.],
+                   [ 1.,  0., 1.]]), np.empty((0, 3))),  # House
+        (np.vstack((np.column_stack(( np.eye(3), np.ones(3))),
+                    np.column_stack((-np.eye(3), np.zeros(3))))), np.empty((0, 4))),  # Cube
+        (np.array([[0, 0, -1]]), np.empty((0, 3))),  # Empty
+        (np.array([[0, 0, -5]]), np.empty((0, 3))),  # Empty
+        (np.empty((0, 4)), np.array([[1, 0, 1, 2],
+                                     [1, 0, 1, 3]])),  # Empty
+        (np.array([[1, 2, 3]]), np.array([[0, 0, -10]])),  # Empty
+        (np.array([[1, 2, 3]]), np.array([[0, 0, 10]])),  # Empty
+        (np.array([[ 1, 0,  0, 1],
+                   [-1, 0,  0, 0],
+                   [0,  1,  0, 1],
+                   [0, -1,  0, 0],
+                   [0,  0,  1, 0],
+                   [0,  0, -1, 0]]), np.empty((0, 4))),  # Plane segment, implicit equalities
+        (np.array([[ 1, 0,  3],
+                   [-1, 0, -2]]), np.array([[0, 1, 1]])),  # Line segment
+        (np.array([[ 1, 0,  2],
+                   [-1, 0, -2]]), np.array([[0, 1, 1]])),  # Singleton
+        (np.empty((0, 3)), np.array([[0, 1, 1],
+                                     [2, 4, 5]])),  # Singleton
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_bounded(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether polytopes initialized from H-representation get marked as bounded"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert poly.is_bounded, \
+            f"Expected `poly.is_bounded` to return True for poly={poly:r}, but received False"
+
+    @pytest.mark.coupled('pes.algo_options')
+    @pytest.mark.parametrize('Ab, Ab_eq', [
+        (np.empty((0, 3)), np.empty((0, 3))),  # Ambient space
+        (np.empty((0, 8)), np.empty((0, 8))),  # Ambient space
+        (np.array([[0, 0, 0, 0]]), np.empty((0, 4))),  # Ambient space
+        (np.array([[0, 0, 0, 10]]), np.empty((0, 4))),  # Ambient space, trivial inequality constraint
+        (np.array([[0, 0, 1]]), np.empty((0, 3))),  # Ambient space, trivial inequality constraint
+        (np.array([[0, 0, 1],
+                   [1, 2, 3]]), np.empty((0, 3))),
+        (np.empty((0, 3)), np.array([[0, 0, 0]])),  # Ambient space, trivial equality constraint
+        (np.empty((0, 3)), np.array([[1, 1, 2]])),  # Line
+        (np.array([[ 1, 0,  2],
+                   [-1, 0, -2]]), np.empty((0, 3))),  # Line, implicit equality
+        (np.array([[1, 0,  0, 1],
+                   [0, 1,  0, 1],
+                   [0, 0,  1, 0],
+                   [0, 0, -1, 0]]), np.empty((0, 4))),  # Plane, unbounded, implicit equalities
+        (np.array([[1, 0,  0, 1],
+                   [0, 1,  0, 1]]), np.array([[0, 0, 1, 2]])),  # Plane, unbounded, explicit equalities
+    ])
+    @pytest.mark.parametrize('on_property_assign', [
+        'minimal',
+        'pass',
+    ])
+    def test_parameterize_hrepr_unbounded(self, Ab: NDArray, Ab_eq: NDArray, on_property_assign: Literal['minimal', 'pass']) -> None:
+        """Test whether unbounded polytopes initialized from H-representation get marked as unbounded"""
+        with pes.algo_options(on_property_assign=on_property_assign):
+            poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
+        assert not poly.is_bounded, \
+            f"Expected `poly.is_bounded` to return False for poly={poly:r}, but received True"
+
+    @pytest.mark.coupled('pes.poly_empty')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_empty(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_empty(n)` results in a bounded polytope"""
+        poly = pes.poly_empty(n)
+        assert poly.is_bounded, \
+            f"Expected empty polytope initialization with n={n}, poly={poly} to result in True, but received False"
+
+    @pytest.mark.coupled('pes.poly_ambient')
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        5,
+        10,
+        100,
+    ])
+    def test_parameterize_poly_ambient(self, n: int) -> None:
+        """Test that initializing a polytope with `pes.poly_ambient(n)` results in an unbounded polytope"""
+        poly = pes.poly_ambient(n)
+        assert not poly.is_bounded, \
+            f"Expected ambient polytope initialization with n={n}, poly={poly} to result in False, but received True"
+
+    @pytest.mark.coupled('pes.poly_from_point')
+    @given(
+        point=tuples(sampled_from([int, float]), integers(min_value=1, max_value=N_MAX)).flatmap(
+            lambda args: arrays(args[0],
+                                args[1],
+                                elements=(floats(-100, 100, allow_infinity=False, allow_nan=False)
+                                          if issubclass(args[0], float)
+                                          else integers(-100, 100)))
+        )
+    )
+    def test_random_poly_from_point(self, point: NDArray) -> None:
+        """Test that initializing a polytope with `pes.poly_from_point(point)` results in a bounded polytope"""
+        poly = pes.poly_from_point(point)
+        assert poly.is_bounded, \
+            f"Expected singleton polytope initialization with point={point}, poly={poly} to result in True, but received False"
