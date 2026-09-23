@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 @overload
 def get_axes_color(ax: Axes1D | Axes | Axes3D | None,  # type: ignore[overload-overlap]
-                   color: ColorType | None,
+                   color: ColorType | int | None,
                    n: Literal[1],
                    display_name: str = "object",
                    ) -> tuple[Axes1D, ColorType]: ...
@@ -29,7 +29,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,  # type: ignore[overload-o
 
 @overload
 def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
-                   color: ColorType | None,
+                   color: ColorType | int | None,
                    n: Literal[2],
                    display_name: str = "object",
                    ) -> tuple[Axes, ColorType]: ...
@@ -37,7 +37,7 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
 
 @overload
 def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
-                   color: ColorType | None,
+                   color: ColorType | int | None,
                    n: Literal[3],
                    display_name: str = "object",
                    ) -> tuple[Axes3D, ColorType]: ...
@@ -45,14 +45,14 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
 
 @overload
 def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
-                   color: ColorType | None,
+                   color: ColorType | int | None,
                    n: int,
                    display_name: str = "object",
                    ) -> tuple[Axes1D | Axes | Axes3D, ColorType]: ...
 
 
 def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
-                   color: ColorType | None,
+                   color: ColorType | int | None,
                    n: int,
                    display_name: str = "object",
                    ) -> tuple[Axes1D | Axes | Axes3D, ColorType]:
@@ -62,8 +62,8 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
     ----------
     ax : Axes or None
         Matplotlib Axes object if provided or else None. If None, a new axes is created of appropriated dimension.
-    color : ColorType or None
-        Color to be used in plotting or else None. If None, the next-in-line color (as determined by Matplotlib) is chosen.
+    color : ColorType, int, or None
+        Color to be used in plotting. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If None, the next-in-line color (as determined by Matplotlib) is chosen.
     n : int
         Dimension of the object/convex region
     display_name : str, default="object"
@@ -105,7 +105,9 @@ def get_axes_color(ax: Axes1D | Axes | Axes3D | None,
             raise ValueError(f"The provided axes 'ax' is 2d, but the {display_name} is {n}d")
         if isinstance(ax, Axes3D) and n != 3:
             raise ValueError(f"The provided axes 'ax' is 3d, but the {display_name} is {n}d")
-    if color is None:
+    if isinstance(color, int):
+        color = (cycle := plt.rcParams['axes.prop_cycle'].by_key()['color'])[color % len(cycle)]
+    elif color is None:
         # pylint: disable=protected-access
         color = ax._get_lines.get_next_color()  # type: ignore[union-attr, attr-defined]
 

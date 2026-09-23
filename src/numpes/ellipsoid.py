@@ -465,7 +465,7 @@ class Ellipsoid:
         return obj
 
     def plot(self,
-             color: Optional[ColorType] = None,
+             color: Optional[ColorType | int] = None,
              alpha: float = 0.5,
              linewidth: Optional[float] = None,
              linestyle: str = '-',
@@ -479,8 +479,8 @@ class Ellipsoid:
 
         Parameters
         ----------
-        color : ColorType, optional
-            Color of the ellipsoid. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        color : ColorType or int, optional
+            Color of the ellipsoid. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
         alpha : float, default=0.5
             Transparency of the ellipsoid
         linewidth : float, optional
@@ -587,7 +587,7 @@ class Ellipsoid:
         return ax
 
     def plot_radii(self,
-                   color: Optional[ColorType] = None,
+                   color: Optional[ColorType | int] = None,
                    annotate: list[str] | bool = False,
                    label: Optional[str] = None,
                    show: bool = True,
@@ -597,8 +597,8 @@ class Ellipsoid:
 
         Parameters
         ----------
-        color : ColorType, optional
-            Color of the radii. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        color : ColorType or int, optional
+            Color of the radii. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
         annotate : list[str] or bool, default=False
             Whether to annotate the radii. If `True`, an incremental annotation 0, 1, ... will be used. A custom list of annotations can be provided.
         label : str, optional

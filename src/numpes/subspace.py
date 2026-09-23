@@ -289,7 +289,7 @@ class Subspace:
         return obj
 
     def plot(self,
-             color: Optional[ColorType] = None,
+             color: Optional[ColorType | int] = None,
              alpha: float = 0.5,
              plot_basis: bool = False,
              label: Optional[str] = None,
@@ -300,8 +300,8 @@ class Subspace:
 
         Parameters
         ----------
-        color : ColorType, optional
-            Color of the subspace. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        color : ColorType or int, optional
+            Color of the subspace. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
         alpha : float, default=0.5
             Transparency of the subspace
         plot_basis : bool, default=False
@@ -384,7 +384,7 @@ class Subspace:
         return ax
 
     def plot_basis(self,
-                   color: Optional[ColorType] = None,
+                   color: Optional[ColorType | int] = None,
                    annotate: list[str] | bool = False,
                    label: Optional[str] = None,
                    show: bool = True,
@@ -394,8 +394,8 @@ class Subspace:
 
         Parameters
         ----------
-        color : ColorType, optional
-            Color of the basis vectors. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        color : ColorType or int, optional
+            Color of the basis vectors. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
         annotate : list[str] or bool, default=False
             Whether to annotate the basis vectors. If `True`, an incremental annotation 0, 1, ... will be used. A custom list of annotations can be provided.
         label : str, optional

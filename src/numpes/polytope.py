@@ -40,7 +40,7 @@ from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, r
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
 from numpes.utils.linalg import find_implicit, is_sing, is_square, minimize_hrepr, minimize_vrepr
 from numpes.utils.linprog import Status, solve_lp
-from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d
+from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d, plot_line
 from numpes.utils.spatial import conv, enum_facets, enum_gens
 
 if TYPE_CHECKING:
@@ -1098,7 +1098,7 @@ class Polytope:
 
     # pylint: disable=too-many-branches,too-many-statements
     def plot(self,
-             color: Optional[ColorType] = None,
+             color: Optional[ColorType | int] = None,
              alpha: float = 0.5,
              linewidth: Optional[float] = None,
              linestyle: str = '-',
@@ -1113,8 +1113,8 @@ class Polytope:
 
         Parameters
         ----------
-        color : ColorType, optional
-            Color of the polytope. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
+        color : ColorType or int, optional
+            Color of the polytope. If an integer is provided, the `color % len(cycle)`-th color from the active Matplotlib color cycle `cycle` is chosen. If not provided, the next color-in-line (as determined by Matplotlib) is automatically selected. Note that `ColorType` is an alias for options such as named colors (e.g., `blue`) or RGB(A) tuples `(r, g, b, a)`.
         alpha : float, default=0.5
             Transparency of the polytope
         linewidth : float, optional
@@ -1161,30 +1161,43 @@ class Polytope:
         >>> poly.plot()  # doctest: +SKIP
         .. image:: # FIXME
         """
-        # TODO: Also implement the logic when `self` is lower-dimensional, so when it is a single plane, or a line.
-        # TODO: Also add a degeneracy check for plotting
         display_name = f"{self.__class__.__name__.lower()}"
+        self.minimal()
+        if self.is_empty:
+            # FIXME: Here I should probably display some sort of warning
+            ax, _ = get_axes_color(ax, None, self.n, display_name=display_name)
+            return ax
         match self.n:
             case 1:
                 ax, color = get_axes_color(ax, color, 1, display_name=display_name)
-                ax.plot(edges := [np.min(self.verts), np.max(self.verts)],
-                        color=color,
-                        alpha=alpha,
-                        linewidth=linewidth,
-                        linestyle=linestyle,
-                        label=label)
+                if self.is_singleton:
+                    # FIXME: Should be replaced by `ax.plot(edges, '.', color=color)`, but Axes1D needs to be updated to only take one argument
+                    ax.scatter(self.verts[0], marker='o', linewidths=4, color=color, label=label)
+                elif not self.is_bounded:
+                    line = plot_line(ax, self.rays[0], (edges := self.verts[0]) if self.k > 0 else None, color=color, bidirectional=False if self.k > 0 else True)
+                    if label is not None:
+                        line.set_label(label)
+                else:
+                    ax.plot(edges := [np.min(self.verts), np.max(self.verts)],
+                            color=color,
+                            alpha=alpha,
+                            linewidth=linewidth,
+                            linestyle=linestyle,
+                            label=label)
                 if annotate_facets:
                     # FIXME: Should I throw an error when len(annotate_facets) != 1?
                     annotation = (annotate_facets[0]
                                   if isinstance(annotate_facets, list)
                                   else "0")
                     ax.text(np.mean(edges), annotation, color='black')
-                if plot_edges:
+                if plot_edges and (not self.is_singleton and self.k > 0):
                     # FIXME: Should be replaced by `ax.plot(edges, '.', color=color)`, but Axes1D needs to be updated to only take one argument
                     ax.scatter(edges, color=color)
                 if label is not None:
                     ax.legend()
             case 2:
+                if not self.is_bounded:
+                    raise NotImplementedError("Plotting unbounded polytopes is not yet implemented")
                 ax, color = get_axes_color(ax, color, 2, display_name=display_name)
                 plot_bounded_poly_2d(ax, self.verts, color, alpha, linewidth, linestyle, label, plot_edges)
                 ax.autoscale_view()
@@ -1206,22 +1219,24 @@ class Polytope:
                 if CFG.plot_aspect == 'equal':
                     ax.set_aspect('equal', adjustable='box')
             case 3:
+                if not self.is_bounded:
+                    raise NotImplementedError("Plotting unbounded polytopes is not yet implemented")
                 ax, color = get_axes_color(ax, color, 3, display_name=display_name)
-                for idx in range(self.m):
+                for idx in range(self.m if self.m_eq == 0 else 1):  # FIXME: Maybe replace with dim?
                     verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
                                                         self.b[idx],
                                                         rtol=CFG.rtol,
-                                                        atol=CFG.atol), :]
+                                                        atol=CFG.atol), :] if self.m_eq == 0 else self.verts  # FIXME: Maybe replace with dim?
                     plot_bounded_facet_3d(ax, verts_facet, color, alpha, linewidth, linestyle, plot_edges)
                     if annotate_facets:
                         annotation = (annotate_facets[idx]
                                       if isinstance(annotate_facets, list)
                                       else f"{idx}")
                         ax.text((mean := np.mean(verts_facet, axis=0))[0],
-                                mean[1],
-                                mean[2],
-                                annotation,
-                                color='black')
+                                 mean[1],
+                                 mean[2],
+                                 annotation,
+                                 color='black')
                 if label is not None:
                     handles, _ = ax.get_legend_handles_labels()
                     handles.append(Patch(facecolor=to_rgba(color, alpha=alpha),
