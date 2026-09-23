@@ -516,6 +516,16 @@ def reduce_ineq(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> NDArray:
     """Remove redundant inequalities from the constraint matrix that are implied by other inequalities and equalities"""
     if Ab.shape[0] == 0:
         return Ab
+    row_scales = np.max(np.abs(Ab), axis=1)
+    normalized_Ab = np.divide(Ab,
+                              row_scales[:, np.newaxis],
+                              out=np.zeros_like(Ab, dtype=float),
+                              where=row_scales[:, np.newaxis] != 0)
+    unique_indices = []
+    for idx, row in enumerate(normalized_Ab):
+        if not any(np.all(np.isclose(row, normalized_Ab[other], rtol=CFG.rtol, atol=CFG.atol)) for other in unique_indices):
+            unique_indices.append(idx)
+    Ab = Ab[unique_indices]
     m, n = Ab.shape[0], Ab.shape[1] - 1
     if Ab_eq is None:
         Ab_eq = np.empty((0, n + 1))

@@ -970,6 +970,32 @@ class TestMinimizeHrepr:
     def test_ineq_only_non_redundant(self) -> None:
         ...
 
+    @pytest.mark.parametrize('Ab, expected_Ab', [
+        (np.array([[1, 1, 1, 10],
+                   [1, 1, 1, 10]]),
+         np.array([[1, 1, 1, 10]])),
+        (np.array([[1, 1, 1, 10],
+                   [1 + 1e-6, 1 - 1e-6, 1, 10 + 1e-6]]),
+         np.array([[1, 1, 1, 10]])),
+        (np.array([[1, 0, 0, 100],
+                   [0, 1, 0, 100],
+                   [0, 0, 1, 100],
+                   [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3), 100 / np.sqrt(3)],
+                   [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3), 100 / np.sqrt(3)]]),
+         np.array([[1, 0, 0, 100],
+                   [0, 1, 0, 100],
+                   [0, 0, 1, 100],
+                   [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3), 100 / np.sqrt(3)]])),
+        (np.array([[1, 2, 3, 4],
+                   [1, 2, 3, 4],
+                   [2, 4, 6, 8]]), np.array([[1, 2, 3, 4]]))
+    ])
+    def test_ineq_only_repeated_constraint(self, Ab: NDArray, expected_Ab: NDArray) -> None:
+        """Test that repeated inequality constraints are reduced to one row"""
+        Ab_res, _ = pes.utils.minimize_hrepr(Ab)
+        assert lsort(normalize(Ab_res)) == approx(lsort(normalize(expected_Ab))), \
+            f"Given Ab=\n{Ab},\nexpected reduced inequalities Ab_res=\n{Ab_res}\nto be equal to\n{expected_Ab}\n(same rows, order does not matter)"
+
     def test_eq_only_non_redundant(self) -> None:
         ...
 
