@@ -88,7 +88,10 @@ def normalize(Ab: NDArray, eq: bool = False) -> NDArray:
 
 
 # FROM: GitHub Copilot Raptor mini (Preview) | 2026/04/26[untested/unverified]
-def requires(import_name: str, exception: type[BaseException] = ImportError, match: str | None = None):
+def requires(import_name: str,
+             exception: type[BaseException] = ImportError,
+             match: str | None = None,
+             ) -> None:
     """Decorator for optional dependency tests.
 
     If the named module is unavailable, the wrapped test is executed under
@@ -170,7 +173,9 @@ def close_figures(test_obj):
     return wrap_test_function(test_obj)
 
 
-def wrap_angle(angle: float | ArrayLike, unit: Literal['rad', 'deg'] = 'rad') -> float | list[float]:
+def wrap_angle(angle: float | ArrayLike,
+               unit: Literal['rad', 'deg'] = 'rad',
+               ) -> float | list[float]:
     """Wrap angles to the range (-π, π] for radians or (-180, 180] for degrees."""
     if isinstance(angle, (tuple, list, np.ndarray)):
         return [wrap_angle(ang, unit) for ang in angle]

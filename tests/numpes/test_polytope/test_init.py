@@ -18,298 +18,277 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray, ArrayLike
 
 
-def test_polytope_init_no_args_no_kwargs():
-    poly = pes.Polytope()
-    assert isinstance(poly, pes.Polytope), \
-        "Expected the constructor to return an instance of Polytope when called with no arguments."
-    
+class TestPolytopeInit:
+    """Tests for the `pes.polytope.Polytope.__init__` dunder method"""
 
-# FIXME: This should raise an error instead
-# def test_polytope_init_no_args_no_kwargs_attr_none():
-#     poly = pes.Polytope()
-#     for attr_name in [
-#         '_vrepr',
-#         '_hrepr',
-#         '_is_empty',
-#         '_is_degen',
-#         '_is_bounded',
-#         '_is_full_dim',
-#         '_is_pointed',
-#         '_is_singleton',
-#         '_dim',
-#         '_vol',
-#         '_chebcr'
-#         ]:
-#         assert getattr(poly, attr_name) is None, \
-#             f"Expected attribute '{attr_name}' to be None for a polytope initialized with no arguments, but got {getattr(poly, attr_name)}."
-        
+    def test_polytope_init_no_args_no_kwargs(self):
+        poly = pes.Polytope()
+        assert isinstance(poly, pes.Polytope), \
+            "Expected the constructor to return an instance of Polytope when called with no arguments."
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((..., ..., ...), {}),
-    ((1, 2, 3), {}),
-    ((...,), {'foo': 1, 'bar': 2, 'baz': 3}),  # NOTE: Should dispatch to `_init_vrepr` (as len_args=1)
-])
-def test_polytope_init_invalid_combination(args: Any, kwargs: dict[str, Any]):
-    with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
-        "An invalid number or combination of arguments was provided," \
-        f" received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid " \
-        "combinations or arguments.")):
-        pes.Polytope(*args, **kwargs)
+    # FIXME: This should raise an error instead
+    # def test_polytope_init_no_args_no_kwargs_attr_none():
+    #     poly = pes.Polytope()
+    #     for attr_name in [
+    #         '_vrepr',
+    #         '_hrepr',
+    #         '_is_empty',
+    #         '_is_degen',
+    #         '_is_bounded',
+    #         '_is_full_dim',
+    #         '_is_pointed',
+    #         '_is_singleton',
+    #         '_dim',
+    #         '_vol',
+    #         '_chebcr'
+    #         ]:
+    #         assert getattr(poly, attr_name) is None, \
+    #             f"Expected attribute '{attr_name}' to be None for a polytope initialized with no arguments, but     got {getattr(poly, attr_name)}."
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((..., ..., ...), {}),
+        ((1, 2, 3), {}),
+        ((...,), {'foo': 1, 'bar': 2, 'baz': 3}),  # NOTE: Should dispatch to `_init_vrepr` (as len_args=1)
+    ])
+    def test_polytope_init_invalid_combination(self, args: Any, kwargs: dict[str, Any]):
+        with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
+            f"An invalid number or combination of arguments was provided, received args={args}, kwargs={kwargs}. Please refer to the documentation for details on valid combinations or arguments.")):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((), {'n': 1}),
-    ((), {'n': 2}),
-    ((), {'n': 3}),
-    ((), {'n': 5}),
-    ((), {'n': 10}),
-    ((), {'n': 20_000})
-])
-def test_polytope_init_empty_valid(args: tuple[()], kwargs: dict[str, int]):
-    _ = pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs', [
+        ((), {'n': 1}),
+        ((), {'n': 2}),
+        ((), {'n': 3}),
+        ((), {'n': 5}),
+        ((), {'n': 10}),
+        ((), {'n': 20_000})
+    ])
+    def test_polytope_init_empty_valid(self, args: tuple[()], kwargs: dict[str, int]):
+        _ = pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((), {'n': -1}),
+        ((), {'n': 0}),
+    ])
+    def test_polytope_init_empty_value_error(self, args: tuple[()], kwargs: dict[str, int]):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Dimension 'n' must be a positive integer, got n={kwargs['n']}")):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((), {'n': -1}),
-    ((), {'n': 0}),
-])
-def test_polytope_init_empty_value_error(args: tuple[()], kwargs: dict[str, int]):
-    with pytest.raises(ValueError, match=re.escape(
-        f"Dimension 'n' must be a positive integer, got n={kwargs['n']}")):
-        pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs', [
+        ((), {'n': 0.5}),
+        ((), {'n': np.inf}),
+        ((), {'n': np.nan}),
+        ((), {'n': '3'}),
+        ((), {'n': ...})
+    ])
+    def test_polytope_init_empty_type_error(self, args: tuple[()], kwargs: dict[str, float | int]):
+        with pytest.raises(TypeError, match=re.escape(
+            f"Dimension 'n' must be a positive integer, received {kwargs['n']} of type '{type(kwargs['n']).__name__}'")):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((2,), {})
+    ])
+    def test_polytope_init_empty_dispatch_init_vrepr_type_error(self, args: tuple[()] | tuple[int], kwargs: dict[str,     float | int]):
+        with pytest.raises(TypeError, match=re.escape(
+            "A single positional argument cannot be an integer (for an empty polytope initialization). Please refer to the documentation for valid argument combinations.")):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((), {'n': 0.5}),
-    ((), {'n': np.inf}),
-    ((), {'n': np.nan}),
-    ((), {'n': '3'}),
-    ((), {'n': ...})
-])
-def test_polytope_init_empty_type_error(args: tuple[()], kwargs: dict[str, float | int]):
-    with pytest.raises(TypeError, match=re.escape(
-        f"Dimension 'n' must be a positive integer, received {kwargs['n']} of type '{type(kwargs['n']).__name__}'")):
-        pes.Polytope(*args, **kwargs)
+    def test_polytope_init_empty_manual_verts(self):
+        ...
 
+    def test_polytope_init_empty_manual_facets(self):
+        ...
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((2,), {})
-])
-def test_polytope_init_empty_dispatch_init_vrepr_type_error(args: tuple[()] | tuple[int], kwargs: dict[str, float | int]):
-    with pytest.raises(TypeError, match=re.escape(
-        "A single positional argument cannot be an integer (for an empty polytope initialization). Please refer to the documentation for valid argument combinations.")):
-        pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs, expected_msg', [
+        ((), {'n': 2, 'verts': ...},
+         "Cannot provide 'n' when initializing from vertices"),  # NOTE: Should dispatch to `_init_vrepr`
+        ((), {'n': 2, 'rays': ...},
+         "Cannot provide 'rays' when initializing an empty polytope"),
+        ((), {'n': 2, 'A': ...},
+         "An invalid number or combination of arguments was provided, received args=(), kwargs={'n': 2, 'A': Ellipsis}. Please refer to the documentation for details on valid combinations or arguments."),  # NOTE: Should 'dispatch' to `__init__` (default method if no dispatchers match)
+        ((), {'n': 2, 'b': ...},
+         "An invalid number or combination of arguments was provided, received args=(), kwargs={'n': 2, 'b': Ellipsis}. Please refer to the documentation for details on valid combinations or arguments."),  # NOTE: Should 'dispatch' to `__init__` (default method if no dispatchers match)
+        ((), {'n': 2, 'A_eq': ...},
+         "Cannot provide 'A_eq' or 'b_eq' when initializing an empty polytope"),
+        ((), {'n': 2, 'b_eq': ...},
+         "Cannot provide 'A_eq' or 'b_eq' when initializing an empty polytope")
+    ])
+    def test_polytope_init_empty_invalid_combination(self, args: tuple[()], kwargs: dict[str, int | EllipsisType],     expected_msg: str):
+        with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(expected_msg)):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((np.array([0]),), {}),
+        ((np.array([[0]]),), {}),
+        ((np.array([[0], 
+                    [1]]),), {}),
+        ((np.array([[0  ], 
+                    [0.5], 
+                    [1  ]]),), {}),
+        ((np.array([[ 3, 3]]),), {}),
+        ((np.array([[-1, 2], 
+                    [-3, 4],
+                    [-5, 6]]),), {}),
+        ((np.array([[ 0.5,   0.001], 
+                    [-0.2, 1/3    ],
+                    [   0,   0    ]]),), {}),
+        ((np.array([1, 2, 3]),), {}),
+        ((np.array([[1, 2, 3]]),), {}),
+        ((np.array([[ 0,  0,  0],
+                    [-1,  0,  1], 
+                    [ 1,  1,  1], 
+                    [ 0,  1,  0],
+                    [-1, -1, -1]]),), {}),
+        (tuple(), {'verts': np.array([1, 0.1, 0.01, 0.001])}),
+        (tuple(), {'verts': np.array([[0, 1],
+                                      [1, 0]])}),  # NOTE: Should dispatch to `_init_vrepr`
+        ([[1, 2, 3, 4]], {}),  # NOTE: `[1, 2, 3, 4]` will be converted to a NumPy array due to `verts = np.    atleast_2d(verts)` in `_init_vrepr`
+        ((np.array([1, 0]),), {'rays': np.array([[1, 0]])}),
+    ])
+    def test_polytope_init_vrepr_valid(self, args: tuple[NDArray], kwargs: dict[str, NDArray]):
+        _ = pes.Polytope(*args, **kwargs)
 
-def test_polytope_init_empty_manual_verts():
-    ...
+    @pytest.mark.parametrize('args, kwargs', [
+        ((2,), {})
+    ])
+    def test_polytope_init_vrepr_type_error(self, args: tuple[int], kwargs: dict[str, int]):
+        with pytest.raises(TypeError, match=re.escape(
+            "A single positional argument cannot be an integer (for an empty polytope initialization). Please refer to the documentation for valid argument combinations.")):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((np.ones((2, 2, 2)),), {})
+    ])
+    def test_polytope_init_vrepr_value_error(self, args: tuple[NDArray], kwargs: dict[str, NDArray]):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Vertices must be provided as a 2D array of shape (k, n), but received an array of shape {args[0].shape}")):
+            pes.Polytope(*args, **kwargs)
 
-def test_polytope_init_empty_manual_facets():
-    ...
+    @pytest.mark.parametrize('args, kwargs, expected_msg', [
+        ((np.array([[np.nan, 1],
+                    [     1, 0]]),), {},
+         "Vertices 'verts' cannot contain NaN values"),
+        (tuple(), {'verts': np.array([[0,      1],
+                                      [1, np.nan]])},
+         "Vertices 'verts' cannot contain NaN values"),
+        (tuple(), {'verts': np.array([[0.1, 0.2],
+                                      [0.3, 0.4]]), 'rays': np.full((2, 2), np.nan)},
+         "Rays 'rays' cannot contain NaN values"),
+    ])
+    def test_polytope_init_vrepr_nan_value_error(self, args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str)    :
+        with pytest.raises(ValueError, match=re.escape(expected_msg)):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((np.array([[0, 1],
+                    [1, 0],
+                    [0, 0]]),), {'rays': np.array([[1, 0, 0]])})
+    ])
+    def test_polytope_init_vrepr_value_error_rays(self, args: tuple[NDArray], kwargs: dict[str, NDArray]):
+        with pytest.raises(ValueError, match=re.escape(
+            f"Rays must be provided as a 2D array of shape (k_rays, n={args[0].shape[1]}), but received an array of shape {kwargs['rays'].shape}")):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((), {'n': 2, 'verts': ...},
-     "Cannot provide 'n' when initializing from vertices"),  # NOTE: Should dispatch to `_init_vrepr`
-    ((), {'n': 2, 'rays': ...},
-     "Cannot provide 'rays' when initializing an empty polytope"),
-    ((), {'n': 2, 'A': ...},
-     "An invalid number or combination of arguments was provided, received args=(), kwargs={'n': 2, 'A': Ellipsis}. Please refer to the documentation for details on valid combinations or arguments."),  # NOTE: Should 'dispatch' to `__init__` (default method if no dispatchers match)
-    ((), {'n': 2, 'b': ...},
-     "An invalid number or combination of arguments was provided, received args=(), kwargs={'n': 2, 'b': Ellipsis}. Please refer to the documentation for details on valid combinations or arguments."),  # NOTE: Should 'dispatch' to `__init__` (default method if no dispatchers match)
-    ((), {'n': 2, 'A_eq': ...},
-     "Cannot provide 'A_eq' or 'b_eq' when initializing an empty polytope"),
-    ((), {'n': 2, 'b_eq': ...},
-     "Cannot provide 'A_eq' or 'b_eq' when initializing an empty polytope")
-])
-def test_polytope_init_empty_invalid_combination(args: tuple[()], kwargs: dict[str, int | EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(expected_msg)):
-        pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs, expected_msg', [
+        ((2,), {'n': 2},
+         "Cannot provide 'n' when initializing from vertices"),
+        ((np.array([[0.1], 
+                    [0.5]]),), {'n': ...},
+         "Cannot provide 'n' when initializing from vertices"),
+        ((np.array([[-1, 2], 
+                    [-3, 4],
+                    [-5, 6]]),), {'A': ...},
+         "Cannot provide 'A' or 'b' when initializing from vertices"),
+        ((np.array([[ 1.1, 1/2], 
+                    [ 3  , 4.0],
+                    [-5  , 0  ]]),), {'b': ...},
+         "Cannot provide 'A' or 'b' when initializing from vertices"),
+        ((np.zeros((4, 4)),), {'A_eq': ..., 'b_eq': ...},
+         "Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
+    ])
+    def test_polytope_init_vrepr_invalid_combination(self, args: tuple[NDArray], kwargs: dict[str, NDArray |     EllipsisType], expected_msg: str):
+        with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        (((np.array([[0, 1],
+                     [1, 0]]),
+           np.array([0,
+                     1]))), {}),
+        (((np.zeros((4, 4)), np.zeros(4)), {})),
+        (((np.array([[0.01, 4.54],
+                     [2.11, 0.90],
+                     [3.21, 0.03]])),
+           np.array([ 1,
+                      0,
+                     -1])), {}),
+        (([1, 2], 3), {}),
+        (([[1, 2],
+           [1, 0],
+           [0, 1]],
+          [-3,
+            1,
+            1]), {}),
+    ])
+    def test_polytope_init_hrepr_valid(self, args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
+        _ = pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((np.array([0]),), {}),
-    ((np.array([[0]]),), {}),
-    ((np.array([[0], 
-                [1]]),), {}),
-    ((np.array([[0  ], 
-                [0.5], 
-                [1  ]]),), {}),
-    ((np.array([[ 3, 3]]),), {}),
-    ((np.array([[-1, 2], 
-                [-3, 4],
-                [-5, 6]]),), {}),
-    ((np.array([[ 0.5,   0.001], 
-                [-0.2, 1/3    ],
-                [   0,   0    ]]),), {}),
-    ((np.array([1, 2, 3]),), {}),
-    ((np.array([[1, 2, 3]]),), {}),
-    ((np.array([[ 0,  0,  0],
-                [-1,  0,  1], 
-                [ 1,  1,  1], 
-                [ 0,  1,  0],
-                [-1, -1, -1]]),), {}),
-    (tuple(), {'verts': np.array([1, 0.1, 0.01, 0.001])}),
-    (tuple(), {'verts': np.array([[0, 1],
-                                  [1, 0]])}),  # NOTE: Should dispatch to `_init_vrepr`
-    ([[1, 2, 3, 4]], {}),  # NOTE: `[1, 2, 3, 4]` will be converted to a NumPy array due to `verts = np.atleast_2d(verts)` in `_init_vrepr`
-    ((np.array([1, 0]),), {'rays': np.array([[1, 0]])}),
-])
-def test_polytope_init_vrepr_valid(args: tuple[NDArray], kwargs: dict[str, NDArray]):
-    _ = pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs', [
+        (..., ...)
+    ])
+    @pytest.mark.skip(reason="'init_hrepr' is currently not raising any TypeErrors.")
+    def test_polytope_init_hrepr_type_error(self, args, kwargs):
+        with pytest.raises(TypeError):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs', [
+        ((np.ones((4, 3)), np.zeros(3)), {})
+    ])
+    def test_polytope_init_hrepr_value_error(self, args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
+        with pytest.raises(ValueError, match=re.escape(
+            f"A must be a matrix of size (m, n) and b must be a vector of size (m,), but received A={args[0].shape}, b={args[1].shape}.")):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((2,), {})
-])
-def test_polytope_init_vrepr_type_error(args: tuple[int], kwargs: dict[str, int]):
-    with pytest.raises(TypeError, match=re.escape(
-        "A single positional argument cannot be an integer (for an empty polytope initialization). Please refer to the documentation for valid argument combinations.")):
-        pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs', [
+        ((np.ones((4, 3)), np.zeros(4)), {'A_eq': np.empty((0, 4)), 'b_eq': np.empty((0,))})
+    ])
+    def test_polytope_init_hrepr_value_error_eq(self, args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
+        with pytest.raises(ValueError, match=re.escape(
+            f"A_eq must be a matrix of shape (m_eq, n={args[0].shape[1]}) and b_eq must be a vector of size (m_eq,), but received shape A_eq={kwargs['A_eq'].shape}, b_eq={kwargs['b_eq'].shape}.")):
+            pes.Polytope(*args, **kwargs)
 
+    @pytest.mark.parametrize('args, kwargs, expected_msg', [
+        ((np.array([[np.nan, 1],
+                    [     1, 0]]), np.array([0, 1])), {},
+         "Inequality matrices 'A' and 'b' cannot contain NaN values"),
+        (tuple(), {'A': np.array([[-2, 0,      1],
+                                  [ 3, 1, np.nan]]), 'b': np.array([0, 1])},
+         "Inequality matrices 'A' and 'b' cannot contain NaN values"),
+        ((np.array([[1, 2, 3],
+                    [4, 5, 6],
+                    [7, 8, 9]]), np.array([-1, 0, 1])),
+         {'A_eq': np.array([[1, 0, np.nan],
+                            [0, 1, np.nan],
+                            [0, 0, np.nan]]), 'b_eq': np.array([0, 1, 2])},
+         "Equality matrices 'A_eq' and 'b_eq' cannot contain NaN values"),
+    ])
+    def test_polytope_init_hrepr_nan_value_error(self, args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str)    :
+        with pytest.raises(ValueError, match=re.escape(expected_msg)):
+            pes.Polytope(*args, **kwargs)
 
-@pytest.mark.parametrize('args, kwargs', [
-    ((np.ones((2, 2, 2)),), {})
-])
-def test_polytope_init_vrepr_value_error(args: tuple[NDArray], kwargs: dict[str, NDArray]):
-    with pytest.raises(ValueError, match=re.escape(
-        f"Vertices must be provided as a 2D array of shape (k, n), but received an array of shape {args[0].shape}")):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((np.array([[np.nan, 1],
-                [     1, 0]]),), {},
-     "Vertices 'verts' cannot contain NaN values"),
-    (tuple(), {'verts': np.array([[0,      1],
-                                  [1, np.nan]])},
-     "Vertices 'verts' cannot contain NaN values"),
-    (tuple(), {'verts': np.array([[0.1, 0.2],
-                                  [0.3, 0.4]]), 'rays': np.full((2, 2), np.nan)},
-     "Rays 'rays' cannot contain NaN values"),
-])
-def test_polytope_init_vrepr_nan_value_error(args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str):
-    with pytest.raises(ValueError, match=re.escape(expected_msg)):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs', [
-    ((np.array([[0, 1],
-                [1, 0],
-                [0, 0]]),), {'rays': np.array([[1, 0, 0]])})
-])
-def test_polytope_init_vrepr_value_error_rays(args: tuple[NDArray], kwargs: dict[str, NDArray]):
-    with pytest.raises(ValueError, match=re.escape(
-        f"Rays must be provided as a 2D array of shape (k_rays, n={args[0].shape[1]}), but received an array of shape {kwargs['rays'].shape}")):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((2,), {'n': 2},
-     "Cannot provide 'n' when initializing from vertices"),
-    ((np.array([[0.1], 
-                [0.5]]),), {'n': ...},
-     "Cannot provide 'n' when initializing from vertices"),
-    ((np.array([[-1, 2], 
-                [-3, 4],
-                [-5, 6]]),), {'A': ...},
-     "Cannot provide 'A' or 'b' when initializing from vertices"),
-    ((np.array([[ 1.1, 1/2], 
-                [ 3  , 4.0],
-                [-5  , 0  ]]),), {'b': ...},
-     "Cannot provide 'A' or 'b' when initializing from vertices"),
-    ((np.zeros((4, 4)),), {'A_eq': ..., 'b_eq': ...},
-     "Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
-])
-def test_polytope_init_vrepr_invalid_combination(args: tuple[NDArray], kwargs: dict[str, NDArray | EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs', [
-    (((np.array([[0, 1],
-                 [1, 0]]),
-       np.array([0,
-                 1]))), {}),
-    (((np.zeros((4, 4)), np.zeros(4)), {})),
-    (((np.array([[0.01, 4.54],
-                 [2.11, 0.90],
-                 [3.21, 0.03]])),
-       np.array([ 1,
-                  0,
-                 -1])), {}),
-    (([1, 2], 3), {}),
-    (([[1, 2],
-       [1, 0],
-       [0, 1]],
-      [-3,
-        1,
-        1]), {}),
-])
-def test_polytope_init_hrepr_valid(args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
-    _ = pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs', [
-    (..., ...)
-])
-@pytest.mark.skip(reason="'init_hrepr' is currently not raising any TypeErrors.")
-def test_polytope_init_hrepr_type_error(args, kwargs):
-    with pytest.raises(TypeError):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs', [
-    ((np.ones((4, 3)), np.zeros(3)), {})
-])
-def test_polytope_init_hrepr_value_error(args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
-    with pytest.raises(ValueError, match=re.escape(
-        f"A must be a matrix of size (m, n) and b must be a vector of size (m,), but received A={args[0].shape}, b={args[1].shape}.")):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs', [
-    ((np.ones((4, 3)), np.zeros(4)), {'A_eq': np.empty((0, 4)), 'b_eq': np.empty((0,))})
-])
-def test_polytope_init_hrepr_value_error_eq(args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
-    with pytest.raises(ValueError, match=re.escape(
-        f"A_eq must be a matrix of shape (m_eq, n={args[0].shape[1]}) and b_eq must be a vector of size (m_eq,), " \
-            f"but received shape A_eq={kwargs['A_eq'].shape}, b_eq={kwargs['b_eq'].shape}.")):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((np.array([[np.nan, 1],
-                [     1, 0]]), np.array([0, 1])), {},
-     "Inequality matrices 'A' and 'b' cannot contain NaN values"),
-    (tuple(), {'A': np.array([[-2, 0,      1],
-                              [ 3, 1, np.nan]]), 'b': np.array([0, 1])},
-     "Inequality matrices 'A' and 'b' cannot contain NaN values"),
-    ((np.array([[1, 2, 3],
-                [4, 5, 6],
-                [7, 8, 9]]), np.array([-1, 0, 1])),
-     {'A_eq': np.array([[1, 0, np.nan],
-                        [0, 1, np.nan],
-                        [0, 0, np.nan]]), 'b_eq': np.array([0, 1, 2])},
-     "Equality matrices 'A_eq' and 'b_eq' cannot contain NaN values"),
-])
-def test_polytope_init_hrepr_nan_value_error(args: tuple[NDArray], kwargs: dict[str, NDArray], expected_msg: str):
-    with pytest.raises(ValueError, match=re.escape(expected_msg)):
-        pes.Polytope(*args, **kwargs)
-
-
-@pytest.mark.parametrize('args, kwargs, expected_msg', [
-    ((..., ...), {'verts': ...},
-     "Cannot provide 'verts' when initializing from half-spaces"),
-])
-def test_polytope_init_hrepr_invalid_combination(args: tuple[EllipsisType, EllipsisType], kwargs: dict[str, EllipsisType], expected_msg: str):
-    with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
-        pes.Polytope(*args, **kwargs)
+    @pytest.mark.parametrize('args, kwargs, expected_msg', [
+        ((..., ...), {'verts': ...},
+         "Cannot provide 'verts' when initializing from half-spaces"),
+    ])
+    def test_polytope_init_hrepr_invalid_combination(self, args: tuple[EllipsisType, EllipsisType], kwargs: dict[str,     EllipsisType], expected_msg: str):
+        with pytest.raises(InvalidCombinationOfArgumentsError, match=expected_msg):
+            pes.Polytope(*args, **kwargs)
 
 
 class TestPoly:
-    """Tests for the function `pes.poly`, which is a wrapper for the `Polytope` constructor"""
+    """Tests for the `pes.poly` factory function"""
 
     def test_poly_no_args_no_kwargs(self):
         with pytest.raises(InvalidCombinationOfArgumentsError, match=re.escape(
@@ -318,7 +297,7 @@ class TestPoly:
 
 
 class TestInitAmbient:
-    """Tests for the method `Polytope._init_ambient`"""
+    """Tests for the `Polytope._init_ambient` method"""
 
     @pytest.mark.parametrize('n', [
         1,
@@ -428,7 +407,7 @@ class TestInitAmbient:
 
 
 class TestInitFromBounds:
-    """Tests for the classmethod `Polytope.from_bounds`"""
+    """Tests for the `Polytope.from_bounds` classmethod"""
 
     @pytest.mark.parametrize('lb, ub', [
         (np.array([0]), np.array([1])),
@@ -672,4 +651,4 @@ class TestInitFromBounds:
 
 
 class TestInitFromPoint:
-    """Tests for the classmethod `Polytope.from_point`"""
+    """Tests for the `Polytope.from_point` classmethod"""

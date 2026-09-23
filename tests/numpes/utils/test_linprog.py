@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class TestStatus:
-    """Test the Status enum used in the LinearProgramResult dataclass"""
+    """Tests for the `pes.utils.linprog.Status` enum"""
 
     def test_values(self):
         """Test that all expected status values exist"""
@@ -27,12 +27,11 @@ class TestStatus:
         assert Status.ITERATION_LIMIT_REACHED
         assert Status.UNKNOWN
 
-
     def test_uniqueness(self):
         """Test that all enum values are unique"""
         values = [status.value for status in Status]
-        assert len(values) == len(set(values))
-
+        assert len(values) == len(set(values)), \
+            f"Assumed all values are unique, but received len(values)={len(values)}, whilst only {len(set(values))} are unique"
 
     def test_comparison(self):
         """Test enum equality and inequality"""
@@ -42,7 +41,7 @@ class TestStatus:
 
 
 class TestLinearProgramResult:
-    """Test the LinearProgramResult dataclass"""
+    """Tests for the `pes.utils.linprog.LinearProgramResult` dataclass"""
 
     def test_fields(self):
         """Test that the LinearProgramResult dataclass has the expected fields"""

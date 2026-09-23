@@ -21,6 +21,7 @@ class TestApprox:
         (ATOL / 2, 0),
     ])
     def test_parameterize_default_tol(self, actual: ArrayLike, expected: ArrayLike):
+        """Test equality with default tolerances"""
         assert actual == approx(expected), \
             f"Expected {actual} to be approximately equal to {expected} with default tolerances"
         
@@ -43,6 +44,7 @@ class TestLsort:
                    [1, 2]])),
     ])
     def test_parameterize(self, arr: NDArray, expected: NDArray):
+        """Test lexicographic sorting of various arrays"""
         assert np.array_equal(lsort(arr), expected), \
             f"Expected lsort to lexicographically sort the rows of {arr}, got {lsort(arr)} instead"
 
@@ -65,10 +67,23 @@ class TestRadiansDegreesConversion:
         (np.pi / 4, 45),
     ])
     def test_parameterize_conversion(self, rad: float, deg: float):
+        """Test conversion of various quantities"""
         assert rad == pytest.approx(deg2rad(deg)), \
             f"Expected {rad} radians to be approximately equal to {deg2rad(deg)} radians"
         assert deg == pytest.approx(rad2deg(rad)), \
             f"Expected {deg} degrees to be approximately equal to {rad2deg(rad)} degrees"
+
+    @given(val=floats(min_value=-1E10, max_value=1E10))
+    def test_random_rad2deg_deg2rad_inverse(self, val: float):
+        """Test whether the d2r is the inverse of r2d"""
+        assert val == pytest.approx(rad2deg(deg2rad(val))), \
+            f"Expected {val} degrees to be approximately equal to {rad2deg(deg2rad(val))} degrees"
+
+    @given(val=floats(min_value=-1E10, max_value=1E10))
+    def test_random_deg2rad_rad2deg_inverse(self, val: float):
+        """Test whether the r2d is the inverse of d2r"""
+        assert val == pytest.approx(deg2rad(rad2deg(val))), \
+            f"Expected {val} radians to be approximately equal to {deg2rad(rad2deg(val))} radians"
 
 
 class TestWrapAngle:
@@ -84,18 +99,9 @@ class TestWrapAngle:
         (3 * np.pi / 2, 'rad', -np.pi / 2),
     ])
     def test_parameterize_wrap_angle(self, angle: float, unit: str, expected: float):
+        """Test wrapped angles for various quantities"""
         assert wrap_angle(angle, unit=unit) == pytest.approx(expected), \
             f"Expected wrap_angle({angle}, unit='{unit}') to be {expected}"
-
-    @given(val=floats(min_value=-1E10, max_value=1E10, allow_infinity=False, allow_nan=False))
-    def test_random_rad2deg_deg2rad_inverse(self, val: float):
-        assert val == pytest.approx(rad2deg(deg2rad(val))), \
-            f"Expected {val} degrees to be approximately equal to {rad2deg(deg2rad(val))} degrees"
-
-    @given(val=floats(min_value=-1E10, max_value=1E10, allow_infinity=False, allow_nan=False))
-    def test_random_deg2rad_rad2deg_inverse(self, val: float):
-        assert val == pytest.approx(deg2rad(rad2deg(val))), \
-            f"Expected {val} radians to be approximately equal to {deg2rad(rad2deg(val))} radians"
 
 
 class TestNormalize:
@@ -108,6 +114,7 @@ class TestNormalize:
                    [0.0, 0.0, 1.0]])),
     ])
     def test_parameterize_normalize(self, arr: NDArray, expected: NDArray):
+        """Test whether various arrays are correctly normalized"""
         assert np.allclose(normalize(arr), expected)
 
     def test_parameterize_normalize(self):
@@ -118,20 +125,22 @@ class TestRequires:
     """Tests for the `@requires` decorator"""
 
     def test_missing_dependency_import_error(self):
+        """Test whether the ImportError with the correct message is properly caught"""
+
         @requires('foo',
                   ImportError,
-                  match="Module 'foo' is required but not installed"
-        )
+                  match="Module 'foo' is required but not installed")
         def bar():
             raise ImportError("Module 'foo' is required but not installed")
 
         bar()
 
     def test_missing_dependency_fail_import_error_incorrect_match(self):
+        """Test whether the ImportError with the incorrect message still raises an AssertionError"""
+
         @requires('foo',
                   ImportError,
-                  match="Module 'foo' is required but not installed"
-        )
+                  match="Module 'foo' is required but not installed")
         def bar():
             raise ImportError("Module 'baz' is required but not installed")
 
@@ -141,10 +150,11 @@ class TestRequires:
             bar()
 
     def test_runs_dependency_present(self):
+        """Test whether an always present package 'math' passes the test"""
+
         @requires('math',
                   ImportError,
-                  match="..."
-        )
+                  match="...")
         def bar():
             return 42
 
@@ -159,6 +169,8 @@ class TestCloseFigures:
         reason='matplotlib is not installed, skipping close_figures decorator test',
     )
     def test_single_figure(self):
+        """Test closing a single figure"""
+
         import matplotlib.pyplot as plt
 
         @close_figures

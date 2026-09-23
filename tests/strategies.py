@@ -7,7 +7,7 @@ import numpy as np
 import numpes as pes
 from hypothesis import reject
 from hypothesis import strategies as st
-from hypothesis.strategies import integers, floats, lists, sampled_from
+from hypothesis.strategies import integers, floats, lists, sampled_from, composite
 from hypothesis.extra.numpy import arrays
 from tests.conftest import RTOL, ATOL, N_MAX
 
@@ -23,21 +23,27 @@ class Decimal:
     RES = 1_000
 
 
-@st.composite
-def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_degen: bool = False) -> Polytope:
+@composite
+def poly_rand(draw,
+              repr: Literal['vrepr', 'hrepr', 'both'],
+              n: int,
+              exclude_degen: bool = False,
+              ) -> Polytope:
     # TODO: Implement a check that the generated polytope is not degenerate if `exclude_degen=True`
     match repr:
         case 'vrepr':
-            num_verts = draw(st.integers(n + 1, n + 10))
-            verts = draw(arrays(float, (num_verts, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
+            num_verts = draw(integers(n + 1, n + 10))
+            verts = draw(arrays(float,
+                                (num_verts, n),
+                                elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))
             try:  # FIXME: I don't know if this is a very good strategy; this was a fix for a QHull error
                 poly = pes.Polytope(verts)  # FIXME: Maybe I should do `with pes.algo_options(on_prop_assign='pass')` instead
             except RuntimeError as _:
                 reject()
         case 'hrepr':
-            num_facets = draw(st.integers(n + 1, n + 10))
-            A = draw(arrays(float, (num_facets, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
-            b = draw(arrays(float, (num_facets,), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
+            num_facets = draw(integers(n + 1, n + 10))
+            A = draw(arrays(float, (num_facets, n), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))
+            b = draw(arrays(float, (num_facets,), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))
             try:  # FIXME: I don't know if this is a very good strategy; this was a fix for a QHull error
                 poly = pes.Polytope(A, b)
             except (RuntimeError, ValueError) as _:  # FIXME: Can we log this error instead?
@@ -46,8 +52,8 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
                 if poly.is_empty:
                     reject()
         case 'both':
-            num_verts = draw(st.integers(n + 1, n + 10))
-            verts = draw(arrays(float, (num_verts, n), elements=st.floats(-100, 100, allow_infinity=False, allow_nan=False)))
+            num_verts = draw(integers(n + 1, n + 10))
+            verts = draw(arrays(float, (num_verts, n), elements=floats(-100, 100, allow_infinity=False, allow_nan=False)))
             try:
                 Ab, _ = pes.utils.enum_facets(verts)
             except RuntimeError as _:
@@ -60,7 +66,7 @@ def poly_rand(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int, exclude_deg
     return poly
 
 
-@st.composite
+@composite
 def polytopes(draw,
               n: Optional[int | Collection[int]] = None,
               which_repr: Optional[Literal['vrepr', 'hrepr', 'both']] = None,
@@ -171,16 +177,12 @@ def polytopes(draw,
             verts = draw(arrays(float if dtype is Decimal else dtype,
                                 (num_verts, max((dim, 1))),
                                 elements=elements)
-                                .filter(lambda verts: np.linalg.matrix_rank(verts[0] - verts[1:], tol=ATOL) == dim
-                                        if dim != 0
-                                        else True))
+                                .filter(lambda verts: np.linalg.matrix_rank(verts[0] - verts[1:], tol=ATOL) == dim if dim != 0 else True))
             if not is_full_dim:
                 M = draw(arrays(float if dtype is Decimal else dtype,
                                 (n, max((dim, 1))),
                                 elements=elements)
-                                .filter(lambda M: np.linalg.matrix_rank(M, tol=ATOL) == dim
-                                        if dim != 0
-                                        else True))
+                                .filter(lambda M: np.linalg.matrix_rank(M, tol=ATOL) == dim if dim != 0 else True))
                 verts = verts @ M.T
             if not is_bounded:
                 num_rays = draw(integers(1, dim))
@@ -264,13 +266,18 @@ def polytopes(draw,
     return poly
 
 
-@st.composite
-def poly_rand_pair(draw, repr: Literal['vrepr', 'hrepr', 'both'], n: int | tuple[int, int], same_n: bool = True, same_repr: bool = True) -> tuple[Polytope, Polytope]:
+@composite
+def poly_rand_pair(draw,
+                   repr: Literal['vrepr', 'hrepr', 'both'],
+                   n: int | tuple[int, int],
+                   same_n: bool = True,
+                   same_repr: bool = True,
+                   ) -> tuple[Polytope, Polytope]:
     if isinstance(n, tuple):
         if not same_n:
-            n_1, n_2 = draw(st.integers(n[0], n[1])), draw(st.integers(n[0], n[1]))
+            n_1, n_2 = draw(integers(n[0], n[1])), draw(integers(n[0], n[1]))
         else:
-            n = draw(st.integers(n[0], n[1]))
+            n = draw(integers(n[0], n[1]))
             n_1, n_2 = n, n
     poly_1 = draw(poly_rand(repr=repr, n=n_1))
     poly_2 = draw(poly_rand(repr=repr, n=n_2))

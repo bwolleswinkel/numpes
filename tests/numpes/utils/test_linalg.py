@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-
 class TestMinimizeVrepr:
     """Tests for the `pes.utils.minimize_vrepr` function"""
 
@@ -258,7 +257,7 @@ def angle_deg(request):
         
 
 class TestIsSquare:
-    """Test class for the `pes.utils.is_square` function"""
+    """Tests for the `pes.utils.is_square` function"""
 
     @pytest.mark.parametrize('A', [
             np.array([[1]]),
@@ -328,15 +327,15 @@ class TestIsSquare:
 
 
 class TestIsSym:
-    """Test class for the `pes.utils.is_sym` function"""
+    """Tests for the `pes.utils.is_sym` function"""
 
 
 class TestIsPosdef:
-    """Test class for the `pes.utils.is_posdef` function"""
+    """Tests for the `pes.utils.is_posdef` function"""
 
 
 class TestIsRotMat:
-    """Test class for the `pes.utils.is_rot_mat` function"""
+    """Tests for the `pes.utils.is_rot_mat` function"""
 
     @pytest.mark.parametrize('R', [
         np.empty((0, 0)),
@@ -463,7 +462,7 @@ class TestIsRotMat:
 
 
 class TestRotMat:
-    """Test class for the `pes.utils.rot_mat` function"""
+    """Tests for the `pes.utils.rot_mat` function"""
 
     def test_parametrize_2d(self, angle_deg: float) -> None:
         """Test the `rot_mat` function with a 2D rotation matrix from a given angle in degrees"""
@@ -634,7 +633,7 @@ class TestRotMat3D:
 
 
 class TestGivensMat:
-    """Test class for the `pes.utils.givens_mat` function"""
+    """Tests for the `pes.utils.givens_mat` function"""
 
     @pytest.mark.parametrize('i, j, angle_deg, n, expected', [
         (0, 1, 60, 2, np.array([[np.cos(np.pi / 3), -np.sin(np.pi / 3)],
@@ -948,7 +947,7 @@ class TestAngles3DConvert:
 
 
 class TestMinimizeHrepr:
-    """Test class for the `pes.utils.minimize_hrepr` function"""
+    """Tests for the `pes.utils.minimize_hrepr` function"""
 
     @pytest.mark.parametrize('Ab, expected_Ab', [
         (np.array([[-1,  0, 0],
@@ -1228,7 +1227,7 @@ class TestMinimizeHrepr:
         
 
 class TestReduceEq:
-    """Test class for the `pes.utils.reduce_eq` function"""
+    """Tests for the `pes.utils.reduce_eq` function"""
 
     @pytest.mark.parametrize('Ab_eq, expected_Ab_eq', [
         (np.array([[1, 1, 1],
@@ -1249,7 +1248,7 @@ class TestReduceEq:
         
 
 class TestReduceIneq:
-    """Test class for the `pes.utils.reduce_ineq` function"""
+    """Tests for the `pes.utils.reduce_ineq` function"""
 
     @pytest.mark.parametrize('Ab, expected_Ab', [
         (np.array([[-1,  0, 0],
@@ -1336,7 +1335,7 @@ class TestReduceIneq:
 
 
 class TestFindImplicit:
-    """Test class for the `pes.utils.find_implicit` function"""
+    """Tests for the `pes.utils.find_implicit` function"""
 
     @pytest.mark.parametrize('Ab, Ab_eq', [
         (np.array([[1, 0, 0],
@@ -1383,7 +1382,6 @@ class TestFindImplicit:
     def test_unsatisfiable(self) -> None:
         """Test the case where the input has unsatisfiable constraints, which should result in an empty polytope"""
         ...
-
 
 
 class TestIdxPlaneIJ:

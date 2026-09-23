@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 
+# TODO: Add 'is_pointed' and 'dim'
 @dataclass(frozen=True, slots=True)
 class PolytopeData:
     name: str
@@ -54,7 +55,7 @@ UNIT_LINE_SEGMENT_1D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=1
+    vol=1,
 )
 
 # NOTE: This is a translation of the unit line segment by one unit
@@ -80,7 +81,7 @@ OFFSET_LINE_SEGMENT_1D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=1
+    vol=1,
 )
 
 # NOTE: This is a scaled version of the unit line segment, scaled by a factor of 2
@@ -106,7 +107,7 @@ SCALED_LINE_SEGMENT_1D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=2
+    vol=2,
 )
 
 # NOTE: Degenerate, unbounded
@@ -129,7 +130,7 @@ LINE_SEGMENT_UNBOUNDED_1D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=np.inf
+    vol=np.inf,
 )
 
 # NOTE: Degenerate, unbounded
@@ -153,7 +154,7 @@ LINE_UNBOUNDED_1D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=np.inf
+    vol=np.inf,
 )
 
 # NOTE: Degenerate, single point
@@ -176,7 +177,7 @@ SINGLE_POINT_1D = PolytopeData(
     is_singleton=True,
     is_empty=False,
     is_minimal=True,
-    vol=0
+    vol=0,
 )
 
 # NOTE: Degenerate, single point
@@ -199,7 +200,7 @@ OFFSET_SINGLE_POINT_1D = PolytopeData(
     is_singleton=True,
     is_empty=False,
     is_minimal=True,
-    vol=0
+    vol=0,
 )
 
 # NOTE: Degenerate, empty
@@ -222,7 +223,7 @@ EMPTY_1D = PolytopeData(
     is_singleton=False,
     is_empty=True,
     is_minimal=True,
-    vol=0
+    vol=0,
 )
 
 # =============
@@ -257,7 +258,7 @@ UNIT_SQUARE_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=1
+    vol=1,
 )
 
 CENTERED_SQUARE_2D = PolytopeData(
@@ -288,7 +289,7 @@ CENTERED_SQUARE_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=4
+    vol=4,
 )
 
 SLIM_BEAM_2D = PolytopeData(
@@ -319,7 +320,7 @@ SLIM_BEAM_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=4
+    vol=4,
 )
 
 TRIANGLE_2D = PolytopeData(
@@ -347,7 +348,7 @@ TRIANGLE_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=0.5
+    vol=0.5,
 )
 
 HOUSE_2D = PolytopeData(
@@ -381,14 +382,14 @@ HOUSE_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=1.25
+    vol=1.25,
 )
 
 # =============
 # 3D ARCHETYPES
 # =============
 
-UNIT_CUBE_2D = PolytopeData(
+UNIT_CUBE_3D = PolytopeData(
     name="unit_cube_3d",
     n=3,
     verts=np.array([[0, 0, 0],
@@ -424,7 +425,53 @@ UNIT_CUBE_2D = PolytopeData(
     is_singleton=False,
     is_empty=False,
     is_minimal=True,
-    vol=1
+    vol=1,
+)
+
+HOUSE_3D = PolytopeData(
+    name="house_3d",
+    n=3,
+    verts=np.array([[  0,   0,   0],
+                    [  1,   0,   0],
+                    [  0,   1,   0],
+                    [  1,   1,   0],
+                    [  0,   0,   1],
+                    [  1,   0,   1],
+                    [  0,   1,   1],
+                    [  1,   1,   1],
+                    [0.5, 0.5, 1.5]]),
+    rays=np.empty((0, 3)),
+    A=np.array([[ 1,  0,  0],
+                [ 0,  1,  0],
+                [-1,  0,  0],
+                [ 0, -1,  0],
+                [ 0,  0, -1],
+                [-1,  0,  1],
+                [ 0, -1,  1],
+                [ 1,  0,  1],
+                [ 0,  1,  1]]),
+    b=np.array([1,
+                1,
+                0,
+                0,
+                0,
+                1,
+                1,
+                2,
+                2]),
+    A_eq=np.empty((0, 3)),
+    b_eq=np.empty((0,)),
+    k=9,
+    k_rays=0,
+    m=9,
+    m_eq=0,
+    is_degen=False,
+    is_bounded=True,
+    is_full_dim=True,
+    is_singleton=False,
+    is_empty=False,
+    is_minimal=True,
+    vol=7/6,
 )
 
 _POLYTOPES_ALL: list[PolytopeData] = [v for v in globals().values() if isinstance(v, PolytopeData)]

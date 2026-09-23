@@ -65,7 +65,9 @@ def pytest_generate_tests(metafunc: Metafunc) -> None:
                 pass
 
 
-def poly_init_safe(poly_data: PolytopeData, repr: Literal['vrepr', 'hrepr', 'both']) -> Polytope:
+def poly_init_safe(poly_data: PolytopeData,
+                   repr: Literal['vrepr', 'hrepr', 'both'],
+                   ) -> Polytope:
     import numpes as pes  # Imported lazily so pytest-cov starts measuring before numpes is first imported
     try:
         match repr:
@@ -85,10 +87,22 @@ def poly_init_safe(poly_data: PolytopeData, repr: Literal['vrepr', 'hrepr', 'bot
 
 
 @pytest.fixture
-def poly_gen_factory() -> Callable[[Literal['unit_hypercube', 'centered_hypercube', 'simplex', 'cross_polytope'], int, Literal['vrepr', 'hrepr', 'both']], tuple[Polytope, PolytopeData]]:
+def poly_gen_factory() -> Callable[[Literal['unit_hypercube',
+                                            'centered_hypercube',
+                                            'simplex',
+                                            'cross_polytope'],
+                                            int,
+                                            Literal['vrepr', 'hrepr', 'both']],
+                                            tuple[Polytope, PolytopeData]]:
     """Factory fixture for generating polytopes dynamically"""
     
-    def _make_polytope(generator_name: Literal['unit_hypercube', 'centered_hypercube', 'simplex', 'cross_polytope'], n: int, repr: Literal['vrepr', 'hrepr', 'both'] = 'both') -> tuple[Polytope, PolytopeData]:
+    def _make_polytope(generator_name: Literal['unit_hypercube',
+                                               'centered_hypercube',
+                                               'simplex',
+                                               'cross_polytope'],
+                                               n: int,
+                                               repr: Literal['vrepr', 'hrepr', 'both'] = 'both',
+                                               ) -> tuple[Polytope, PolytopeData]:
         generators = {
             'simplex': simplex,
             'unit_hypercube': unit_hypercube,

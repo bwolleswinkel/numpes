@@ -247,8 +247,11 @@ def conv(verts: NDArray) -> NDArray:
         proj_rank = np.linalg.matrix_rank(coords_proj, tol=CFG.atol)
         n_unique_points = len(np.unique(coords_proj, axis=0))
         if proj_rank == rank and n_unique_points > rank and coords_proj.shape[0] > rank:
-            # Projected coordinates are well-conditioned for ConvexHull
-            hull = sp.spatial.ConvexHull(coords_proj)  # pylint: disable=no-member
+            # FROM: GitHub Copilot GPT-5.6 Luna (use 'Qs Q12' for projected hulls) | 2026/10/23[untested/unverified]
+            # Scale and search all points to avoid fragile high-dimensional simplices.
+            coordinate_range = np.ptp(coords_proj, axis=0)
+            coords_scaled = (coords_proj - np.min(coords_proj, axis=0)) / coordinate_range
+            hull = sp.spatial.ConvexHull(coords_scaled, qhull_options='Qs Q12')  # pylint: disable=no-member
             return verts[hull.vertices]
         # Projected coordinates are still degenerate - use extremes fallback
         extremes = []
@@ -261,7 +264,10 @@ def conv(verts: NDArray) -> NDArray:
         # For 1D case, find min and max points
         idx_min, idx_max = np.argmin(verts_clean[:, 0]), np.argmax(verts_clean[:, 0])
         return verts[np.unique([idx_min, idx_max])]
-    hull = sp.spatial.ConvexHull(verts_clean)  # pylint: disable=no-member
+    # FROM: GitHub Copilot GPT-5.6 Luna | 2026/10/23[untested/unverified]
+    coordinate_range = np.ptp(verts_clean, axis=0)
+    verts_scaled = (verts_clean - np.min(verts_clean, axis=0)) / coordinate_range
+    hull = sp.spatial.ConvexHull(verts_scaled, qhull_options='Q12')  # pylint: disable=no-member
     return verts[hull.vertices]
 
 

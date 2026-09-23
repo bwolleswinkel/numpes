@@ -38,6 +38,7 @@ expected_display_attr = {
 
 expected_attr = expected_algo_attr | expected_display_attr
 
+
 class TestConfigSchema:
     """Test for the `numpes._config.ConfigSchema` dataclass"""
 

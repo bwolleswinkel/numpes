@@ -16,6 +16,7 @@ class TestPolyRand:
 
     @given(poly_rand(repr='vrepr', n=3))
     def test_random_vrepr_3d(self, poly: Polytope):
+        """Test basic properties for a random polytope in V-representation"""
         assert isinstance(poly, Polytope), \
             f"Expected a Polytope instance, got {type(poly)}"
         assert isinstance(poly._vrepr, tuple), \
@@ -27,6 +28,7 @@ class TestPolyRand:
 
     @given(poly_rand(repr='hrepr', n=3))
     def test_random_hrepr_3d(self, poly: Polytope):
+        """Test basic properties for a random polytope in H-representation"""
         assert isinstance(poly, Polytope), \
             f"Expected a Polytope instance, got {type(poly)}"
         assert poly._vrepr is None, \
@@ -42,6 +44,7 @@ class TestPolyRand:
     )
     @given(poly_rand(repr='both', n=3))
     def test_random_both_3d(self, poly: Polytope):
+        """Test basic properties for a random polytope in both representations"""
         assert isinstance(poly, Polytope), \
             f"Expected a Polytope instance, got {type(poly)}"
         assert isinstance(poly._vrepr, tuple), \
@@ -62,6 +65,7 @@ class TestPolyRand:
             f"Expected dimension n in range [1, 10], got n={poly.n}"
 
     def test_3d_invalid_repr_value_error(self):
+        """Test whether an invalid representation specification raises an ValueError"""
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=NonInteractiveExampleWarning)
             with pytest.raises(ValueError, match="Unknown representation type"):
@@ -76,6 +80,7 @@ class TestPolyRandPair:
 
     @given(poly_rand_pair(repr='vrepr', n=(1, 10), same_n=True))
     def test_random_vrepr_same_n_range(self, polys):
+        """Test whether generated polytope pairs are in the expected range when `same_n=True`"""
         poly_1, poly_2 = polys
         assert poly_1.n == poly_2.n, \
             f"Expected both polytopes to have the same dimension, got n_1={poly_1.n} and n_2={poly_2.n}"
@@ -84,6 +89,7 @@ class TestPolyRandPair:
 
     @given(poly_rand_pair(repr='hrepr', n=(1, 10), same_n=False))
     def test_random_hrepr_same_n_false_range(self, polys):
+        """Test whether generated polytope pairs are in the expected range when `same_n=False`"""
         poly_1, poly_2 = polys
         assert 1 <= poly_1.n <= 10, \
             f"Expected dimension n in range [1, 10], got n={poly_1.n}"
