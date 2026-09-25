@@ -85,6 +85,13 @@ deps = [
 ]
 commands = [
   [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
+  [
     "pytest",
     "-p",
     "tests.conftest",
@@ -104,6 +111,13 @@ deps = [
   "hypothesis",
 ]
 commands = [
+  [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
   [
     "pytest",
     "-p",
@@ -125,6 +139,13 @@ deps = [
 ]
 commands = [
   [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
+  [
     "pytest",
     "-p",
     "tests.conftest",
@@ -144,6 +165,13 @@ deps = [
   "hypothesis",
 ]
 commands = [
+  [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
   [
     "pytest",
     "-p",
@@ -165,6 +193,20 @@ deps = [
 ]
 set_env = { PYTEST_ADDOPTS = "--benchmark-only --benchmark-time-unit=ms --benchmark-min-rounds=10 --benchmark-columns=min,max,stddev,median,rounds --benchmark-save-data --benchmark-storage=file://.benchmarks --benchmark-json=.benchmarks/latest.json --override-ini=python_files=time_*.py --override-ini=python_classes=Time* --override-ini=python_functions=time_*" }
 commands = [
+  [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
+  [
+    "python",
+    "-m",
+    "pip",
+    "list",
+    "--format=columns",
+  ],
   [
     "pytest",
     "--noconftest",

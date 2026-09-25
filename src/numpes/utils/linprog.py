@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -148,7 +147,7 @@ def _solve_lp_pulp(
     bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
     x_0: Optional[NDArray] = None,
 ) -> OptimizationProgramResult:
-    """Solve a linear program using PULP"""
+    """Solve a linear program using PuLP"""
 
     if not PULP_INSTALLED:
         raise ImportError("The package 'pulp' is not installed. Please install it to use the PuLP backend.")
@@ -165,10 +164,7 @@ def _solve_lp_pulp(
         upper = bounds_pulp[i][1]
         lb = lower if lower is not None and np.isfinite(lower) else None
         ub = upper if upper is not None and np.isfinite(upper) else None
-        # FIXME[BUG]: A depreciation warning is shown, but errors occur when following the `prob.add_variable` method
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning, module="pulp")
-            x_i = pulp.LpVariable(name=f"x_{i}", lowBound=lb, upBound=ub)
+        x_i = prob.add_variable(f"x_{i}", lowBound=lb, upBound=ub)
         x.append(x_i)
     objective = pulp.lpSum([c[i] * x[i] for i in range(n)])
     prob += objective
@@ -176,12 +172,12 @@ def _solve_lp_pulp(
     if A is not None and b is not None:
         for i in range(A.shape[0]):
             cons = pulp.lpSum([A[i, j] * x[j] for j in range(n)])
-            prob += cons <= b[i]
+            prob += cons <= float(b[i])
 
     if A_eq is not None and b_eq is not None:
         for i in range(A_eq.shape[0]):
             cons = pulp.lpSum([A_eq[i, j] * x[j] for j in range(n)])
-            prob += cons == b_eq[i]
+            prob += cons == float(b_eq[i])
 
     if x_0 is not None:
         if x_0.shape[0] != n:
@@ -189,22 +185,19 @@ def _solve_lp_pulp(
         for i, x_i in enumerate(x):
             x_i.setInitialValue(float(x_0[i]))
 
-    # FIXME[BUG]: A depreciation warning is shown, but it persists when following the advised `pulp[cbc]` solutions
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=DeprecationWarning, module="pulp")
-        solver = pulp.PULP_CBC_CMD(msg=0, warmStart=x_0 is not None)
-    prob.solve(solver)
-    success = prob.status in {pulp.LpStatusOptimal, pulp.LpStatusUnbounded}
+    solver = pulp.getSolver("HiGHS", msg=False, warmStart=x_0 is not None)
+    solve_stats = prob.solve(solver)
+    success = solve_stats.status in {pulp.LpSolveStatus.Optimal, pulp.LpSolveStatus.Unbounded}
     status = {
-        pulp.LpStatusOptimal: Status.OPTIMAL,
-        pulp.LpStatusUnbounded: Status.UNBOUNDED,
-        pulp.LpStatusInfeasible: Status.INFEASIBLE,
-        pulp.LpStatusNotSolved: Status.UNKNOWN,
-    }.get(prob.status, Status.UNKNOWN)
+        pulp.LpSolveStatus.Optimal: Status.OPTIMAL,
+        pulp.LpSolveStatus.Unbounded: Status.UNBOUNDED,
+        pulp.LpSolveStatus.Infeasible: Status.INFEASIBLE,
+        pulp.LpSolveStatus.NotSolved: Status.UNKNOWN,
+    }.get(solve_stats.status, Status.UNKNOWN)
 
     return OptimizationProgramResult(
         success=success,
-        value=prob.objective.value() if status == Status.OPTIMAL else None,
+        value=solve_stats.objective if status == Status.OPTIMAL else None,
         x_star=np.array([var.varValue for var in x]) if status == Status.OPTIMAL else None,
         status=status,
     )
