@@ -779,12 +779,22 @@ class Polytope:
         return self.copy(deepcopy=True, memo=memo)
 
     def __matmul__(self, M: NDArray) -> Self:
-        """Invoked when right-hand matrix multiplication is performed (i.e., `self @ M`)"""
+        """Matrix multiplication with a matrix `M`. See method `Polytope.mat_mul()` for further documentation."""
+        if not isinstance(M, np.ndarray):
+            raise TypeError(f"Matrix multiplication is only defined with a NumPy array, but received object of type '{type(M).__name__}'")
         raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
 
     def __rmatmul__(self, M: NDArray) -> Self:
-        """Invoked when left-hand matrix multiplication is performed (i.e., `M @ self`)"""
+        """Matrix multiplication with a matrix `M`. See method `Polytope.mat_mul()` for further documentation."""
         return self.mat_mul(M, in_place=False)
+
+    def __add__(self, other: Polytope | ArrayLike) -> Self:
+        """Compute the Minkoswski sum between two polytopes, or between a subspace/affine subset. See method `Polytope.mink_sum()` for further documentation."""
+        if not isinstance(other, Polytope):
+            other = np.atleast_1d(other)
+            raise NotImplementedError("Translation with a vector is not yet implemented.")
+        else:
+            return self.mink_sum(other, in_place=False)
 
     def __str__(self) -> str:
         """Description of the polytope in either V-represenation or H-representation"""
@@ -1073,7 +1083,7 @@ class Polytope:
         if obj._vol is not None:
             obj._vol = obj._vol * np.linalg.det(M) if not M_is_sing else (0 if is_square(M) else None)
         if obj._diam is not None:
-            obj._dim = None  # FIXME: Maybe we can do better for `not is_square`?
+            obj._diam = None  # FIXME: Maybe we can do better for `not is_square`?
         if obj._width is not None:
             obj._width = None if not M_is_sing else 0
         if obj._chebcr is not None:
@@ -1094,6 +1104,57 @@ class Polytope:
                 obj._vrepr = (conv(obj.verts), obj.rays)
         if which_repr in {'hrepr', 'both'}:
             obj._hrepr = minimize_hrepr(obj.Ab, obj.Ab_eq)
+        return obj
+
+    # [untested/unverified]
+    def mink_sum(self,
+                 other: Polytope,  # TODO: Add `Subspace | AffineSubset`
+                 in_place: bool = True,
+                 ) -> Self:
+        """Compute the Minkoswski sum between two polytopes, or between a subspace/affine subset.
+        
+        Parameters
+        ----------
+        other : Polytope, Subspace, or AffineSubset
+            Object to perform the Minkowski addition with. Note that if `other` is a non-trivial subspace of affine subset, the result will be guarenteed to be unbounded.
+        in_place : bool, default=True
+            If True, the polytope is modified in place
+
+        Returns
+        -------
+        poly : Polytope
+            The polytope resulting from the Minkowski addition
+
+        Raises
+        ------
+        TypeError
+            If `other` is not a polytope, subspace, or affine subset
+        DimensionError
+            If `other` has a different ambient dimension `n`
+        """
+        if not isinstance(other, Polytope):
+            raise TypeError(f"Object `other` must be a polytope, subspace, or affine subset, received '{type(other).__name__}'")
+        if self.n != other.n:
+            raise DimensionError(f"Both polytopes must have the same ambient dimension, received self.n={self.n}, other.n={other.n}")
+
+        verts_sum = (self.verts[:, np.newaxis, :] + other.verts[np.newaxis, : , :]).reshape(-1, self.n)
+        rays_union = np.vstack((self.rays, other.rays))
+
+        obj = self if in_place else self.copy()
+        obj.vrepr = (verts_sum, rays_union)
+        obj._hrepr = None
+
+        if obj._dim is not None:
+            obj._dim is None
+        if obj._vol is not None:
+            obj._vol = None  # TODO: Change this for Subspace/Subset
+        if obj._diam is not None:
+            obj._dim = None
+        if obj._width is not None:
+            obj._width = None
+        if obj._chebcr is not None:
+            obj._chebcr = None
+
         return obj
 
     # pylint: disable=too-many-branches,too-many-statements
