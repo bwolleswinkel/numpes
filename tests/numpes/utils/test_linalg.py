@@ -13,7 +13,7 @@ from tests.conftest import ATOL, N_MAX
 from tests.helpers import approx, lsort, normalize, rad2deg, deg2rad, wrap_angle
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
+    from numpy.typing import NDArray, ArrayLike
 
 
 class TestMinimizeVrepr:
@@ -1382,6 +1382,108 @@ class TestFindImplicit:
     def test_unsatisfiable(self) -> None:
         """Test the case where the input has unsatisfiable constraints, which should result in an empty polytope"""
         ...
+
+
+class TestSpan:
+    """Tests for the `pes.utils.span` function"""
+
+    @pytest.mark.parametrize('A', [
+        [[1, 0, 0],
+         [0, 1, 0]],
+        [[  1,  2  , 3,   4],
+         [0.1, -0.5, 0,   0],
+         [  1, -1  , 2,   0],
+         [  0,  1  , 0, 6.7]],
+    ])
+    def test_parameterize_linearly_independent(self, A: ArrayLike) -> None:
+        """Test whether linearly independent rows are left as-is"""
+        A_res = pes.utils.span(A := np.array(A))
+        assert A_res == approx(A), \
+            f"Expected A=\n{A}\nto return A, but got A_res=\n{A_res}"
+
+    @pytest.mark.parametrize('A, A_expected', [
+        ([[1, 0, 0],
+          [0, 1, 0],
+          [1, 0, 0]],
+         [[1, 0, 0],
+          [0, 1, 0]]),
+        ([[1, 0, 0],
+          [0, 1, 0],
+          [2, 0, 0],
+          [0, 0, 2],
+          [1, 0, 0]],
+         [[1, 0, 0],
+          [0, 1, 0],
+          [0, 0, 2]]),
+    ])
+    def test_parameterize_linearly_dependent(self, A: NDArray, A_expected: NDArray) -> None:
+        """Test whether liniearly dependent rows are removed and returned in the same order"""
+        A_res = pes.utils.span(A := np.array(A))
+        assert A_res == approx(A_expected := np.array(A_expected)), \
+            f"Expected A=\n{A}\nto return A_expected=\n{A_expected},\nbut got A_res=\n{A_res}"
+
+    @pytest.mark.parametrize('a', [
+        [1, 0, 0],
+        [1, 2 * ATOL, -1],
+        [10, -10, 100],
+    ])
+    def test_parameterize_single_rows(self, a: ArrayLike) -> None:
+        """Test whether providing a single row returns that same row"""
+        A_res = pes.utils.span(A := np.atleast_2d(a))
+        assert A_res == approx(A), \
+            f"Expected A=\n{A}\nto return the same row, but got A_res=\n{A_res}"
+
+    @pytest.mark.parametrize('A, A_expected', [
+        ([[1, 0, 0],
+          [0, 1, 0],
+          [0, 0, 0],
+          [1, 0, 0]],
+         [[1, 0, 0],
+          [0, 1, 0]]),
+        ([[0,        0, 0],
+          [0, ATOL / 2, 0],
+          [0,        0, 1]],
+          [[0, 0, 1]]),
+    ])
+    def test_parameterize_zero_rows(self, A: ArrayLike, A_expected: ArrayLike) -> None:
+        """Test whether providing an array where some rows are (almost) zero are correctly removed"""
+
+    @pytest.mark.parametrize('m, n', [
+        (2, 3),
+        (1, 1),
+        (10, 2),
+        (6, 10),
+    ])
+    def test_parameterize_all_zeros(self, m: int, n: int) -> None:
+        """Test whether providing an array with all zeros returns an emtpy array"""
+        A = np.zeros((m, n))
+        A_res = pes.utils.span(A)
+        assert A_res.size == 0, \
+            f"Expected A=\n{A}\nto return an empty array, but reveived A_res=\n{A_res}"
+        assert A.ndim == 2 and A_res.shape[1] == n, \
+            f"Expected A=\n{A}\nto return an empty array of shape (0, n={n}), but reveived array of shape {A_res.shape}"
+
+    @pytest.mark.parametrize('n', [
+        1,
+        2,
+        3,
+        10,
+        100,
+    ])
+    def test_parameterize_empty_array(self, n: int) -> None:
+        """Test whether providing an empty array returns an empty array"""
+        A = np.empty((0, n))
+        A_res = pes.utils.span(A)
+        assert A_res.size == 0, \
+            f"Expected A=\n{A}\nto return an empty array, but reveived A_res=\n{A_res}"
+        assert A.ndim == 2 and A_res.shape[1] == n, \
+            f"Expected A=\n{A}\nto return an empty array of shape (0, n={n}), but reveived array of shape {A_res.shape}"
+
+    def test_random_same_dtype(self) -> None:
+        """Test whether the datatype is preserved when selecting independent rows"""
+
+    def test_random_satisfies_rank_inequality(self) -> None:
+        """Test whether random matrices of size (m, n) satiefy the rank inequality #of l.i. row <= min(m, n)"""
 
 
 class TestIdxPlaneIJ:

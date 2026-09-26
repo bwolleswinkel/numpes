@@ -285,7 +285,7 @@ class Subspace:
                 ) -> Self:
         """Compute a minimal representation of the subspace by removing linearly dependent basis vectors"""
         obj = self if in_place else self.copy()
-        obj._basis = span(self._basis.T).T
+        obj._basis = span(self._basis)
         return obj
 
     def plot(self,

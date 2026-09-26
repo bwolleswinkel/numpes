@@ -13,7 +13,7 @@ reduce_ineq
 find_implicit
     Find implicit equalities using slack analysis from a single LP solve
 span
-    Remove linearly dependent columns from a matrix
+    Remove linearly dependent rows from a matrix
 """
 
 from __future__ import annotations
@@ -590,25 +590,24 @@ def find_implicit(Ab: NDArray, Ab_eq: NDArray) -> tuple[NDArray, NDArray]:
 
 # [untested/unverified]
 def span(A: NDArray) -> NDArray:
-    """Remove linearly dependent columns from a matrix. The columns are preserved in a left-to-right order."""
+    """Remove linearly dependent rows from a matrix. The rows are preserved in a top-to-bottom order."""
     # FIXME: Should we just make this row-major ordering instead? to fix the "transpose-hell"?
     if A.ndim != 2:
         raise ValueError(f"Parameter 'A' must be a matrix of size `(m, n)`, but recieved {A.shape}")
     if np.isnan(A).any() or not np.isfinite(A).all():
         raise ValueError("Array 'A' must not contain NaN or inf values")
 
-    if np.all(np.abs(A) <= CFG.atol):
-        return np.empty((A.shape[0], 0))
+    if np.allclose(A, 0, atol=CFG.atol):
+        return np.empty((0, A.shape[1]))
     if A.shape[0] <= 1:
         return A
 
-    # FIXME: For some reason, left-to-right ordering is NOT preserved; the returned columns are always in order,
-    # but if columns i and i + delta are lin dependent, sometimes the i + delta column is returned instead of
-    # the 'first' encountered i column, which is a bit arbitrary. Off course this is not a huge problem, but might
-    # be nice to look into if we can actually preserve this ordering.
-    _, R, P = sp.linalg.qr(A, pivoting=True)
-    rank = np.sum(np.abs(np.diag(R)) > CFG.atol)
-    return A[:, sorted(P[:rank])]
+    R, *_ = sp.linalg.qr(A.T, mode='r')  # BUG: Documentation suggest that this should return an NDArray, returns a tuple instead
+    mask = np.abs(R) > CFG.atol
+    has_pivot = np.any(mask, axis=1)
+    pivot_cols = np.argmax(mask[has_pivot], axis=1)
+
+    return A[pivot_cols]
 
 
 # FROM: Gemini 1.5 Flash | 26/09/02[untested/unverified]
