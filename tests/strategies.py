@@ -72,10 +72,14 @@ def polytopes(draw,
               which_repr: Optional[Literal['vrepr', 'hrepr', 'both']] = None,
               dtype: type[Number] | type[Decimal] = Decimal,
               *,
+              k: Optional[int] = None,
+              k_rays: Optional[int] = None,
+              m: Optional[int] = None,
+              m_eq: Optional[int] = None,
+              dim: Optional[int] = None,
               is_bounded: bool = True,
               is_full_dim: bool = True,
               is_minimal: bool = True,
-              dim: Optional[int] = None,
               ) -> Polytope:
     """Strategy for generating random polytopes. Polytopes can be specified for any dimensions `n >= 1`, and in either V-representation, H-representation, or both.
     
@@ -87,14 +91,22 @@ def polytopes(draw,
         Which representation to use for defining the polytope. If `None`, either 'vrepr' or 'hrepr' will be chosen. When 'both' is selected, a V-representation is constructed first from which a (minimal) H-representation is computed. Note that for the latter, the package pycddlib must be installed.
     dtype : int, float, or Microdecimal, default=Microdecimal
         Which numerical representation to use in the arrays. Default is Microdecimal, meaning fixed step sizes of 1E-6 are taken.
+    k : int, optional
+        Number of vertices to generate. If `None`, the number of vertices is chosen randomly based on `n` and `dim`.
+    k_rays : int, optional
+        Number of rays to generate. If `None`, the number of rays is chosen randomly based on `n` and `dim`.
+    m : int, optional
+        Number of linear inequalities to generate. If `None`, the number of inequalities is chosen randomly based on `n` and `dim`.
+    m_eq : int, optional
+        Number of equalities to generate. If `None`, the number of equalities is chosen randomly based on `n` and `dim`.
+    dim : int, optional
+        The specific dimension of the polytope to generate (see Warnings). If `None`, the full dimension `n` or a random lower dimension `n'` in [1, ..., n - 1] is chosen, for `is_full_dim=True` and `is_full_dim=False`, respectively.
     is_bounded : bool, default=True
         Whether to only generate bounded polytopes (see Warnings)
     is_full_dim : bool, default=True
         Whether to only generate full dimensional polytopes (see Warnings)
     is_minimal : bool, default=True
         Whether to minimize the representation or not
-    dim : int or None, default=None
-        The specific dimension of the polytope to generate (see Warnings). If None, the full dimension `n` or a random lower dimension `n'` in [1, ..., n - 1] is chosen, for `is_full_dim=True` and `is_full_dim=False`, respectively.
 
     Raises
     ------
@@ -137,6 +149,7 @@ def polytopes(draw,
     One extremely important caveat, however, is that `hypothesis.extra.numpy.arrays` does not sample points uniformly from this domain. As such, one might encounter far more violations of the assumption in practice then one would expect by uniform-like sampling.
     """
     # FIXME: Make it such that doctest actually doesn't test the above code.
+    # TODO: Add errors, such as k < n + 1 but is_bounded is True, or when m < n ** 2 (due to box) and bounded is True
     if n is not None:
          if not isinstance(n, int):
              n = draw(sampled_from(n))
@@ -160,7 +173,9 @@ def polytopes(draw,
     MAX_VAL = 100
     match which_repr:
         case 'vrepr' | 'both':
-            num_verts = (dim + draw(integers(1, dim ** 2))
+            num_verts = (k
+                         if k is not None
+                         else dim + draw(integers(1, dim ** 2))
                          if dim != 0
                          else 1)
             bound = (MAX_VAL
@@ -185,7 +200,9 @@ def polytopes(draw,
                                 .filter(lambda M: np.linalg.matrix_rank(M, tol=ATOL) == dim if dim != 0 else True))
                 verts = verts @ M.T
             if not is_bounded:
-                num_rays = draw(integers(1, dim))
+                num_rays = (k_rays
+                            if k_rays is not None
+                            else draw(integers(1, dim)))
                 if not is_full_dim:
                     rays = M[:, draw(lists(integers(0, dim - 1),
                                            min_size=num_rays,
@@ -211,14 +228,16 @@ def polytopes(draw,
             repr_dtype = int if issubclass(dtype, int) else float
             elements = (integers(int(-MAX_VAL * Decimal.RES),
                                  int(MAX_VAL * Decimal.RES)).map(lambda value: value / Decimal.RES)
-                                 if dtype is Decimal
-                                 else floats(-MAX_VAL, MAX_VAL)
-                                 if issubclass(dtype, float)
-                                 else integers(-MAX_VAL, MAX_VAL))
+                        if dtype is Decimal
+                        else floats(-MAX_VAL, MAX_VAL)
+                        if issubclass(dtype, float)
+                        else integers(-MAX_VAL, MAX_VAL))
             if dim == 0:
                 Ab = np.empty((0, n + 1))
             else:
-                num_planes = draw(integers(n, n ** 3))
+                num_planes = (m
+                              if m is not None
+                              else draw(integers(n, n ** 3)))
                 Ab_box = np.block([[ np.eye(n, dtype=repr_dtype), np.full(n, MAX_VAL, dtype=repr_dtype)[:, np.newaxis]],
                                    [-np.eye(n, dtype=repr_dtype), np.full(n, MAX_VAL, dtype=repr_dtype)[:, np.newaxis]]])
                 coordinate, sign = 0, 0
@@ -239,16 +258,20 @@ def polytopes(draw,
                                               else True))
                 b_extra = draw(arrays(repr_dtype,
                                       num_planes,
-                                      elements=(integers(1, MAX_VAL)
+                                      elements=(integers(int(np.sqrt(MAX_VAL)), MAX_VAL)
                                                 if dtype is int
-                                                else floats(0.1, 0.9))))
+                                                else floats(np.sqrt(MAX_VAL), MAX_VAL))))
                 Ab = np.vstack((Ab_box, np.column_stack((A_extra, b_extra))))
             if not is_full_dim:
                 if dim == 0:
                     A_eq = np.eye(n, dtype=repr_dtype)
                     b_eq = draw(arrays(repr_dtype, n, elements=elements))
                 else:
-                    num_eq_columns = n - 1 if not is_bounded else n
+                    num_eq_columns = (m_eq
+                                      if m_eq is not None
+                                      else n - 1
+                                      if not is_bounded
+                                      else n)
                     A_eq = draw(arrays(repr_dtype,
                                        (n - dim, num_eq_columns),
                                        elements=elements)
