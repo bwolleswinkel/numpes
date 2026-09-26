@@ -25,6 +25,7 @@ import numpy as np
 import scipy as sp
 
 from numpes._config import CFG
+from numpes.utils.spatial import minimize_hrepr_cdd
 from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
@@ -460,29 +461,39 @@ def reduce_verts(verts: NDArray, rays: NDArray) -> NDArray:
 
 
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/19[untested/unverified]
-def minimize_hrepr(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
+def minimize_hrepr(Ab: NDArray,
+                   Ab_eq: Optional[NDArray] = None,
+                   method: Literal['lp_backend', 'cdd'] = 'lp_backend',
+                   ) -> tuple[NDArray, NDArray]:
     """Minimize an H-representation by removing redundant inequalities
     and finding implicit equalities"""
     if Ab_eq is None:
         Ab_eq = np.empty((0, Ab.shape[1]))
-    # Step 1: Find implicit equalities in the inequalities, move them to the equality matrix,
-    # and remove redundant equalities; repeat until no more implicit equalities are found
-    while True:
-        # Remove redundant/duplicate/trivial ([0, 0, ..., 0]) equalities
-        Ab_eq = reduce_eq(Ab_eq)
-        n = Ab_eq.shape[1] - 1
 
-        Ab, Ab_eq_new = find_implicit(Ab, Ab_eq)  # pylint: disable=invalid-name
-        # Check if find_implicit returned the infeasible marker
-        if Ab.shape[0] == 1 and Ab_eq_new.size == 0 and np.array_equal(Ab[0], [0] * n + [-1]):
-            return Ab, Ab_eq_new
+    match method:
+        case 'cdd':
+            Ab, Ab_eq = minimize_hrepr_cdd(Ab, Ab_eq)
+        case 'lp_backend':
+            # Step 1: Find implicit equalities in the inequalities, move them to the equality matrix,
+            # and remove redundant equalities; repeat until no more implicit equalities are found
+            while True:
+                # Remove redundant/duplicate/trivial ([0, 0, ..., 0]) equalities
+                Ab_eq = reduce_eq(Ab_eq)
+                n = Ab_eq.shape[1] - 1
 
-        if Ab_eq_new.size == 0:
-            break
-        Ab_eq = np.vstack([Ab_eq, Ab_eq_new]) if Ab_eq.size > 0 else Ab_eq_new
+                Ab, Ab_eq_new = find_implicit(Ab, Ab_eq)  # pylint: disable=invalid-name
+                # Check if find_implicit returned the infeasible marker
+                if Ab.shape[0] == 1 and Ab_eq_new.size == 0 and np.array_equal(Ab[0], [0] * n + [-1]):
+                    return Ab, Ab_eq_new
 
-    # Step 2: Global redundancy check for inequalities
-    Ab = reduce_ineq(Ab, Ab_eq)
+                if Ab_eq_new.size == 0:
+                    break
+                Ab_eq = np.vstack([Ab_eq, Ab_eq_new]) if Ab_eq.size > 0 else Ab_eq_new
+
+            # Step 2: Global redundancy check for inequalities
+            Ab = reduce_ineq(Ab, Ab_eq)
+        case _:
+            raise ValueError(f"Unknown minimize H-representation method '{method}'")
 
     return Ab, Ab_eq
 

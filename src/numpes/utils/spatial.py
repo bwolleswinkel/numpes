@@ -33,6 +33,130 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
+# FROM: Google Gemini 3.1 Pro | 2026/10/26[untested/unverified]
+def minimize_hrepr_cdd(Ab: NDArray,
+                       Ab_eq: Optional[NDArray] = None,
+                       ) -> tuple[NDArray, NDArray]:
+    """Minimize an H-representation by removing redundant inequalities
+    and finding implicit equalities"""
+    if not CDD_INSTALLED:
+        raise ImportError("The package 'pycddlib' is not installed. Please install it to enable minimizing an H-representation (or use a different method).")
+
+    # NOTE: This was added such that integer dtype are kep as integer dtypes
+    input_dtypes = [Ab.dtype]
+    if Ab_eq is not None and Ab_eq.size > 0:
+        input_dtypes.append(Ab_eq.dtype)
+    integer_dtype = np.result_type(*input_dtypes) if all(
+        np.issubdtype(dtype, np.integer) for dtype in input_dtypes
+    ) else None
+
+    def preserve_integer_dtype(Ab_out: NDArray, Ab_eq_out: NDArray) -> tuple[NDArray, NDArray]:
+        if integer_dtype is None:
+            return Ab_out, Ab_eq_out
+
+        limits = np.iinfo(integer_dtype)
+        for result in (Ab_out, Ab_eq_out):
+            if (not np.isfinite(result).all()
+                    or not np.equal(result, np.trunc(result)).all()
+                    or (result.size > 0 and (result.min() < limits.min or result.max() > limits.max))):
+                return Ab_out, Ab_eq_out
+
+        return Ab_out.astype(integer_dtype), Ab_eq_out.astype(integer_dtype)
+
+    if Ab.shape[0] == 0 and (Ab_eq is None or Ab_eq.shape[0] == 0):
+        return preserve_integer_dtype(np.empty((0, Ab.shape[1])), np.empty((0, Ab.shape[1])))
+
+    n = Ab.shape[1] - 1
+    if Ab.shape[0] > 0:
+        zero_ineq = np.all(np.isclose(Ab[:, :-1], 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+        if np.any(zero_ineq & (Ab[:, -1] <= -CFG.atol)):
+            return preserve_integer_dtype(np.array([[0] * n + [-1]]), np.empty((0, n + 1)))
+    if Ab_eq is not None and Ab_eq.shape[0] > 0:
+        zero_eq = np.all(np.isclose(Ab_eq[:, :-1], 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+        if np.any(zero_eq & ~np.isclose(Ab_eq[:, -1], 0, rtol=CFG.rtol, atol=CFG.atol)):
+            return preserve_integer_dtype(np.array([[0] * n + [-1]]), np.empty((0, n + 1)))
+        Ab_eq = Ab_eq[~zero_eq]
+
+    if Ab.shape[0] > 0:
+        zero_ineq = np.all(np.isclose(Ab[:, :-1], 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+        Ab = Ab[~(zero_ineq & (Ab[:, -1] >= -CFG.atol))]
+
+    if Ab.shape[0] == 0 and (Ab_eq is None or Ab_eq.shape[0] == 0):
+        return preserve_integer_dtype(np.empty((0, n + 1)), np.empty((0, n + 1)))
+
+    # 1. Convert standard [A, b] to pycddlib format [b, -A] (representing b - Ax >= 0)
+    def to_cdd_format(mat: NDArray) -> NDArray:
+        if mat is None or mat.size == 0:
+            return np.empty((0, Ab.shape[1]))
+        return np.column_stack((mat[:, -1], -mat[:, :-1]))
+
+    # 2. Convert pycddlib format [b, -A] back to [A, b]
+    def from_cdd_format(mat: NDArray) -> NDArray:
+        if mat is None or mat.size == 0:
+            return np.empty((0, Ab.shape[1]))
+        return np.column_stack((-mat[:, 1:], mat[:, 0]))
+
+    # NOTE: This was added to pass a numerical tolerance check in equality matrices; I don't know if it's really needed/preferable though
+    if Ab.shape[0] > 1:
+        row_scales = np.max(np.abs(Ab), axis=1)
+        normalized_Ab = np.divide(
+            Ab,
+            row_scales[:, np.newaxis],
+            out=np.zeros_like(Ab, dtype=float),
+            where=row_scales[:, np.newaxis] != 0,
+        )
+        unique_indices = []
+        for idx, row in enumerate(normalized_Ab):
+            if not any(np.all(np.isclose(
+                    row,
+                    normalized_Ab[other],
+                    rtol=CFG.rtol,
+                    atol=CFG.atol,
+            )) for other in unique_indices):
+                unique_indices.append(idx)
+        Ab = Ab[unique_indices]
+
+    cdd_ineq = to_cdd_format(Ab)
+    
+    # 3. Stack equalities (if any) and inequalities, tracking equality indices
+    if Ab_eq is not None and len(Ab_eq) > 0:
+        cdd_eq = to_cdd_format(Ab_eq)
+        data = np.vstack([cdd_eq, cdd_ineq])
+        lin_set = frozenset(range(len(cdd_eq)))
+    else:
+        data = cdd_ineq
+        lin_set = frozenset()
+
+    # 4. Initialize cdd Matrix
+    mat = cdd.matrix_from_array(
+        data.astype(float).tolist(), rep_type=cdd.RepType.INEQUALITY
+    )
+    mat.lin_set = lin_set
+
+    # 5. Canonicalize: removes redundant rows and moves implicit equalities into lin_set
+    cdd.matrix_canonicalize(mat)
+
+    # 6. Extract the reduced system
+    minimized_data = np.array(mat.array)
+    
+    # mat.lin_set contains the updated indices of all explicit and implicit equalities
+    eq_indices = list(mat.lin_set)
+    
+    eq_mask = np.zeros(len(minimized_data), dtype=bool)
+    eq_mask[eq_indices] = True
+
+    # 7. Separate and convert back to original format
+    cdd_out_eq = minimized_data[eq_mask]
+    cdd_out_ineq = minimized_data[~eq_mask]
+
+    Ab_out = from_cdd_format(cdd_out_ineq)
+    Ab_eq_out = from_cdd_format(cdd_out_eq)
+    if Ab_eq_out.shape[0] > 0 and np.linalg.matrix_rank(Ab_eq_out) > np.linalg.matrix_rank(Ab_eq_out[:, :-1]):
+        return preserve_integer_dtype(np.array([[0] * n + [-1]]), np.empty((0, n + 1)))
+
+    return preserve_integer_dtype(Ab_out, Ab_eq_out)
+
+
 # FROM: GitHub Copilot Claude Sonnet 4.5 | 2026/02/08[unverified]
 def enum_gens(Ab: NDArray, Ab_eq: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
     """Enumerate the vertices and rays of a polytope defined by its facets using the double description method.
