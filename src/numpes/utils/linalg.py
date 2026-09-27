@@ -24,8 +24,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 import scipy as sp
 
+try:
+    import cdd
+    CDD_INSTALLED: bool = True
+except ImportError:
+    CDD_INSTALLED = False
+
 from numpes._config import CFG
-from numpes.utils.spatial import minimize_hrepr_cdd
+from numpes.utils.spatial import minimize_hrepr_cdd, conv
 from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
@@ -346,8 +352,11 @@ def angles_3d_convert(angles: list[float],
 
 
 # FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
-def minimize_vrepr(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray, NDArray]:
+def minimize_vrepr(verts: NDArray,
+                   rays: Optional[NDArray] = None,
+                   ) -> tuple[NDArray, NDArray]:
     """Minimize the V-representation by removing redundant rays and vertices"""
+    # TODO: Also implement the `cdd` variant with `canonicalize()``
 
     def spans_ambient_space(rays: NDArray) -> bool:
         """Check whether the rays span the ambient space"""
@@ -381,6 +390,8 @@ def minimize_vrepr(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDAr
         rays = rays[~zero_indices, :]
         if np.count_nonzero(zero_indices) > 0:
             verts = np.vstack((verts, np.zeros(n)))
+    else:  # Only vertices; just take the convex hull
+        return conv(verts), rays
     # 1: Find redundant rays
     rays = reduce_rays(rays)
     # 1-A: Check of the rays span the entire space
@@ -463,14 +474,21 @@ def reduce_verts(verts: NDArray, rays: NDArray) -> NDArray:
 # FROM: GitHub Copilot Claude Sonnet 4 | 2026/04/19[untested/unverified]
 def minimize_hrepr(Ab: NDArray,
                    Ab_eq: Optional[NDArray] = None,
-                   method: Literal['lp_backend', 'cdd'] = 'lp_backend',
+                   backend: Optional[Literal['lp_backend', 'cdd']] = None,
                    ) -> tuple[NDArray, NDArray]:
     """Minimize an H-representation by removing redundant inequalities
     and finding implicit equalities"""
+
+    if backend is None:
+        if CFG.minimize_backend == 'auto':
+            backend = 'cdd' if CDD_INSTALLED else 'lp_backend'
+        else:
+            backend = CFG.lp_backend
+    
     if Ab_eq is None:
         Ab_eq = np.empty((0, Ab.shape[1]))
 
-    match method:
+    match backend:
         case 'cdd':
             Ab, Ab_eq = minimize_hrepr_cdd(Ab, Ab_eq)
         case 'lp_backend':
@@ -493,7 +511,7 @@ def minimize_hrepr(Ab: NDArray,
             # Step 2: Global redundancy check for inequalities
             Ab = reduce_ineq(Ab, Ab_eq)
         case _:
-            raise ValueError(f"Unknown minimize H-representation method '{method}'")
+            raise ValueError(f"Unknown minimize H-representation backend '{backend}'")
 
     return Ab, Ab_eq
 

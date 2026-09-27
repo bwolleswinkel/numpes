@@ -1098,10 +1098,7 @@ class Polytope:
         """Return a minimal representation of the polytope by removing redundant vertices and facets"""
         obj = self if in_place else self.copy()
         if which_repr in {'vrepr', 'both'}:
-            if obj.rays.size > 0:
-                obj._vrepr = minimize_vrepr(obj.verts, obj.rays)
-            else:
-                obj._vrepr = (conv(obj.verts), obj.rays)
+            obj._vrepr = minimize_vrepr(obj.verts, obj.rays)
         if which_repr in {'hrepr', 'both'}:
             obj._hrepr = minimize_hrepr(obj.Ab, obj.Ab_eq)
         return obj
@@ -1137,6 +1134,7 @@ class Polytope:
         if self.n != other.n:
             raise DimensionError(f"Both polytopes must have the same ambient dimension, received self.n={self.n}, other.n={other.n}")
 
+        # TODO: Add the specialized method in 2d `mink_sum_2d` by sorting vertices, in `spatial.py`
         verts_sum = (self.verts[:, np.newaxis, :] + other.verts[np.newaxis, : , :]).reshape(-1, self.n)
         rays_union = np.vstack((self.rays, other.rays))
 

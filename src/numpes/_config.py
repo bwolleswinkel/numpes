@@ -29,7 +29,8 @@ class _ConfigSchema:
     on_property_assign: Literal['pass', 'minimal'] = 'minimal'
     on_hash_degen: Literal['error', 'unsafe'] = 'error'
 
-    lp_backend: Literal['auto', 'scipy', 'cvxpy', 'pulp'] = 'auto'  # NOTE: 'auto' will try CVXPY is installed, otherwise will fall back to SciPy
+    lp_backend: Literal['auto', 'scipy', 'cvxpy', 'pulp'] = 'auto'  # NOTE: 'auto' will try CVXPY if installed, otherwise will fall back to SciPy
+    minimize_backend: Literal['lp_backend', 'cdd', 'auto'] = 'auto'  # NOTE: 'auto' will try cdd if installed, otherwise fall back to linear programs
     sdp_backend: Literal['cvxpy'] = 'cvxpy'
     scipy_method: Literal['highs', 'highs-ds', 'highs-ipm'] | str = 'highs'
     cvxpy_solver: Any | None = cvx.HIGHS if CVXPY_INSTALLED else None
@@ -120,6 +121,7 @@ def set_algo_options(*,
                      on_property_assign: Optional[Literal['pass', 'minimal']] = None,
                      on_hash_degen: Optional[Literal['error', 'unsafe']] = None,
                      lp_backend: Optional[Literal['auto', 'scipy', 'cvxpy', 'pulp']] = None,
+                     minimize_backend: Optional[Literal['auto', 'lp_backend', 'cdd']] = None,
                      sdp_backend: Optional[Literal['cvxpy']] = None,
                      scipy_method: Optional[Literal['highs', 'highs-ds', 'highs-ipm'] | str] = None,
                      cvxpy_solver: Optional[Any] = None,
@@ -142,6 +144,8 @@ def set_algo_options(*,
         Behavior when hashing degenerate objects
     lp_backend : {'auto', 'scipy', 'cvxpy', 'pulp'}, default='auto'
         Linear programming backend
+    minimize_backend : {'auto', 'lp_backend', 'cdd'}, default='auto'
+        Backend to use for minimizing polytope representations
     sdp_backend: {'cvxpy'}, default='cvxpy'
         Semi-definite programming backend
     scipy_method : {'highs', 'highs-ds', 'highs-ipm'} or str, default='highs'
@@ -185,6 +189,7 @@ def algo_options(*,
                  on_property_assign: Optional[Literal['pass', 'minimal']] = None,
                  on_hash_degen: Optional[Literal['error', 'unsafe']] = None,
                  lp_backend: Optional[Literal['auto', 'scipy', 'cvxpy', 'pulp']] = None,
+                 minimize_backend: Optional[Literal['auto', 'lp_backend', 'cdd']] = None,
                  sdp_backend: Optional[Literal['cvxpy']] = None,
                  scipy_method: Optional[Literal['highs', 'highs-ds', 'highs-ipm'] | str] = None,
                  cvxpy_solver: Optional[Any] = None,
@@ -322,6 +327,7 @@ def get_config(key: Literal['atol',
                             'on_property_assign',
                             'on_hash_degen',
                             'lp_backend',
+                            'minimize_backend',
                             'sdp_backend',
                             'scipy_method',
                             'cvxpy_solver',
@@ -341,6 +347,7 @@ def get_config(key: Literal['atol',
     - on_property_assign -> `str`
     - on_hash_degen -> `str`
     - lp_backend -> `str`
+    - minimize_backend -> `str`
     - sdp_backend -> `str`
     - scipy_method -> `str`
     - cvxpy_solver -> `None | cvxpy.Solver`
@@ -389,6 +396,7 @@ def _invalid_display_keys(extra_kwargs: dict[str, Any], prefix: str = '') -> Non
         'on_property_assign',
         'on_hash_degen',
         'lp_backend',
+        'minimize_backend',
         'sdp_backend',
         'scipy_method',
         'cvxpy_solver',

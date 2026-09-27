@@ -23,7 +23,7 @@ except ImportError:
     PULP_INSTALLED = False
 
 if TYPE_CHECKING:
-    from typing import Optional, Sequence
+    from typing import Optional, Sequence, Literal
 
     from numpy.typing import NDArray
 
@@ -210,6 +210,7 @@ def solve_lp(c: NDArray,
              b_eq: Optional[NDArray] = None,
              bounds: Optional[Sequence[tuple[float | None, float | None]]] = None,
              x_0: Optional[NDArray] = None,
+             backend: Optional[Literal['scipy', 'cvxpy']] = None,
              ) -> OptimizationProgramResult:
     """Solve a linear program in the form `min c.T @ x` subject to `A @ x <= b`, `A_eq @ x = b_eq`,
     and `bounds` on `x`"""
@@ -268,10 +269,12 @@ def solve_lp(c: NDArray,
             x_star=np.empty(0) if feasible else None,
         )
 
-    if CFG.lp_backend == 'auto':
-        backend = 'cvxpy' if CVXPY_INSTALLED else 'scipy'
-    else:
-        backend = CFG.lp_backend
+    if backend is None:
+        if CFG.lp_backend == 'auto':
+            backend = 'cvxpy' if CVXPY_INSTALLED else 'scipy'
+        else:
+            backend = CFG.lp_backend
+
     match backend:
         case 'scipy':
             res = _solve_lp_scipy(c, A, b, A_eq, b_eq, bounds, x_0)
