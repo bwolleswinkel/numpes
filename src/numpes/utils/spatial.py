@@ -297,15 +297,13 @@ def enum_facets(verts: NDArray, rays: Optional[NDArray] = None) -> tuple[NDArray
         generators = np.vstack((verts, rays)) if verts.size > 0 else rays
         ray_flags = np.concatenate((np.ones(verts.shape[0]),
                                     np.zeros(rays.shape[0]))) if verts.size > 0 else np.zeros(rays.shape[0])
-        mat = cdd.matrix_from_array(
-            np.column_stack((ray_flags, generators)).astype(float).tolist(),
-            rep_type=cdd.RepType.GENERATOR,
-        )
     else:
-        mat = cdd.matrix_from_array(
-            np.column_stack((np.ones(verts.shape[0]), verts)).astype(float).tolist(),
-            rep_type=cdd.RepType.GENERATOR,
-        )
+        ray_flags = None
+    mat = cdd.matrix_from_array(np.column_stack((np.ones(verts.shape[0]), verts)
+                                                if ray_flags is None
+                                                else (ray_flags, generators))
+                                                .astype(float).tolist(),
+                                rep_type=cdd.RepType.GENERATOR)
 
     # Get inequalities from cdd
     ineq = cdd.copy_inequalities(cdd.polyhedron_from_matrix(mat))
