@@ -98,19 +98,19 @@ class Polytope:
         InvalidCombinationOfArgumentsError
             If no positional or keywords arguments are provided
         """
-        self._vrepr: tuple[NDArray, NDArray] | None
-        self._hrepr: tuple[NDArray, NDArray] | None
-        self._is_empty: bool | None
-        self._is_degen: bool | None
-        self._is_bounded: bool | None
-        self._is_full_dim: bool | None
-        self._is_pointed: bool | None
-        self._is_singleton: bool | None
-        self._dim: int | None
-        self._vol: float | None
-        self._diam: float | None
-        self._width: float | None  # FIXME: We should create a method `width`, and call this`min_width`
-        self._chebcr: tuple[NDArray, float] | None
+        self._vrepr: tuple[NDArray, NDArray] | None = None
+        self._hrepr: tuple[NDArray, NDArray] | None = None
+        self._is_empty: bool | None = None
+        self._is_degen: bool | None = None
+        self._is_bounded: bool | None = None
+        self._is_full_dim: bool | None = None
+        self._is_pointed: bool | None = None
+        self._is_singleton: bool | None = None
+        self._dim: int | None = None
+        self._vol: float | None = None
+        self._diam: float | None = None
+        self._width: float | None = None  # FIXME: We should create a method `width`, and call this`min_width`
+        self._chebcr: tuple[NDArray, float] | None = None
 
         # NOTE: This is the fallback method if no dispatchers match, and should raise an error
         kwargs = {key: value for key, value in {
@@ -710,7 +710,7 @@ class Polytope:
             -I[ub_only | is_unbounded],
         )) if (lb_only | ub_only | is_unbounded).any() else np.empty((0, n))
 
-        polytope = cls()
+        polytope = cls()  # FIXME: This empty constructor needs to be investigated
         polytope._vrepr = (verts, rays)
         polytope._hrepr = (Ab, Ab_eq)
         polytope._is_empty = False
@@ -779,7 +779,6 @@ class Polytope:
         return self.copy(deepcopy=True, memo=memo)
 
     def __matmul__(self, M: NDArray) -> Self:
-        """Matrix multiplication with a matrix `M`. See method `Polytope.mat_mul()` for further documentation."""
         if not isinstance(M, np.ndarray):
             raise TypeError(f"Matrix multiplication is only defined with a NumPy array, but received object of type '{type(M).__name__}'")
         raise InvalidOperationError("Right-hand matrix multiplication is not defined for polytopes. Only left-hand matrix multiplication is allowed by reversing the order of operands (i.e., use 'M @ poly' instead of 'poly @ M').")
@@ -790,6 +789,14 @@ class Polytope:
 
     def __add__(self, other: Polytope | ArrayLike) -> Self:
         """Compute the Minkoswski sum between two polytopes, or between a subspace/affine subset. See method `Polytope.mink_sum()` for further documentation."""
+        if not isinstance(other, Polytope):
+            other = np.atleast_1d(other)
+            raise NotImplementedError("Translation with a vector is not yet implemented.")
+        else:
+            return self.mink_sum(other, in_place=False)
+
+    def __iadd__(self, other: Polytope | ArrayLike) -> Self:
+        """Compute the Minkoswski sum between another polytope, or between a subspace/affine subset, performing the operation in place. See method `Polytope.mink_sum()` for further documentation."""
         if not isinstance(other, Polytope):
             other = np.atleast_1d(other)
             raise NotImplementedError("Translation with a vector is not yet implemented.")
@@ -881,7 +888,8 @@ class Polytope:
             if to_dtype is None:
                 A, b, A_eq, b_eq = self.A, self.b, self.A_eq, self.b_eq
             elif to_dtype in {'int', 'float'}:
-                A, b, A_eq, b_eq = (self.A.astype(dtype := int if to_dtype == 'int' else float),
+                dtype = int if to_dtype == 'int' else float
+                A, b, A_eq, b_eq = (self.A.astype(dtype),
                                     self.b.astype(dtype),
                                     self.A_eq.astype(dtype),
                                     self.b_eq.astype(dtype))
