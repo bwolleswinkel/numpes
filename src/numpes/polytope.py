@@ -1142,13 +1142,26 @@ class Polytope:
         if self.n != other.n:
             raise DimensionError(f"Both polytopes must have the same ambient dimension, received self.n={self.n}, other.n={other.n}")
 
+        obj = self if in_place else self.copy()
+        if self.is_empty or other.is_empty:
+            obj._init_empty(n=self.n)
+            return obj
+
         # TODO: Add the specialized method in 2d `mink_sum_2d` by sorting vertices, in `spatial.py`
         verts_sum = (self.verts[:, np.newaxis, :] + other.verts[np.newaxis, : , :]).reshape(-1, self.n)
         rays_union = np.vstack((self.rays, other.rays))
-
-        obj = self if in_place else self.copy()
-        obj.vrepr = (verts_sum, rays_union)
+        obj.vrepr = (verts_sum, rays_union)  # NOTE: By default, this minimizes the representation
         obj._hrepr = None
+
+        obj._is_empty = False
+        obj._is_degen = None
+        obj._is_bounded = rays_union.size > 0
+        if self._is_full_dim is not None or other._is_full_dim is not None:
+            obj._is_full_dim = True if (self.is_full_dim or other.is_full_dim) else None
+        if self._is_pointed is not None and other._is_pointed is not None:
+            obj._is_pointed = True if (self.is_pointed and other.is_pointed) else None
+        if self._is_singleton is not None and other._is_singleton is not None:
+            obj._is_singleton = True if (self.is_singleton and other.is_singleton) else False
 
         if obj._dim is not None:
             obj._dim is None

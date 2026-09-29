@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from hypothesis import given, assume
 from hypothesis.extra.numpy import arrays
-from hypothesis.strategies import integers, tuples, sampled_from
+from hypothesis.strategies import integers, tuples, sampled_from, floats
 
 import numpes as pes
 
@@ -28,37 +28,146 @@ if TYPE_CHECKING:
 class TestPolytopeMinkSum:
     """Tests for the Minkowski sum operation on polytopes"""
 
-    @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented")
+    @pytest.mark.coupled('Polytope.is_empty')
+    @given(
+        poly=integers(1, N_MAX).flatmap(lambda n: poly_rand('vrepr', n))
+    )
+    def test_random_sum_with_empty_poly(self, poly: Polytope) -> None:
+        """Test whether the sum with an empty polytope result in an empty polytope"""
+        poly_empty = pes.poly_empty(poly.n)
+        poly_res = poly + poly_empty
+        assert poly_res.is_empty, \
+            f"Expected Minkowski sum of random polytope poly=\n{poly:r} with empty polytope poly_empty={poly_empty:r} to result in an empty polytope, but received poly_res={poly_res:r}"
+
+    @given(
+        args=integers(1, N_MAX).flatmap(lambda n: tuples(poly_rand('vrepr', n),
+                                                         arrays(int, n, elements=integers(-100, 100))))
+    )
+    def test_random_singleton(self, args: tuple[Polytope, NDArray]) -> None:
+        """Tests whether the sum with a singleton polytope simply moves all vertices"""
+        poly, point = args
+        poly_singleton = pes.poly_from_point(point)
+        poly_res = poly + poly_singleton
+        assert lsort(poly_res.verts) == approx(lsort(poly.verts + point)), \
+            f"Expected sum of polytope poly=\n{poly:r}\nwith vertices poly.verts=\n{poly.verts}\nand singleton point=\n{point}\nto result in a new polytope poly_res=\n{poly_res:r}\nwith shifted vertices\n{poly.verts + point},\nbut received poly_res.verts=\n{poly_res.verts}"
+
+    def test_random_singleton_equivalent_translation(self) -> None:
+        """Tests whether the sum with a singleton polytope is equivalent to translating the polytope"""
+
+    def test_random_sum_tow_singletons_remains_singleton(self) -> None:
+        """Tests whether the sum of two singletons results in a singleton"""
+
+    @pytest.mark.skip("I need to update the `polytopes` strategy as now it generates empty polytopes 'Empty polytope in R^4; [0 0 0 0] x <= [-1]'")
+    @requires(
+        'cdd',
+        ImportError,
+        "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+    )
+    @given(
+        poly_pair=integers(1, N_MAX).flatmap(lambda n: tuples(poly_rand('both', n, exclude_degen=True), poly_rand('both', n, exclude_degen=True)))
+    )
+    def test_random_resulting_attr_none(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+        """Tests that after summing two polytopes the resulting sum has its H-representation and resulting attributes set to None"""
+        poly_1, poly_2 = poly_pair
+        poly_res = poly_1 + poly_2
+        assert poly_res._hrepr is None, \
+            f"Expected H-representation to be set to None after sum, but received poly_res._hrepr={poly_res._hrepr}"
+        assert not poly_res._is_empty, \
+            f"Expected sum not to be an empty polytope, but received poly_res._is_empty={poly_res._is_empty}"
+        assert poly_res._is_degen is None, \
+            f"Expected degeneracy to be set to None after sum, but received poly_res._is_degen={poly_res._is_degen}"
+        assert poly_res._is_bounded is None, \
+            f"Expected boundedness to be set to None after sum, but received poly_res._is_bounded={poly_res._is_bounded}"
+        assert poly_res._is_full_dim is None, \
+            f"Expected full-dimensionality to be set to None after sum, but received poly_res._is_full_dim={poly_res._is_full_dim}"
+        assert poly_res._is_pointed is None, \
+            f"Expected pointedness to be set to None after sum, but received poly_res._is_pointed={poly_res._is_pointed}"
+        assert poly_res._is_singleton is None, \
+            f"Expected singleton to be set to None after sum, but received poly_res._is_singleton={poly_res._is_singleton}"
+        assert poly_res._dim is None, \
+            f"Expected dimension to be set to None after sum, but received poly_res._dim={poly_res._dim}"
+        assert poly_res._vol is None, \
+            f"Expected volume of poly_1 to be None, but received poly._vol={poly_res._vol}"
+        assert poly_res._diam is None, \
+            f"Expected diameter of poly_1 to be None, but received poly._diam={poly_res._diam}"
+        assert poly_res._width is None, \
+            f"Expected width of poly_1 to be None, but received poly._width={poly_res._width}"
+        assert poly_res._chebcr is None, \
+            f"Expected Chebyshev center of poly_1 to be None, but received poly._chebcr={poly_res._chebcr}"
+
+    @pytest.mark.parametrize('other', [
+        5,
+        [1, 2],
+        's',
+        np.array([[1,  2],
+                  [0, -1]]),
+        ...,
+        None,
+    ])
+    def test_parameterize_invalid_wrong_object_raises_type_error(self, other: Any) -> None:
+        """Test whether the Minkowski sum with an invalid type results in a type error"""
+        poly = pes.poly([[0, 0],
+                         [1, 0],
+                         [0, 1]])
+        with pytest.raises(TypeError, match=re.escape(
+            f"Object `other` must be a polytope, subspace, or affine subset, received '{type(other).__name__}'"
+            )):
+            _ = poly.mink_sum(other)
+
+    @given(
+        poly_pair=poly_rand_pair('vrepr', (1, N_MAX), same_n=False)
+    )
+    def test_archetype_invalid_incompatible_dimension_raises_dimension_error(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+        """Test whether the Minkowski sum between archetypes of invalid dimensions raises a DimensionError"""
+        poly_1, poly_2 = poly_pair
+        with pytest.raises(pes.DimensionError, match=re.escape(
+            f"Both polytopes must have the same ambient dimension, received self.n={poly_1.n}, other.n={poly_2.n}"
+            )):
+            _ = poly_1.mink_sum(poly_2)
+
     @pytest.mark.parametrize('poly_1_name, poly_2_name, expected_verts', [
         ('poly_arch_unit_square_2d', 'poly_arch_unit_square_2d',
-        np.array([[0, 0],
-                  [2, 0],
-                  [2, 2],
-                  [0, 2]])),
+         np.array([[0, 0],
+                   [2, 0],
+                   [2, 2],
+                   [0, 2]])),
         ('poly_arch_unit_square_2d', 'poly_arch_centered_square_2d',
-        np.array([[-1, -1],
-                  [ 2, -1],
-                  [ 2,  2],
-                  [-1,  2]])),
+         np.array([[-1, -1],
+                   [ 2, -1],
+                   [ 2,  2],
+                   [-1,  2]])),
         ('poly_arch_unit_square_2d', 'poly_arch_triangle_2d',
-        np.array([[0, 0],
-                  [2, 0],
-                  [0, 2],
-                  [1, 2],
-                  [2, 1]]))
+         np.array([[0, 0],
+                   [2, 0],
+                   [0, 2],
+                   [1, 2],
+                   [2, 1]])),
+        ('poly_arch_triangle_2d', 'poly_arch_unit_square_2d',
+         np.array([[0, 0],
+                   [0, 2],
+                   [1, 2],
+                   [2, 1],
+                   [2, 0]])),
+        ('poly_arch_triangle_2d', 'poly_arch_line_segment_2d',
+         np.array([[0, 0],
+                   [0, 1],
+                   [1, 1],
+                   [2, 0]])),
     ])
     def test_archetypes_2d_nondegen(self, poly_1_name: str, poly_2_name: str, expected_verts: NDArray, request: pytest.FixtureRequest) -> None:
         """Test Minkowski sum on several combinations of non-degenerate 2D archetypes"""
         poly_1, poly_2 = request.getfixturevalue(poly_1_name), request.getfixturevalue(poly_2_name)
-        assert lsort(poly_1.mink_sum(poly_2).verts) == lsort(expected_verts), \
-            f"Minkowski sum of {poly_1_name} and {poly_2_name} should have vertices {expected_verts}, but got {poly_1.mink_sum(poly_2).verts} instead"
+        poly_res = poly_1 + poly_2
+        assert lsort(poly_res.verts) == approx(lsort(expected_verts)), \
+            f"Minkowski sum of {poly_1_name} and {poly_2_name} should have vertices expected_verts=\n{expected_verts},\nbut got poly_res.verts=\n{poly_res.verts}\ninstead"
 
-
+    @pytest.mark.coupled('Polytope.__eq__')
     @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and equality `==` is also not implemented")
     @given(poly_pair=integers(
         min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
-    def test_commutative(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+    def test_random_commutative(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+        """Test whether the Minkowski sum between two polytopes is commutative, meaning reversing the operands should not change the results"""
         poly_1, poly_2 = poly_pair
         poly_sum_1 = poly_1.mink_sum(poly_2)
         poly_sum_2 = poly_2.mink_sum(poly_1)
@@ -69,7 +178,8 @@ class TestPolytopeMinkSum:
     @given(poly_pair=integers(
         min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
-    def test_volume_lesser_equal(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+    def test_random_volume_inequality_lesser_equal(self, poly_pair: tuple[Polytope, Polytope]) -> None:
+        """Test whether the Minkowski sum preserves an inequality regarding their volumes"""
         poly_1, poly_2 = poly_pair
         poly_sum = poly_1.mink_sum(poly_2)
         assert poly_sum.vol < poly_1.vol + poly_2.vol or poly_sum.vol == approx(poly_1.vol + poly_2.vol), \
@@ -85,6 +195,9 @@ class TestPolytopeMinkSum:
         poly_sum = poly_1.mink_sum(poly_2)
         assert poly_sum.vol ** (1 / poly_1.n) > poly_1.vol ** (1 / poly_1.n) + poly_2.vol ** (1 / poly_2.n) or poly_sum.vol ** (1 / poly_1.n) == approx(poly_1.vol ** (1 / poly_1.n) + poly_2.vol ** (1 / poly_2.n)), \
             f"Volume of Minkowski sum should be at most the sum of the volumes, but got {poly_sum.vol} > {poly_1.vol} + {poly_2.vol} for polytopes {poly_1} and {poly_2}"
+
+    def test_iadd_functionality(self) -> None:
+        """Test whether `poly_1 += poly_2` works as expected"""
 
 
 class TestPolytopeCopy:

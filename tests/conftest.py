@@ -70,18 +70,20 @@ def poly_init_safe(poly_data: PolytopeData,
                    ) -> Polytope:
     import numpes as pes  # Imported lazily so pytest-cov starts measuring before numpes is first imported
     try:
-        match repr:
-            case 'vrepr':
-                poly = pes.Polytope(poly_data.verts, rays=poly_data.rays)
-            case 'hrepr':
-                poly = pes.Polytope(poly_data.A, poly_data.b, A_eq=poly_data.A_eq, b_eq=poly_data.b_eq)
-            case 'both':
-                poly = pes.Polytope(n=poly_data.n)
-                poly._vrepr = (poly_data.verts, poly_data.rays)
-                poly._hrepr = (np.column_stack((poly_data.A, poly_data.b)), np.column_stack((poly_data.A_eq, poly_data.b_eq)))
-            case _:
-                raise ValueError(f"Unknown representation type '{repr}' specified (must be one of 'both', 'vrepr', or 'hrepr')")     
-        return poly
+        # FIXME: I don't know if this is the best way
+        with pes.algo_options(on_property_assign='pass'):
+            match repr:
+                case 'vrepr':
+                    poly = pes.Polytope(poly_data.verts, rays=poly_data.rays)
+                case 'hrepr':
+                    poly = pes.Polytope(poly_data.A, poly_data.b, A_eq=poly_data.A_eq, b_eq=poly_data.b_eq)
+                case 'both':
+                    # FIXME: Use empty constructor `Polytope()` here instead
+                    poly = pes.Polytope(poly_data.verts, rays=poly_data.rays)
+                    poly._hrepr = (np.column_stack((poly_data.A, poly_data.b)), np.column_stack((poly_data.A_eq, poly_data.b_eq)))
+                case _:
+                    raise ValueError(f"Unknown representation type '{repr}' specified (must be one of 'both', 'vrepr', or 'hrepr')")     
+            return poly
     except Exception as e:
         raise RuntimeError(f"Failed to construct polytope from polytope '{poly_data.name}'") from e
 

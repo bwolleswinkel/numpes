@@ -7,7 +7,7 @@ import numpy as np
 import numpes as pes
 from hypothesis import reject
 from hypothesis import strategies as st
-from hypothesis.strategies import integers, floats, lists, sampled_from, composite
+from hypothesis.strategies import integers, floats, lists, sampled_from, composite, tuples
 from hypothesis.extra.numpy import arrays
 from tests.conftest import RTOL, ATOL, N_MAX
 
@@ -296,12 +296,15 @@ def poly_rand_pair(draw,
                    same_n: bool = True,
                    same_repr: bool = True,
                    ) -> tuple[Polytope, Polytope]:
-    if isinstance(n, tuple):
-        if not same_n:
-            n_1, n_2 = draw(integers(n[0], n[1])), draw(integers(n[0], n[1]))
+    if not same_n:
+        if isinstance(n, tuple):
+            n_1, n_2 = draw(tuples(integers(*n), integers(*n)).filter(lambda arg: arg[0] != arg[1]))
         else:
+            raise ValueError(f"When same_n=False, a range for n must be provided, received n={n}")
+    else:
+        if isinstance(n, tuple):
             n = draw(integers(n[0], n[1]))
-            n_1, n_2 = n, n
+        n_1, n_2 = n, n
     poly_1 = draw(poly_rand(repr=repr, n=n_1))
     poly_2 = draw(poly_rand(repr=repr, n=n_2))
     return poly_1, poly_2
