@@ -801,7 +801,15 @@ class Polytope:
             other = np.atleast_1d(other)
             raise NotImplementedError("Translation with a vector is not yet implemented.")
         else:
-            return self.mink_sum(other, in_place=False)
+            return self.mink_sum(other, in_place=True)
+
+    def __sub__(self, other: Polytope) -> Self:
+        """Compute the Pontryagin difference between two polytopes. See method `Polytope.pont_diff()` for further documentation."""
+        return self.pont_diff(other, in_place=False)
+
+    def __isub__(self, other: Polytope) -> Self:
+        """Compute the Pontryagin difference between two polytopes, performing the operation in place. See method `Polytope.pont_diff()` for further documentation."""
+        return self.pont_diff(other, in_place=True)
 
     def __str__(self) -> str:
         """Description of the polytope in either V-represenation or H-representation"""
@@ -1111,7 +1119,6 @@ class Polytope:
             obj._hrepr = minimize_hrepr(obj.Ab, obj.Ab_eq)
         return obj
 
-    # [untested/unverified]
     def mink_sum(self,
                  other: Polytope,  # TODO: Add `Subspace | AffineSubset`
                  in_place: bool = True,
@@ -1155,7 +1162,7 @@ class Polytope:
 
         obj._is_empty = False
         obj._is_degen = None
-        obj._is_bounded = rays_union.size > 0
+        obj._is_bounded = rays_union.size == 0
         if self._is_full_dim is not None or other._is_full_dim is not None:
             obj._is_full_dim = True if (self.is_full_dim or other.is_full_dim) else None
         if self._is_pointed is not None and other._is_pointed is not None:
@@ -1173,6 +1180,72 @@ class Polytope:
             obj._width = None
         if obj._chebcr is not None:
             obj._chebcr = None
+
+        return obj
+
+    # [untested/unverified]
+    def pont_diff(self,
+                  other: Polytope,
+                  in_place: bool = True,
+                  ) -> Self:
+        """Compute the Pontryagin difference between two polytopes.
+        
+        Parameters
+        ----------
+        other : Polytope, Subspace, or AffineSubset
+            Object to perform the Pontryagin difference with
+        in_place : bool, default=True
+            If True, the polytope is modified in place
+
+        Returns
+        -------
+        poly : Polytope
+            The polytope resulting from the Pontryagin difference
+
+        Raises
+        ------
+        TypeError
+            If `other` is not a polytope
+        DimensionError
+            If `other` has a different ambient dimension `n`
+        """
+        if not isinstance(other, Polytope):
+            raise TypeError(f"Object `other` must be a polytope, received '{type(other).__name__}'")
+        if self.n != other.n:
+            raise DimensionError(f"Both polytopes must have the same ambient dimension, received self.n={self.n}, other.n={other.n}")
+
+        obj = self if in_place else self.copy()
+        rays_check = self.A @ other.rays.T
+        if np.any(rays_check > CFG.atol):
+            obj._init_empty(n=self.n)
+            return obj
+        if not np.allclose(self.A_eq @ other.verts.T, 0, atol=CFG.atol) or not np.allclose(self.A_eq @ other.rays.T, 0, atol=CFG.atol):
+            obj._init_empty(n=self.n)
+            return obj
+
+        # TODO: Add the specialized method in 2d `mink_sum_2d` by sorting vertices, in `spatial.py`
+        # TODO: Implement the other fallback methods for when both are in `hrepr` represnetation
+        deltas = np.zeros(self.m)
+        for idx, a in enumerate(self.A):
+            deltas[idx] = np.max(other.verts @ a)
+        obj._vrepr = None
+        obj.hrepr = (np.column_stack((obj.A, obj.b - deltas)), obj.Ab_eq)  # FIXME: Equality representations aren't correct
+
+        obj._is_empty = None
+        obj._is_degen = None
+        obj._is_bounded = None
+        if self._is_full_dim is not None or other._is_full_dim is not None:
+            obj._is_full_dim = True if (self.is_full_dim or other.is_full_dim) else None
+        if self._is_pointed is not None and other._is_pointed is not None:
+            obj._is_pointed = True if (self.is_pointed and other.is_pointed) else None
+        if self._is_singleton is not None and other._is_singleton is not None:
+            obj._is_singleton = True if (self.is_singleton and other.is_singleton) else False
+
+        obj._dim is None
+        obj._vol = None
+        obj._dim = None
+        obj._width = None
+        obj._chebcr = None
 
         return obj
 
