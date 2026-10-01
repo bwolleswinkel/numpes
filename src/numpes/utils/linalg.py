@@ -31,7 +31,7 @@ except ImportError:
     CDD_INSTALLED = False
 
 from numpes._config import CFG
-from numpes.utils.spatial import minimize_hrepr_cdd, conv
+from numpes.utils.spatial import minimize_hrepr_cdd, minimize_vrepr_cdd, conv
 from numpes.utils.linprog import Status, solve_lp
 
 if TYPE_CHECKING:
@@ -354,9 +354,9 @@ def angles_3d_convert(angles: list[float],
 # FROM: Google Gemini Pro | 2026/08/31[untested/unverified]
 def minimize_vrepr(verts: NDArray,
                    rays: Optional[NDArray] = None,
+                   backend: Optional[Literal['lp_backend', 'cdd']] = None,
                    ) -> tuple[NDArray, NDArray]:
     """Minimize the V-representation by removing redundant rays and vertices"""
-    # TODO: Also implement the `cdd` variant with `canonicalize()``
 
     def spans_ambient_space(rays: NDArray) -> bool:
         """Check whether the rays span the ambient space"""
@@ -369,6 +369,12 @@ def minimize_vrepr(verts: NDArray,
                 return False
         return True
 
+    if backend is None:
+        if CFG.minimize_backend == 'auto':
+            backend = 'cdd' if CDD_INSTALLED else 'lp_backend'
+        else:
+            backend = CFG.lp_backend
+    
     if not isinstance(verts, np.ndarray) or (rays is not None and not isinstance(rays, np.ndarray)):
         raise TypeError(f"Expected verts and rays to be NumPy arrays, but got verts of type {type(verts)} and rays of type {type(rays)}")
     if verts.ndim != 2:
@@ -381,27 +387,34 @@ def minimize_vrepr(verts: NDArray,
 
     if rays is None:
         rays = np.empty((0, n))
-    # 0: Check for the special zero rays case, which should be mapped to a zero vertex
-    if rays.size != 0:
-        zero_indices = np.zeros(rays.shape[0], dtype=bool)
-        for idx, ray in enumerate(rays):
-            if np.allclose(ray, 0, rtol=CFG.rtol, atol=CFG.atol):
-                zero_indices[idx] = True
-        rays = rays[~zero_indices, :]
-        if np.count_nonzero(zero_indices) > 0:
-            verts = np.vstack((verts, np.zeros(n)))
-    else:  # Only vertices; just take the convex hull
-        return conv(verts), rays
-    # 1: Find redundant rays
-    rays = reduce_rays(rays)
-    # 1-A: Check of the rays span the entire space
-    if spans_ambient_space(rays):
-        return np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n)))
-    # 1-B: Check if the vertices are empty and rays are not (non-pointed; add the zero vertex)
-    if verts.size == 0 and rays.size > 0:
-        return np.zeros((1, n)), rays
-    # 2: Find redundant vertices
-    verts = reduce_verts(verts, rays)
+
+    match backend:
+        case 'cdd':
+            verts, rays = minimize_vrepr_cdd(verts, rays)
+        case 'lp_backend':
+            # 0: Check for the special zero rays case, which should be mapped to a zero vertex
+            if rays.size != 0:
+                zero_indices = np.zeros(rays.shape[0], dtype=bool)
+                for idx, ray in enumerate(rays):
+                    if np.allclose(ray, 0, rtol=CFG.rtol, atol=CFG.atol):
+                        zero_indices[idx] = True
+                rays = rays[~zero_indices, :]
+                if np.count_nonzero(zero_indices) > 0:
+                    verts = np.vstack((verts, np.zeros(n)))
+            else:  # Only vertices; just take the convex hull
+                return conv(verts), rays
+            # 1: Find redundant rays
+            rays = reduce_rays(rays)
+            # 1-A: Check of the rays span the entire space
+            if spans_ambient_space(rays):
+                return np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n)))
+            # 1-B: Check if the vertices are empty and rays are not (non-pointed; add the zero vertex)
+            if verts.size == 0 and rays.size > 0:
+                return np.zeros((1, n)), rays
+            # 2: Find redundant vertices
+            verts = reduce_verts(verts, rays)
+        case _:
+            raise ValueError(f"Unknown minimize V-representation backend '{backend}'")
 
     return verts, rays
 

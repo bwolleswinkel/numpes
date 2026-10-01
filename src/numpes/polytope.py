@@ -1111,7 +1111,7 @@ class Polytope:
                 which_repr: Literal['both', 'vrepr', 'hrepr'] = 'both',
                 in_place: bool = True,
                 ) -> Self:
-        """Return a minimal representation of the polytope by removing redundant vertices and facets"""
+        """Return a minimal representation of the polytope by removing redundant vertices, rays, and facets"""
         obj = self if in_place else self.copy()
         if which_repr in {'vrepr', 'both'}:
             obj._vrepr = minimize_vrepr(obj.verts, obj.rays)

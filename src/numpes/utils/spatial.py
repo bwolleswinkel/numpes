@@ -33,7 +33,100 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 
-# FROM: Google Gemini 3.1 Pro | 2026/10/26[untested/unverified]
+# FROM: GitHub Copilot GPT-6 Luna | 2026/10/01[untested/unverified]
+def minimize_vrepr_cdd(verts: NDArray,
+                       rays: Optional[NDArray] = None,
+                       ) -> tuple[NDArray, NDArray]:
+    """Minimize the V-representation by removing redundant rays and vertices"""
+    if not CDD_INSTALLED:
+        raise ImportError("The package 'pycddlib' is not installed. Please install it to enable minimizing a V-representation.")
+
+    if rays is None:
+        rays = np.empty((0, verts.shape[1]), dtype=verts.dtype)
+
+    verts_integer_dtype = verts.dtype if np.issubdtype(verts.dtype, np.integer) else None
+    rays_integer_dtype = rays.dtype if np.issubdtype(rays.dtype, np.integer) else None
+
+    def preserve_integer_dtype(verts_out: NDArray, rays_out: NDArray) -> tuple[NDArray, NDArray]:
+        outputs = []
+        for result, integer_dtype in ((verts_out, verts_integer_dtype), (rays_out, rays_integer_dtype)):
+            if integer_dtype is None:
+                outputs.append(result)
+                continue
+            limits = np.iinfo(integer_dtype)
+            integral = (np.isfinite(result).all()
+                        and np.equal(result, np.trunc(result)).all()
+                        and (result.size == 0 or (result.min() >= limits.min and result.max() <= limits.max)))
+            outputs.append(result.astype(integer_dtype) if integral else result)
+        return tuple(outputs)
+
+    n = verts.shape[1]
+    if verts.shape[0] == 0 and rays.shape[0] == 0:
+        return preserve_integer_dtype(np.empty((0, n)), np.empty((0, n)))
+
+    zero_rays = np.all(np.isclose(rays, 0, rtol=CFG.rtol, atol=CFG.atol), axis=1)
+    if np.any(zero_rays):
+        verts = np.vstack((verts, np.zeros((1, n), dtype=verts.dtype)))
+        rays = rays[~zero_rays]
+
+    if verts.shape[0] == 0:
+        verts = np.zeros((1, n), dtype=rays.dtype)
+
+    source_verts = verts.copy()
+    source_rays = rays.copy()
+
+    if rays.shape[0] >= n + 1:
+        spans_ambient = all(
+            sp.optimize.linprog(
+                np.zeros(rays.shape[0]),
+                A_eq=rays.T,
+                b_eq=basis,
+                bounds=(0, None),
+                method="highs",
+            ).success
+            for basis in np.vstack((np.eye(n), -np.ones(n)))
+        )
+        if spans_ambient:
+            return preserve_integer_dtype(np.empty((0, n)), np.vstack((np.eye(n), -np.ones(n))))
+
+    generators = np.vstack((
+        np.column_stack((np.ones(verts.shape[0]), verts)),
+        np.column_stack((np.zeros(rays.shape[0]), rays)),
+    ))
+    mat = cdd.matrix_from_array(generators.astype(float).tolist(), rep_type=cdd.RepType.GENERATOR)
+    cdd.matrix_canonicalize(mat)
+    minimized = np.asarray(mat.array, dtype=float)
+
+    if minimized.size == 0:
+        return preserve_integer_dtype(np.empty((0, n)), np.empty((0, n)))
+
+    vertex_mask = np.isclose(minimized[:, 0], 1, rtol=CFG.rtol, atol=CFG.atol)
+    ray_mask = np.isclose(minimized[:, 0], 0, rtol=CFG.rtol, atol=CFG.atol)
+    minimized_verts = minimized[vertex_mask, 1:]
+    minimized_rays = minimized[ray_mask, 1:]
+
+    if mat.lin_set:
+        line_indices = set(mat.lin_set)
+        ray_rows = np.flatnonzero(ray_mask)
+        line_rays = minimized[ray_rows[np.array([idx in line_indices for idx in ray_rows])], 1:]
+        if line_rays.shape[0] > 0:
+            minimized_rays = np.vstack((minimized_rays, -line_rays))
+
+    if minimized_verts.shape[0] == 0 and minimized_rays.shape[0] > 0:
+        minimized_verts = np.zeros((1, n))
+
+    def representation_rank(points: NDArray, directions: NDArray) -> int:
+        differences = points[1:] - points[0] if points.shape[0] > 1 else np.empty((0, n))
+        span = np.vstack((differences, directions))
+        return np.linalg.matrix_rank(span, tol=CFG.atol) if span.size else 0
+
+    if representation_rank(minimized_verts, minimized_rays) < representation_rank(source_verts, source_rays):
+        return preserve_integer_dtype(source_verts, source_rays)
+
+    return preserve_integer_dtype(minimized_verts, minimized_rays)
+
+
+# FROM: Google Gemini 3.1 Pro | 2026/09/26[untested/unverified]
 def minimize_hrepr_cdd(Ab: NDArray,
                        Ab_eq: Optional[NDArray] = None,
                        ) -> tuple[NDArray, NDArray]:
