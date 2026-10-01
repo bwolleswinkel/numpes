@@ -162,7 +162,7 @@ class TestPolytopeMinkSum:
             f"Minkowski sum of {poly_1_name} and {poly_2_name} should have vertices expected_verts=\n{expected_verts},\nbut got poly_res.verts=\n{poly_res.verts}\ninstead"
 
     @pytest.mark.coupled('Polytope.__eq__')
-    @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and equality `==` is also not implemented")
+    @pytest.mark.skip(reason="Equality `==` is also not implemented")
     @given(poly_pair=integers(
         min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
@@ -174,7 +174,7 @@ class TestPolytopeMinkSum:
         assert poly_sum_1 == poly_sum_2, \
             f"Minkowski sum should be commutative, but got {poly_sum_1} and {poly_sum_2} for polytopes {poly_1} and {poly_2}"
 
-    @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and `.vol` is also not yet implemented")
+    @pytest.mark.skip(reason="Method `vol` is not yet implemented")
     @given(poly_pair=integers(
         min_value=1, max_value=N_MAX).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )
@@ -185,7 +185,7 @@ class TestPolytopeMinkSum:
         assert poly_sum.vol < poly_1.vol + poly_2.vol or poly_sum.vol == approx(poly_1.vol + poly_2.vol), \
             f"Volume of Minkowski sum should be at most the sum of the volumes, but got {poly_sum.vol} > {poly_1.vol} + {poly_2.vol} for polytopes {poly_1} and {poly_2}"
         
-    @pytest.mark.skip(reason="Method 'mink_sum' is currently not yet implemented, and `.vol` is also not yet implemented")
+    @pytest.mark.skip(reason="Method `.vol` is not yet implemented")
     @given(poly_pair=integers(
         min_value=1, max_value=10).flatmap(lambda n: poly_rand_pair(repr='vrepr', n=n, same_n=True, same_repr=True))
     )

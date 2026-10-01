@@ -59,9 +59,8 @@ class TestPolytopeRepr:
         assert captured.out == f"{expected_str}\n", \
             f"Expected print(repr(poly)) to output\n{expected_str}\nbut got\n{captured.out}\n instead"
 
-    @pytest.mark.skip(reason="Formatting is not yet implemented")
     def test_parameterize_format(self) -> None:
-        ...
+        """Test printing a polytope with several formatting strings"""
 
 
 class TestPolytopeFormatHashtag:

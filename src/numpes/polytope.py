@@ -44,7 +44,7 @@ from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d, plot_
 from numpes.utils.spatial import conv, enum_facets, enum_gens
 
 if TYPE_CHECKING:
-    from typing import Any, Literal, Optional, Self
+    from typing import Any, Literal, Optional, Self, Sequence
 
     from matplotlib.axes import Axes  # FIXME: Should we make this a lazy import/exclude import error if matplotlib is not installed?
     from matplotlib.typing import ColorType
@@ -772,7 +772,7 @@ class Polytope:
 
         return polytope
 
-    __array_ufunc__ = None  # Disable NumPy ufuncs for Polytope objects to trigger fallback to dunder methods
+    __array_ufunc__ = None  # Disable NumPy ufuncs to trigger fallback to dunder methods
 
     def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """Invoked when `copy.deepcopy` is called on the object"""
@@ -885,7 +885,7 @@ class Polytope:
         elif comb_rays is not None:
             comb = comb_rays
         else:  # This must be an empty polytope
-            comb = "conv {/}"
+            comb = "{/}"
         return comb
 
     # [untested/unverified]
@@ -1229,7 +1229,7 @@ class Polytope:
         for idx, a in enumerate(self.A):
             deltas[idx] = np.max(other.verts @ a)
         obj._vrepr = None
-        obj.hrepr = (np.column_stack((obj.A, obj.b - deltas)), obj.Ab_eq)  # FIXME: Equality representations aren't correct
+        obj.hrepr = (np.column_stack((obj.A, obj.b - deltas)), obj.Ab_eq)
 
         obj._is_empty = None
         obj._is_degen = None
@@ -1240,6 +1240,78 @@ class Polytope:
             obj._is_pointed = True if (self.is_pointed and other.is_pointed) else None
         if self._is_singleton is not None and other._is_singleton is not None:
             obj._is_singleton = True if (self.is_singleton and other.is_singleton) else False
+
+        obj._dim is None
+        obj._vol = None
+        obj._dim = None
+        obj._width = None
+        obj._chebcr = None
+
+        return obj
+
+    # [untested/unverified]
+    def proj(self,
+             other: int | Sequence[int],  # TODO: Add Subspace and AddineSubset
+             keep_dims: bool = True,
+             in_place: bool = True,
+             ) -> Self:
+        """Project the polytope onto one or a subset of the axes, a subspace, or an affine subset.
+        
+        Parameters
+        ----------
+        other : int, Sequence of int, Subspace, or AffineSubset
+            Object to project the polytope onto. When an integer or sequence is provided, the elements refer to the index of the axis to project onto.
+        keep_dims : bool, default=True
+            Whether to keep the ambient dimension of the original polytope. If set to `False`, the polytope will be mapped to the dimension of the subspace its projected onto.
+        in_place : bool, default=True
+            If True, the polytope is modified in place
+
+        Returns
+        -------
+        poly : Polytope
+            The polytope resulting from the projection
+
+        Raises
+        ------
+        TypeError
+            If `other` is not a sequence of integers (without duplicates), subspace, or affince subset
+        DimensionError
+            If `other` has a different ambient dimension `n`
+        ValueError
+            If one of the axis indices exceeds the number of axis `n`
+
+        Notes
+        -----
+        When `other` is a sequence, the order of the elements is preserved, meaning the axis can implicitly be reflected. For instance, `poly.proj([0, 1])` can yield a different polytope from  `poly.proj([1, 0])`.
+        """
+        if not isinstance(other, (int, tuple, list, range)):
+            raise NotImplementedError(f"Currently, only projecting to the axis is implemented")
+        if isinstance(other, int):
+            other = [other]
+        if max(other) >= self.n:
+            raise ValueError(f"Axes indices must all be smaller then n={self.n}, received {other}")
+        if min(other) < 0:
+            # TODO: Change this with modulo such that we can do '-1' to select the last axis
+            raise ValueError(f"Axes indices must all be non-negative indices, received {other}")
+
+        obj = self if in_place else self.copy()
+        if keep_dims:
+            mask = ~np.isin(range(self.n), other)
+            obj.verts[:, mask] = 0
+            obj.verts[:, other] = obj.verts[:, np.array(other)[np.argsort(other)]]
+            obj.rays[:, mask] = 0
+            obj.rays[:, other] = obj.rays[:, np.array(other)[np.argsort(other)]]
+            obj.vrepr = (obj.verts, obj.rays)
+        else:
+            obj.vrepr = (obj.verts[:, other], obj.rays[:, other])
+        obj._hrepr = None
+
+        obj._is_empty = None
+        obj._is_degen = None
+        obj._is_bounded = None
+        obj._is_full_dim = None
+        obj._is_pointed = None
+        obj._is_singleton = None
 
         obj._dim is None
         obj._vol = None

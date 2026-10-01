@@ -202,7 +202,7 @@ class TestPolytopeIsEmpty:
 class TestPolytopeIsSingleton:
     """Tests for the `Polytope.is_singleton` property"""
 
-    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working for `poly_rand`")
     @given(poly=tuples(
         integers(min_value=1, max_value=N_MAX),
         sampled_from(['vrepr', 'hrepr']),
@@ -362,7 +362,7 @@ class TestPolytopeIsSingleton:
 class TestPolytopeIsFullDim:
     """Tests for the `Polytope.is_full_dim` property"""
 
-    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working for `poly_rand`")
     @given(poly=tuples(
         integers(min_value=1, max_value=N_MAX),
         sampled_from(['vrepr', 'hrepr']),
@@ -552,7 +552,7 @@ class TestPolytopeIsFullDim:
 class TestPolytopeIsBounded:
     """Tests for the `Polytope.is_bounded` property"""
 
-    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working")
+    @pytest.mark.skip("Option 'exclude_degen=True' is not actually working for `poly_rand`")
     @given(poly=tuples(
         integers(min_value=1, max_value=N_MAX),
         sampled_from(['vrepr', 'hrepr']),

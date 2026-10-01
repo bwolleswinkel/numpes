@@ -236,14 +236,6 @@ class TestPolytopeInit:
         _ = pes.Polytope(*args, **kwargs)
 
     @pytest.mark.parametrize('args, kwargs', [
-        (..., ...)
-    ])
-    @pytest.mark.skip(reason="'init_hrepr' is currently not raising any TypeErrors.")
-    def test_polytope_init_hrepr_type_error(self, args, kwargs):
-        with pytest.raises(TypeError):
-            pes.Polytope(*args, **kwargs)
-
-    @pytest.mark.parametrize('args, kwargs', [
         ((np.ones((4, 3)), np.zeros(3)), {})
     ])
     def test_polytope_init_hrepr_value_error(self, args: tuple[NDArray, NDArray], kwargs: dict[str, NDArray]):
