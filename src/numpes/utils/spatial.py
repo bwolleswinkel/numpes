@@ -118,7 +118,8 @@ def minimize_vrepr_cdd(verts: NDArray,
     def representation_rank(points: NDArray, directions: NDArray) -> int:
         differences = points[1:] - points[0] if points.shape[0] > 1 else np.empty((0, n))
         span = np.vstack((differences, directions))
-        return np.linalg.matrix_rank(span, tol=CFG.atol) if span.size else 0
+        tolerance = np.nextafter(CFG.atol, 0)
+        return np.linalg.matrix_rank(span, tol=tolerance) if span.size else 0
 
     if representation_rank(minimized_verts, minimized_rays) < representation_rank(source_verts, source_rays):
         return preserve_integer_dtype(source_verts, source_rays)
@@ -448,7 +449,9 @@ def conv(verts: NDArray) -> NDArray:
     verts_clean[np.abs(verts_clean) < CFG.atol] = 0.0
 
     centered = verts_clean - np.mean(verts_clean, axis=0)
-    rank = np.linalg.matrix_rank(centered, tol=CFG.atol)
+    differences = verts_clean[1:] - verts_clean[0]
+    tolerance = np.nextafter(CFG.atol, 0)
+    rank = np.linalg.matrix_rank(differences, tol=tolerance)
     if rank == 0:
         return verts[0:1, :]  # To maintain 2D shape, use original
     if rank < verts_clean.shape[1]:
@@ -459,7 +462,8 @@ def conv(verts: NDArray) -> NDArray:
             # For collinear points, find extremes along the line
             idx_min, idx_max = np.argmin(coords_proj[:, 0]), np.argmax(coords_proj[:, 0])
             return verts[np.unique([idx_min, idx_max])]
-        proj_rank = np.linalg.matrix_rank(coords_proj, tol=CFG.atol)
+        projected_differences = coords_proj[1:] - coords_proj[0]
+        proj_rank = np.linalg.matrix_rank(projected_differences, tol=tolerance)
         n_unique_points = len(np.unique(coords_proj, axis=0))
         if proj_rank == rank and n_unique_points > rank and coords_proj.shape[0] > rank:
             # FROM: GitHub Copilot GPT-5.6 Luna (use 'Qs Q12' for projected hulls) | 2026/10/23[untested/unverified]
