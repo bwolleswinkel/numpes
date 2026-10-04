@@ -426,7 +426,7 @@ def plot_bounded_poly_2d(ax: Axes,
         linewidth = 1.5
         if plot_edges:
             for idx in range(2):
-                ax.plot(*verts[idx], '.', color=color, label=label)  # FIXME: This label should probably be removed?
+                ax.plot(*verts[idx], '.', color=color)
     centroid = np.mean(verts, axis=0)
     points_sorted = sorted(verts, key=lambda p: signed_angle(verts[0] - centroid, p - centroid))
     ax.add_collection(PolyCollection([points_sorted],
@@ -436,7 +436,9 @@ def plot_bounded_poly_2d(ax: Axes,
                                                 else 'none'),
                                      linewidth=linewidth,
                                      linestyle=linestyle,
-                                     label=label))
+                                     label=label if not is_lower_dim else None))
+    if is_lower_dim and label is not None:
+        ax.plot([], [], color=color, label=label)
 
 
 def plot_bounded_facet_3d(ax: Axes,

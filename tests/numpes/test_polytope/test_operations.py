@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 class TestPolytopeMinkSum:
-    """Tests for the Minkowski sum operation on polytopes"""
+    """Tests for the `Polytope.mink_sum` method"""
 
     @pytest.mark.coupled('Polytope.is_empty')
     @given(
@@ -451,6 +451,62 @@ class TestPolytopeMatMul:
             f"Input matrix 'M' must be of size (m, {poly.n}), received shape={M.shape}"
             )):
             _ = M @ poly
+
+
+class TestPolytopePontDiff:
+    """Tests for the `Polytope.pont_diff` method"""
+
+    @pytest.mark.parametrize('other', [
+        1,
+        0,
+        'k',
+        np.nan,
+        True,
+        [1],
+        [[ 1, 2], 
+         [-3, 0]],
+        ([1, 2],
+         [-3, 0]),
+         np.array([[ -1, 2],
+                   [0.5, 3]]),
+        pes.subs([1, 2, 3]),
+        pes.ellps([[   1, -1/4],
+                   [-1/4,    2]]),
+        ...,
+    ])
+    def test_parameterize_invalid_wrong_type_raises_type_error(self, other: Any) -> None:
+        """Test that passing in anything other then a Polytopes raises a TypeError"""
+        poly = pes.poly([[1, 0],
+                         [0, 1],
+                         [1, 1]])
+        with pytest.raises(TypeError, match=re.escape(
+            f"Object `other` must be a polytope, received '{type(other).__name__}'"
+            )):
+            _ = poly - other
+
+    @requires(
+        'cdd',
+        ImportError,
+        "The package 'pycddlib' is not installed. Please install it to enable converting from H-representation to V-representation.",
+    )
+    @pytest.mark.parametrize('poly_1, poly_2', [
+        (pes.poly([[0, 0, 0],
+                   [2, 0, 0],
+                   [0, 2, 0],
+                   [2, 2, 0]]),  # 2 x 2 plane segment in xy-plane
+         pes.poly([[ 0,  0, -1],
+                   [ 1,  0,  0],
+                   [ 0,  1,  0],
+                   [-1,  0,  0],
+                   [ 0, -1,  0],
+                   [ 0,  0,  1]]))  # Regular octahedron
+    ])
+    def test_parameterize_mink_sum_inverse_lower_dimensional(self, poly_1: Polytope, poly_2: Polytope) -> None:
+        """Test whether performing the Pontryagin difference after a Minkowski sum is a known lower dimensional polytope works as expected"""
+        poly_mink_sum = poly_1 + poly_2
+        poly_pont_diff = poly_mink_sum - poly_2
+        assert lsort(poly_pont_diff.verts) == approx(lsort(poly_1.verts)), \
+            f"Expected verts of resulting polytope to be equal to poly_1.verts\n{poly_1.verts},\nbut got poly_pont_diff.verts=\n{poly_pont_diff.verts}\n(same vertices, order does not matter)"
 
 
 class TestPolytopeCopy:

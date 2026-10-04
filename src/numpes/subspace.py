@@ -161,7 +161,7 @@ class Subspace:
     # [untested/unverified]
     @property
     def perp(self) -> Subspace:
-        """"Returns the subspace orthogonal to the currecnt subspace"""
+        """"Return the subspace orthogonal to the current subspace"""
         basis_ortho = sp.linalg.null_space(self.basis).T
         return Subspace(basis_ortho)
 
@@ -287,6 +287,12 @@ class Subspace:
         obj = self if in_place else self.copy()
         obj._basis = span(self._basis)
         return obj
+
+    def proj_mat(self) -> NDArray:
+        """Return the projection matrix `P` onto the subspace"""
+        if self.is_trivial:
+            return np.zeros((self.n, self.n))
+        return self.basis.T @ np.linalg.inv(self.basis @ self.basis.T) @ self.basis
 
     def plot(self,
              color: Optional[ColorType | int] = None,
@@ -439,6 +445,11 @@ class Subspace:
                               if isinstance(annotate, list)
                               else f"{idx}")
                 ax.text(*self.basis[idx, :], annotation, color='black')
+        if CFG.plot_aspect == 'equal':
+            if ax.name == '3d':
+                ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
+            else:
+                ax.set_aspect('equal', adjustable='box')
         if show:
             plt.show()
 

@@ -38,8 +38,10 @@ from numpes._internal.common import get_axes_color
 from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
 from numpes.exceptions import ConversionError, DimensionError, InvalidCombinationOfArgumentsError, InvalidOperationError, InvalidRepresentationError
+from numpes.subspace import Subspace
 from numpes.utils.linalg import find_implicit, is_sing, is_square, minimize_hrepr, minimize_vrepr
 from numpes.utils.linprog import Status, solve_lp
+from numpes.utils.misc import as_list
 from numpes.utils.plot import plot_bounded_facet_3d, plot_bounded_poly_2d, plot_line
 from numpes.utils.spatial import conv, enum_facets, enum_gens
 
@@ -1215,18 +1217,18 @@ class Polytope:
             raise DimensionError(f"Both polytopes must have the same ambient dimension, received self.n={self.n}, other.n={other.n}")
 
         obj = self if in_place else self.copy()
-        rays_check = self.A @ other.rays.T
+        rays_check = obj.A @ other.rays.T
         if np.any(rays_check > CFG.atol):
             obj._init_empty(n=self.n)
             return obj
-        if not np.allclose(self.A_eq @ other.verts.T, 0, atol=CFG.atol) or not np.allclose(self.A_eq @ other.rays.T, 0, atol=CFG.atol):
+        if not np.allclose(obj.A_eq @ other.verts.T, 0, atol=CFG.atol) or not np.allclose(obj.A_eq @ other.rays.T, 0, atol=CFG.atol):
             obj._init_empty(n=self.n)
             return obj
 
         # TODO: Add the specialized method in 2d `mink_sum_2d` by sorting vertices, in `spatial.py`
         # TODO: Implement the other fallback methods for when both are in `hrepr` represnetation
         deltas = np.zeros(self.m)
-        for idx, a in enumerate(self.A):
+        for idx, a in enumerate(obj.A):
             deltas[idx] = np.max(other.verts @ a)
         obj._vrepr = None
         obj.hrepr = (np.column_stack((obj.A, obj.b - deltas)), obj.Ab_eq)
@@ -1251,7 +1253,7 @@ class Polytope:
 
     # [untested/unverified]
     def proj(self,
-             other: int | Sequence[int],  # TODO: Add Subspace and AddineSubset
+             other: int | Sequence[int] | Subspace,  # TODO: Add AffineSubset
              keep_dims: bool = True,
              in_place: bool = True,
              ) -> Self:
@@ -1274,7 +1276,7 @@ class Polytope:
         Raises
         ------
         TypeError
-            If `other` is not a sequence of integers (without duplicates), subspace, or affince subset
+            If `other` is not a sequence of integers (without duplicates), or not a subspace or affince subset
         DimensionError
             If `other` has a different ambient dimension `n`
         ValueError
@@ -1284,26 +1286,34 @@ class Polytope:
         -----
         When `other` is a sequence, the order of the elements is preserved, meaning the axis can implicitly be reflected. For instance, `poly.proj([0, 1])` can yield a different polytope from  `poly.proj([1, 0])`.
         """
-        if not isinstance(other, (int, tuple, list, range)):
-            raise NotImplementedError(f"Currently, only projecting to the axis is implemented")
-        if isinstance(other, int):
-            other = [other]
-        if max(other) >= self.n:
-            raise ValueError(f"Axes indices must all be smaller then n={self.n}, received {other}")
-        if min(other) < 0:
-            # TODO: Change this with modulo such that we can do '-1' to select the last axis
-            raise ValueError(f"Axes indices must all be non-negative indices, received {other}")
-
+        if isinstance(other, (int, tuple, list, range)):
+            other = as_list(other)
+            if any([not isinstance(elem, int) for elem in other]):
+                raise TypeError(f"Axes indices must be a sequence of integers, received {other}")
+            if max(other) >= self.n:
+                raise ValueError(f"Axes indices must be smaller then n={self.n}, received {other}")
+            if min(other) < -self.n:
+                raise ValueError(f"Negative axes indices must be no smaller then -n={-self.n}, received {other}")
+            if len(other := [elem % self.n for elem in other]) > len(set(elem % self.n for elem in other)):
+                raise ValueError(f"Axes indices must be unique, received {other} (converted modulo n={self.n})")
+        
         obj = self if in_place else self.copy()
-        if keep_dims:
-            mask = ~np.isin(range(self.n), other)
-            obj.verts[:, mask] = 0
-            obj.verts[:, other] = obj.verts[:, np.array(other)[np.argsort(other)]]
-            obj.rays[:, mask] = 0
-            obj.rays[:, other] = obj.rays[:, np.array(other)[np.argsort(other)]]
-            obj.vrepr = (obj.verts, obj.rays)
-        else:
-            obj.vrepr = (obj.verts[:, other], obj.rays[:, other])
+        match other:
+            case Subspace():
+                P = other.proj_mat()
+                if not keep_dims:
+                    P = np.linalg.pinv(other.basis).T @ P
+                obj.vrepr = (self.verts @ P.T, self.rays @ P.T)
+            case tuple() | list() | range():
+                if keep_dims:
+                    mask = ~np.isin(range(self.n), other)
+                    obj.verts[:, mask] = 0
+                    obj.verts[:, other] = obj.verts[:, np.array(other)[np.argsort(other)]]
+                    obj.rays[:, mask] = 0
+                    obj.rays[:, other] = obj.rays[:, np.array(other)[np.argsort(other)]]
+                    obj.vrepr = (obj.verts, obj.rays)
+                else:
+                    obj.vrepr = (obj.verts[:, other], obj.rays[:, other])
         obj._hrepr = None
 
         obj._is_empty = None
@@ -1375,6 +1385,15 @@ class Polytope:
         --------
         To plot a polytope, both its V-representation and H-representation need to either be initialized, or need to be computed using pycddlib; as such, this can be a soft requirement in practice for plotting most user-defined polytopes.
 
+        Notes
+        -----
+        *Side effects*
+        - `self.is_empty` : Checks whether the polytope is empty (or computes and stores this when not determined prior)
+        - `self.is_singleton` : If `n` is 1, checks whether the polytope is a singleton (or computes and stores this when not determined prior)
+        - `self.is_bounded` : Checks whether the polytope is a singleton (or computes and stores this when not determined prior)
+        - `self.vrepr` : If `n` is either 2 or 3, the vertices are retrieved (or computed and stored when not determined prior)
+        - `self.hrepr` : If `n` is 3, the facets are are retrieved (or computed and stored when not determined prior)
+
         Examples
         --------
         >>> A = [[ 0,  1],
@@ -1387,7 +1406,6 @@ class Polytope:
         .. image:: # FIXME
         """
         display_name = f"{self.__class__.__name__.lower()}"
-        self.minimal()
         if self.is_empty:
             # FIXME: Here I should probably display some sort of warning
             ax, _ = get_axes_color(ax, None, self.n, display_name=display_name)
@@ -1395,15 +1413,22 @@ class Polytope:
         match self.n:
             case 1:
                 ax, color = get_axes_color(ax, color, 1, display_name=display_name)
+                verts_min, rays_min = minimize_vrepr(self.verts, self.rays)  # FIXME: I think this is overkill, could do something simpler
                 if self.is_singleton:
                     # FIXME: Should be replaced by `ax.plot(edges, '.', color=color)`, but Axes1D needs to be updated to only take one argument
-                    ax.scatter(self.verts[0], marker='o', linewidths=4, color=color, label=label)
+                    ax.scatter(verts_min[0], marker='o', linewidths=4, color=color, label=label)
                 elif not self.is_bounded:
-                    line = plot_line(ax, self.rays[0], (edges := self.verts[0]) if self.k > 0 else None, color=color, bidirectional=False if self.k > 0 else True)
+                    line = plot_line(ax,
+                                     rays_min[0],
+                                     (edges := verts_min[0]) if verts_min.shape[0] > 0 else None,
+                                     color=color,
+                                     alpha=alpha,
+                                     linewidth=linewidth if linewidth is not None else 3,
+                                     bidirectional=False if verts_min.shape[0] > 0 else True)
                     if label is not None:
                         line.set_label(label)
                 else:
-                    ax.plot(edges := [np.min(self.verts), np.max(self.verts)],
+                    ax.plot(edges := [np.min(verts_min), np.max(verts_min)],
                             color=color,
                             alpha=alpha,
                             linewidth=linewidth,
@@ -1415,7 +1440,7 @@ class Polytope:
                                   if isinstance(annotate_facets, list)
                                   else "0")
                     ax.text(np.mean(edges), annotation, color='black')
-                if plot_edges and (not self.is_singleton and self.k > 0):
+                if plot_edges and (not self.is_singleton and verts_min.shape[0] > 0):
                     # FIXME: Should be replaced by `ax.plot(edges, '.', color=color)`, but Axes1D needs to be updated to only take one argument
                     ax.scatter(edges, color=color)
                 if label is not None:
@@ -1423,8 +1448,16 @@ class Polytope:
             case 2:
                 if not self.is_bounded:
                     raise NotImplementedError("Plotting unbounded polytopes is not yet implemented")
+                    match self.dim:
+                        case 0:
+                            raise InvalidRepresentationError("Polytope is unbounded, but dimension is equal to 0, which should not be possible")
+                        case 1:
+                            raise NotImplementedError("MEthod is not yet implemented")
+                        case _:
+                            raise RuntimeError(f"Dimensions dim={self.dim} should not be greater then ambient dimension n={self.n}. This is either a bug or an invalid representation has been set.")
                 ax, color = get_axes_color(ax, color, 2, display_name=display_name)
-                plot_bounded_poly_2d(ax, self.verts, color, alpha, linewidth, linestyle, label, plot_edges)
+                verts_min, _ = minimize_vrepr(self.verts, self.rays) 
+                plot_bounded_poly_2d(ax, verts_min, color, alpha, linewidth, linestyle, label, plot_edges)
                 ax.autoscale_view()
                 if annotate_facets:
                     for idx in range(self.m):
@@ -1447,11 +1480,12 @@ class Polytope:
                 if not self.is_bounded:
                     raise NotImplementedError("Plotting unbounded polytopes is not yet implemented")
                 ax, color = get_axes_color(ax, color, 3, display_name=display_name)
+                verts_min, _ = minimize_vrepr(self.verts, self.rays) 
                 for idx in range(self.m if self.m_eq == 0 else 1):  # FIXME: Maybe replace with dim?
-                    verts_facet = self.verts[np.isclose(self.A[idx, :] @ self.verts.T,
-                                                        self.b[idx],
-                                                        rtol=CFG.rtol,
-                                                        atol=CFG.atol), :] if self.m_eq == 0 else self.verts  # FIXME: Maybe replace with dim?
+                    verts_facet = verts_min[np.isclose(self.A[idx, :] @ verts_min.T,
+                                                       self.b[idx],
+                                                       rtol=CFG.rtol,
+                                                       atol=CFG.atol), :] if self.m_eq == 0 else verts_min  # FIXME: Maybe replace with dim?
                     plot_bounded_facet_3d(ax, verts_facet, color, alpha, linewidth, linestyle, plot_edges)
                     if annotate_facets:
                         annotation = (annotate_facets[idx]
@@ -1476,6 +1510,17 @@ class Polytope:
                     ax.set_box_aspect([ub - lb for lb, ub in (getattr(ax, f'get_{a}lim')() for a in 'xyz')])  # type: ignore[arg-type]
             case _:
                 raise ValueError(f"Plotting is only supported for an n-d polytope with n <= 3, received n = {self.n}")
+
+        if verts_min.size < self.verts.size:  # Plot non-minimal vertices in the interior or on the boundary
+            ranks = [np.linalg.matrix_rank(np.vstack([self.A_eq, self.A[act]]), tol=CFG.atol)
+                     for act in np.isclose(self.verts @ self.A.T, self.b, rtol=CFG.rtol, atol=CFG.atol)]
+            verts_inside = self.verts[np.array(ranks) < max(ranks)]
+            for vert in verts_inside:
+                if self.n == 1:
+                    # FIXME: Should be replaced by `ax.plot(*vert, '.', color=color)`, but Axes1D needs to be updated to only take one argument
+                    ax.scatter(vert, color=color)
+                else:
+                    ax.plot(*vert, '.', color=color)
 
         if annotate_verts:
             for idx in range(self.k):

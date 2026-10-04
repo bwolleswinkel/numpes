@@ -160,7 +160,10 @@ class TestPolytopePlot:
     # def test_passing_ax_arg_valid(self) -> None:
     #     ...
 
-    @pytest.mark.skipif(not MATPLOTLIB_INSTALLED, reason="Matplotlib is required for creating the 2D axes")
+    @pytest.mark.skipif(
+        not MATPLOTLIB_INSTALLED,
+        reason="Raises 'NameError: name 'plt' is not defined' otherwise",
+    )
     def test_polytope_plot_invalid_2d_ax(self) -> None:
         """Test whether providing an invalid `ax` argument for 2D plotting raises a ValueError"""
         poly = pes.Polytope(np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]))
@@ -168,7 +171,10 @@ class TestPolytopePlot:
         with pytest.raises(ValueError):
             poly.plot(show=False, ax=ax)
 
-    @pytest.mark.skipif(not MATPLOTLIB_INSTALLED, reason="Matplotlib is required for creating the 3D axes")
+    @pytest.mark.skipif(
+        not MATPLOTLIB_INSTALLED,
+        reason="Raises 'NameError: name 'plt' is not defined' otherwise",
+    )
     def test_polytope_plot_invalid_3d_ax(self) -> None:
         """Test whether providing an invalid `ax` argument for 3D plotting raises a ValueError"""
         poly = pes.Polytope(np.array([[0, 0], [1, 0], [0, 1], [0, 0]]))
@@ -176,3 +182,10 @@ class TestPolytopePlot:
         ax = fig.add_subplot(111, projection='3d')
         with pytest.raises(ValueError):
             poly.plot(show=False, ax=ax)
+
+    @pytest.mark.display
+    def test_no_minimal_repr_change(self) -> None:
+        """Test that upon plotting the representations which are computed (and possibly non-minimal) are left as-is"""
+        # FIXME: Placeholder as an importerror needs to be raised
+        poly = pes.poly(n=3)
+        poly.plot()

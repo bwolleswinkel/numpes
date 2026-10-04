@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 import numpes as pes
@@ -77,9 +78,9 @@ def polytopes(draw,
               m: Optional[int] = None,
               m_eq: Optional[int] = None,
               dim: Optional[int] = None,
-              is_bounded: bool = True,
-              is_full_dim: bool = True,
-              is_minimal: bool = True,
+              bounded: bool = True,
+              full_dim: bool = True,
+              minimal: bool = True,
               ) -> Polytope:
     """Strategy for generating random polytopes. Polytopes can be specified for any dimensions `n >= 1`, and in either V-representation, H-representation, or both.
     
@@ -101,11 +102,11 @@ def polytopes(draw,
         Number of equalities to generate. If `None`, the number of equalities is chosen randomly based on `n` and `dim`.
     dim : int, optional
         The specific dimension of the polytope to generate (see Warnings). If `None`, the full dimension `n` or a random lower dimension `n'` in [1, ..., n - 1] is chosen, for `is_full_dim=True` and `is_full_dim=False`, respectively.
-    is_bounded : bool, default=True
+    bounded : bool, default=True
         Whether to only generate bounded polytopes (see Warnings)
-    is_full_dim : bool, default=True
-        Whether to only generate full dimensional polytopes (see Warnings)
-    is_minimal : bool, default=True
+    full_dim : bool, default=True
+        Whether to only generate full dimensional polytopes (see Warnings). If `dim` is not `None`, this will flag will be ignored.
+    minimal : bool, default=True
         Whether to minimize the representation or not
 
     Raises
@@ -158,15 +159,15 @@ def polytopes(draw,
     else:
         n = draw(integers(1, N_MAX))
     if dim is not None:
-        if dim < n and is_full_dim:
-            raise ValueError(f"Dimension 'dim' cannot be set smaller then 'n' when is_full_dim=True, received n={n}, dim={dim}")
-        if dim == n and not is_full_dim:
-            raise ValueError(f"Dimension 'dim' cannot be set equal to 'n' when is_full_dim=False, received n={n}, dim={dim}")
-        if dim == 0 and not is_bounded:
+        if dim < n and full_dim:
+            warnings.warn(f"'dim' set to {dim} < n={n} but 'full_dim' set to True, which will be ignored")
+        elif dim == n and not full_dim:
+            warnings.warn(f"'dim' set to {dim} == n={n} but 'full_dim' set to False, which will be ignored")
+        if dim == 0 and not bounded:
             raise ValueError(f"Dimension 'dim' cannot be set to 0 when is_bounded=False")
     else:
-        dim = draw(integers(0, n - 1)) if not is_full_dim else n
-    if not is_full_dim and not is_bounded and dim == 0:
+        dim = draw(integers(0, n - 1)) if not full_dim else n
+    if not full_dim and not bounded and dim == 0:
         reject()
     if which_repr is None:
         which_repr = draw(sampled_from(('vrepr', 'hrepr')))
@@ -179,7 +180,7 @@ def polytopes(draw,
                          if dim != 0
                          else 1)
             bound = (MAX_VAL
-                     if is_full_dim
+                     if full_dim
                      else np.sqrt(MAX_VAL / max((dim, 1))))
             if issubclass(dtype, int):
                 bound = int(bound)
@@ -193,17 +194,17 @@ def polytopes(draw,
                                 (num_verts, max((dim, 1))),
                                 elements=elements)
                                 .filter(lambda verts: np.linalg.matrix_rank(verts[0] - verts[1:], tol=ATOL) == dim if dim != 0 else True))
-            if not is_full_dim:
+            if not full_dim:
                 M = draw(arrays(float if dtype is Decimal else dtype,
                                 (n, max((dim, 1))),
                                 elements=elements)
                                 .filter(lambda M: np.linalg.matrix_rank(M, tol=ATOL) == dim if dim != 0 else True))
                 verts = verts @ M.T
-            if not is_bounded:
+            if not bounded:
                 num_rays = (k_rays
                             if k_rays is not None
                             else draw(integers(1, dim)))
-                if not is_full_dim:
+                if not full_dim:
                     rays = M[:, draw(lists(integers(0, dim - 1),
                                            min_size=num_rays,
                                            max_size=num_rays))].T
@@ -214,7 +215,7 @@ def polytopes(draw,
                                        .filter(lambda rays: not np.allclose(rays, 0, rtol=RTOL, atol=ATOL)))
             else:
                 rays = np.empty((0, n))
-            with pes.algo_options(on_property_assign='minimal' if is_minimal else 'pass'):
+            with pes.algo_options(on_property_assign='minimal' if minimal else 'pass'):
                 poly = pes.poly(verts, rays=rays)
             if which_repr == 'both':
                 try:  # FIXME: This is really not working; FAR to many polytopes are rejected, especially for higher dimensions
@@ -241,7 +242,7 @@ def polytopes(draw,
                 Ab_box = np.block([[ np.eye(n, dtype=repr_dtype), np.full(n, MAX_VAL, dtype=repr_dtype)[:, np.newaxis]],
                                    [-np.eye(n, dtype=repr_dtype), np.full(n, MAX_VAL, dtype=repr_dtype)[:, np.newaxis]]])
                 coordinate, sign = 0, 0
-                if not is_bounded:  # Remove some planes from the bounding box
+                if not bounded:  # Remove some planes from the bounding box
                     selected = draw(lists(integers(0, 2 * n - 1), min_size=1, max_size=n, unique=True))
                     Ab_box = Ab_box[selected]
                     coordinate, sign = draw(sampled_from([(j, 1) for j in range(n) if np.all(Ab_box[:, j] <= ATOL)]
@@ -254,7 +255,7 @@ def polytopes(draw,
                                             if dtype is not int
                                             else A))  # Normalize to direction vector on the unit hyperspere
                                       .filter(lambda A: np.all(sign * A[:, coordinate] <= (0 if dtype is int else ATOL))
-                                              if not is_bounded
+                                              if not bounded
                                               else True))
                 b_extra = draw(arrays(repr_dtype,
                                       num_planes,
@@ -262,7 +263,7 @@ def polytopes(draw,
                                                 if dtype is int
                                                 else floats(np.sqrt(MAX_VAL), MAX_VAL))))
                 Ab = np.vstack((Ab_box, np.column_stack((A_extra, b_extra))))
-            if not is_full_dim:
+            if not full_dim:
                 if dim == 0:
                     A_eq = np.eye(n, dtype=repr_dtype)
                     b_eq = draw(arrays(repr_dtype, n, elements=elements))
@@ -270,19 +271,19 @@ def polytopes(draw,
                     num_eq_columns = (m_eq
                                       if m_eq is not None
                                       else n - 1
-                                      if not is_bounded
+                                      if not bounded
                                       else n)
                     A_eq = draw(arrays(repr_dtype,
                                        (n - dim, num_eq_columns),
                                        elements=elements)
                                        .filter(lambda A: np.linalg.matrix_rank(A) == n - dim))
-                    if not is_bounded:
+                    if not bounded:
                         A_eq = np.insert(A_eq, coordinate, 0, axis=1)
                     b_eq = np.zeros(n - dim, dtype=repr_dtype)
                 Ab_eq = np.column_stack((A_eq, b_eq))
             else:
                 Ab_eq = np.empty((0, n + 1))
-            with pes.algo_options(on_property_assign='minimal' if is_minimal else 'pass'):  # FIXME: I think 'minimal' is extremely slow here; we need to look into that
+            with pes.algo_options(on_property_assign='minimal' if minimal else 'pass'):
                 poly = pes.poly(Ab[:, :-1], Ab[:, -1], A_eq=Ab_eq[:, :-1], b_eq=Ab_eq[:, -1])
         case _:
             raise ValueError(f"Unknown representation type '{which_repr}' specified for polytope strategy (must be one of 'both', 'vrepr', or 'hrepr')")
