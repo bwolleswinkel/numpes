@@ -33,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from numpes._config import CFG
+from numpes._config import CFG, algo_options
 from numpes._internal.common import get_axes_color
 from numpes._internal.multipledispatch import multipledispatch
 from numpes._internal.printing import format_as_set, format_spec_to_opts, pad, repr_items
@@ -212,20 +212,37 @@ class Polytope:
                                                      f"received args={args}, kwargs={dict(kwargs)}. Please refer "
                                                      "to the documentation for details on valid "
                                                      "combinations or arguments.")
-        if 'n' in kwargs:
-            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
         if 'A' in kwargs or 'b' in kwargs:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'A' or 'b' when initializing from vertices")
         if 'A_eq' in kwargs or 'b_eq' in kwargs:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'A_eq' or 'b_eq' when initializing from vertices")
         if len(args) == 1:
-            if isinstance(*args, int):
+            if isinstance(*args, int) and 'n' not in kwargs:
                 raise TypeError("A single positional argument cannot be an integer (for an empty polytope "
                                 "initialization). Please refer to the documentation for valid argument "
                                 "combinations.")
             (verts,) = args
         else:
             verts = kwargs['verts']
+        if verts is None:
+            if 'rays' in kwargs:
+                if 'n' in kwargs:
+                    raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when providing rays")
+                rays = kwargs['rays']
+                rays = np.atleast_2d(rays)
+                verts = np.empty((0, rays.shape[1]))
+            elif 'n' in kwargs:
+                n = kwargs['n']
+                if not isinstance(n, int):
+                    raise TypeError(f"Dimension 'n' must be a positive integer, received {n} of type '{type(n).__name__}'")
+                if n <= 0:
+                    raise ValueError(f"Dimension 'n' must be a positive integer, got n={n}")
+                verts = np.empty((0, n))
+            else:
+                raise InvalidCombinationOfArgumentsError("If 'verts' is None, either 'rays' or 'n' must be provided as a keyword argument")
+        else:
+            if 'n' in kwargs:
+                raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from vertices")
         verts = np.atleast_2d(verts)
         if verts.ndim != 2:
             raise ValueError("Vertices must be provided as a 2D array of shape (k, n),"
@@ -295,8 +312,6 @@ class Polytope:
             raise InvalidCombinationOfArgumentsError("An invalid number or combination of arguments was provided,"
                                                      f" received args={args}, kwargs={dict(kwargs)}. Please refer " "to the documentation for details on valid "
                                                      "combinations or arguments.")
-        if 'n' in kwargs:
-            raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when initializing from half-spaces")
         if 'verts' in kwargs:
             raise InvalidCombinationOfArgumentsError("Cannot provide 'verts' when initializing from half-spaces")
         if 'rays' in kwargs:
@@ -305,13 +320,29 @@ class Polytope:
             A, b = args
         else:
             A, b = kwargs['A'], kwargs['b']
+        if A is None or b is None:
+            if b is not None or A is not None:
+                raise ValueError(f"If either 'A' or 'b' is provided as None, both must be None, received A={A}, b={b}")
+            if 'A_eq' in kwargs or 'b_eq' in kwargs:
+                if 'b_eq' not in kwargs or 'A_eq' not in kwargs:
+                    raise InvalidCombinationOfArgumentsError("If either 'A_eq' or 'b_eq' is provided, both must be provided")
+                if 'n' in kwargs:
+                    raise InvalidCombinationOfArgumentsError("Cannot provide 'n' when 'A_eq' or 'b_eq' are provided")
+                A_eq = kwargs['A_eq']
+                A_eq = np.atleast_2d(A_eq)
+                A, b = np.empty((0, A_eq.shape[1])), np.empty((0,))
+            elif 'n' in kwargs:
+                n = kwargs['n']
+                A, b = np.empty((0, n)), np.empty((0,))
         A, b = np.atleast_2d(A), np.atleast_1d(b)
         if A.ndim != 2 or b.ndim != 1 or A.shape[0] != b.size:
             raise ValueError(f"A must be a matrix of size (m, n) and b must be a vector of size (m,),"
                              f" but received A={A.shape}, b={b.shape}.")
         if np.isnan(A).any() or np.isnan(b).any():
             raise ValueError("Inequality matrices 'A' and 'b' cannot contain NaN values")
-        if 'A_eq' in kwargs and 'b_eq' in kwargs:
+        if 'A_eq' in kwargs or 'b_eq' in kwargs:
+            if 'b_eq' not in kwargs or 'A_eq' not in kwargs:
+                raise InvalidCombinationOfArgumentsError("If either 'A_eq' or 'b_eq' is provided, both must be provided")
             A_eq, b_eq = kwargs['A_eq'], kwargs['b_eq']
             A_eq, b_eq = np.atleast_2d(A_eq), np.atleast_1d(b_eq)
             if A_eq.ndim != 2 or b_eq.ndim != 1 or A_eq.shape[0] != b_eq.size or A_eq.shape[1] != A.shape[1]:
@@ -712,8 +743,8 @@ class Polytope:
             -I[ub_only | is_unbounded],
         )) if (lb_only | ub_only | is_unbounded).any() else np.empty((0, n))
 
-        polytope = cls()  # FIXME: This empty constructor needs to be investigated
-        polytope._vrepr = (verts, rays)
+        with algo_options(on_property_assign='pass'):
+            polytope = cls(verts, rays=rays)
         polytope._hrepr = (Ab, Ab_eq)
         polytope._is_empty = False
         polytope._is_singleton = bool(is_eq.all())
@@ -757,7 +788,8 @@ class Polytope:
             raise ValueError(f"Point vector cannot contain inf or NaN values, received point={point}")
         n = point.size
 
-        polytope = cls(point)
+        with algo_options(on_property_assign='pass'):
+            polytope = cls(point)
         polytope._hrepr = (np.empty((0, n + 1)),
                            np.column_stack((np.eye(n), point)))
         polytope._is_empty = False
@@ -1633,6 +1665,7 @@ def poly(*args: Optional[ArrayLike],
     Empty polytope in R^2
     [0 0] x <= [-1]
     """
+    # TODO: To allow syntax like `_ = pes.poly(verts=None, rays=[1, 0, 0])`, use the sentinal syntax to check this
     kwargs = {key: value for key, value in {
         'n': n,
         'verts': verts,
@@ -1644,7 +1677,7 @@ def poly(*args: Optional[ArrayLike],
     }.items() if value is not None}
     if len(args) == 0 and len(kwargs) == 0:
         raise InvalidCombinationOfArgumentsError("No arguments provided for polytope initialization. Please refer to the documentation for valid argument combinations.")
-    return Polytope(*args, **{key: value for key, value in kwargs.items() if value is not None})
+    return Polytope(*args, **kwargs)
 
 
 def poly_empty(n: int) -> Polytope:
